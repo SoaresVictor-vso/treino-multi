@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import ErrorBox from "@/components/ui/ErrorBox";
 import validateCPF from "@/utilities/validators/cpf";
 import validateEmail from "@/utilities/validators/email";
+import { LoginService } from "@/api/services/login";
 
 export default function Login() {
   const [login, setLogin] = useState("");
@@ -26,37 +27,34 @@ export default function Login() {
     return null;
   }
 
-  const validateAndSetLogin = (value: string) => {
-    setLogin(value);
-    setError(validateAndCleanLogin(value));
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    try {
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ login, password }),
-      });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data?.message ?? "Credenciais inválidas.");
-        return;
-      }
+    const loginService = new LoginService();
+    const res = await loginService.login(login, password);
+    if (!res.success)
+      return setError(res.error || "Não foi possível realizar o login.");
 
-      console.log("Login bem-sucedido!"); // TODO: redirecionar para dashboard
-      console.log(res.json())
-      // TODO: armazenar tokens e redirecionar
-    } catch {
-      setError("Não foi possível conectar ao servidor.");
-    } finally {
-      setLoading(false);
-    }
+
+    // const res = await fetch(`${API_URL}/auth/login`, {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({ login, password }),
+    // });
+
+    // if (!res.ok) {
+    //   const data = await res.json().catch(() => ({}));
+    //   setError(data?.message ?? "Credenciais inválidas.");
+    //   return;
+    // }
+
+    console.log("Login bem-sucedido!"); // TODO: redirecionar para dashboard
+    console.log(res.success);
+    // TODO: armazenar tokens e redirecionar
+
   }
 
   return (

@@ -1,6 +1,5 @@
-import { Constants } from "../constants";
+const {EMAIL_REGEX} = require("@/lib/constants");
 
 export default function validateEmail(email: string): boolean {
-    const { EMAIL_REGEX } = Constants;
     return EMAIL_REGEX.test(email);
 }

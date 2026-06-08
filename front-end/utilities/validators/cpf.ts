@@ -1,7 +1,6 @@
-import { Constants } from "../constants";
+const { CPF_REGEX } = require("@/lib/constants");
 
 export default function validateCPF(cpf: string): boolean {
-    const { CPF_REGEX } = Constants;
     if (!CPF_REGEX.test(cpf)) return false;
 
     cpf = cpf.replace(/\D/g, ""); // Remove non-digit characters
