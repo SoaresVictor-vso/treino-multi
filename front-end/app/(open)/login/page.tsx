@@ -2,12 +2,34 @@
 
 import { useState } from "react";
 import { API_URL } from "@/lib/constants";
+import Input from "@/components/ui/Input";
+import Button from "@/components/ui/Button";
+import ErrorBox from "@/components/ui/ErrorBox";
+import validateCPF from "@/utilities/validators/cpf";
+import validateEmail from "@/utilities/validators/email";
 
 export default function Login() {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const validateAndCleanLogin = (value: string) => {
+    value = value.trim();
+    if (!value) return "Campo obrigatório";
+
+    if (validateCPF(value))
+      value = value.replace(/\D/g, "");
+    else if (!validateEmail(value))
+      return "Digite um e-mail ou CPF válido";
+
+    return null;
+  }
+
+  const validateAndSetLogin = (value: string) => {
+    setLogin(value);
+    setError(validateAndCleanLogin(value));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,57 +68,26 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="login"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              E-mail ou CPF
-            </label>
-            <input
-              id="login"
-              type="text"
-              autoComplete="username"
-              required
-              value={login}
-              onChange={(e) => setLogin(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="seu@email.com"
-            />
-          </div>
+          <Input
+            label="E-mail ou CPF"
+            placeholder="seu@email.com"
+            value={login}
+            onChange={(e) => setLogin(e.target.value)}
+            onBlur={(e) => setError(validateAndCleanLogin(e.target.value))}
+          />
+          <Input
+            label="Senha"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Senha
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              placeholder="••••••••"
-            />
-          </div>
+          <ErrorBox message={error} />
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? "Entrando…" : "Entrar"}
-          </button>
+          <Button buttonStyle="default" disabled={loading}>
+            <span>{loading ? "Entrando…" : "Entrar"}</span>
+          </Button>
         </form>
       </div>
     </main>
