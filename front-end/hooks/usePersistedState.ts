@@ -1,8 +1,11 @@
+"use client";
+
 import { useEffect, useState } from "react";
 
 export default function usePersistedState<T>(key: string, initialValue: T):
     [T, React.Dispatch<React.SetStateAction<T>>] {
     const [state, setState] = useState(() => {
+        if (typeof window === "undefined") return initialValue;
         const stickyValue = localStorage.getItem(key);
         return stickyValue !== null ? JSON.parse(stickyValue) : initialValue;
     });

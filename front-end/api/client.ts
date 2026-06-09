@@ -1,4 +1,5 @@
 import { API_URL } from "@/lib/constants";
+import { getAuthToken } from "@/lib/auth";
 
 export interface ApiResponse<T> {
     success: boolean;
@@ -12,7 +13,7 @@ export async function apiRequest<T>(
     options?: RequestInit
 ): Promise<ApiResponse<T>> {
     try {
-        const res = await fetch(`${API_URL}${endpoint}`, {
+        const res = await fetch(`${API_URL}/${endpoint}`, {
             ...options,
             headers: { "Content-Type": "application/json", ...options?.headers },
         });
@@ -34,4 +35,18 @@ export async function apiRequest<T>(
     } catch (error) {
         return { success: false, error: "Não foi possível conectar ao servidor.", status: 0 };
     }
+}
+
+export async function authenticatedRequest<T>(
+    endpoint: string,
+    options?: RequestInit
+): Promise<ApiResponse<T>> {
+    const token = getAuthToken();
+    return apiRequest<T>(endpoint, {
+        ...options,
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...options?.headers,
+        },
+    });
 }

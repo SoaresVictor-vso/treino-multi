@@ -1,15 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { API_URL } from "@/lib/constants";
+import { useRouter } from "next/navigation";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import ErrorBox from "@/components/ui/ErrorBox";
 import validateCPF from "@/utilities/validators/cpf";
 import validateEmail from "@/utilities/validators/email";
 import { LoginService } from "@/api/services/login";
+import { setAuthCookie } from "@/lib/auth";
+import usePersistedState from "@/hooks/usePersistedState";
 
 export default function Login() {
+  const [accessToken, setAccessToken] = usePersistedState<string | null>('accessToken', null);
+  const [__, setRefreshToken] = usePersistedState<string | null>('refreshToken', null);
+  const router = useRouter();
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,28 +38,27 @@ export default function Login() {
     setLoading(true);
 
 
-    const loginService = new LoginService();
-    const res = await loginService.login(login, password);
-    if (!res.success)
-      return setError(res.error || "Não foi possível realizar o login.");
+    try {
+      const loginService = new LoginService();
+      const res = await loginService.login(login, password);
+      if (!res.success) {
+        setLoading(false);
+        setError(res.error || "Não foi possível realizar o login.");
+        return;
+      }
 
+      setAccessToken(res.data!.accessToken);
+      setRefreshToken(res.data!.refreshToken);
 
-    // const res = await fetch(`${API_URL}/auth/login`, {
-    //   method: "POST",
-    //   headers: { "Content-Type": "application/json" },
-    //   body: JSON.stringify({ login, password }),
-    // });
-
-    // if (!res.ok) {
-    //   const data = await res.json().catch(() => ({}));
-    //   setError(data?.message ?? "Credenciais inválidas.");
-    //   return;
-    // }
-
-    console.log("Login bem-sucedido!"); // TODO: redirecionar para dashboard
-    console.log(res.success);
-    // TODO: armazenar tokens e redirecionar
-
+      console.log("Login bem-sucedido!");
+      console.log(res.success);
+      if (accessToken)
+        setAuthCookie(accessToken);
+      router.push("/home");
+    } catch (error) {
+      setLoading(false);
+      setError("Não foi possívelrealizar o login.");
+    }
   }
 
   return (
