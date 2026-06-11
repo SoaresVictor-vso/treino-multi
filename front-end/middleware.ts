@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ROUTE_PERMISSIONS } from "./lib/route-permissions";
 import { Role } from "./lib/roles";
+import { getAllowedRoles } from "./lib/navigation";
 
 const PUBLIC_PATHS = ["/login", "/unauthorized"];
 
@@ -22,13 +22,6 @@ function parseJwt(token: string): JwtPayload | null {
     }
 }
 
-/** Retorna as roles permitidas para o pathname dado, ou null se a rota não estiver mapeada. */
-function getAllowedRoles(pathname: string): Role[] | null {
-    // Ordena por comprimento decrescente para fazer match do mais específico primeiro
-    const sortedRoutes = Object.keys(ROUTE_PERMISSIONS).sort((a, b) => b.length - a.length);
-    const match = sortedRoutes.find((route) => pathname.startsWith(route));
-    return match ? ROUTE_PERMISSIONS[match] : null;
-}
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;

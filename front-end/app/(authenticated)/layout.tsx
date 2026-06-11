@@ -1,7 +1,21 @@
-export default function AuthenticatedLayout({
+import Sidebar from "@/components/Sidebar";
+import { getServerSessionUser } from "@/lib/auth.server";
+import { getNavItemsForRoles } from "@/lib/navigation";
+
+export default async function AuthenticatedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  const user = await getServerSessionUser();
+  const navItems = getNavItemsForRoles(user?.roles ?? []);
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar items={navItems} />
+      <main className="flex-1 overflow-auto bg-gray-50">
+        {children}
+      </main>
+    </div>
+  );
 }
