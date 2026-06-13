@@ -1,3 +1,4 @@
+import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import { getServerSessionUser } from "@/lib/auth.server";
 import { getNavItemsForRoles } from "@/lib/navigation";
@@ -13,7 +14,8 @@ export default async function AuthenticatedLayout({
   return (
     <div className="flex min-h-screen">
       <Sidebar items={navItems} />
-      <main className="flex-1 overflow-auto bg-gray-50">
+      <main className="flex-1 overflow-auto bg-gray-700">
+        <Header navItems={navItems} />
         {children}
       </main>
     </div>

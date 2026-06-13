@@ -15,7 +15,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-lg font-bold text-gray-100 ps-1"
           >
             {label}
           </label>
@@ -26,12 +26,13 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           aria-invalid={!!error}
           aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
           className={[
-            "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 ",
+            "w-full rounded-lg border border-gray-300 px-3 py-2 text-lg text-gray-100 ",
             "placeholder-gray-400 focus:outline-none focus:ring-2",
             "focus:ring-indigo-500 focus:border-transparent",
+            "autofill:bg-gray-800 autofill:text-gray-100 autofill:shadow-[inset_0_0_0px_1000px_rgb(31,41,55)] autofill:[-webkit-text-fill-color:rgb(243,244,246)]",
             error
               ? "border-red-500 bg-red-50 focus:ring-red-400 focus:border-red-500"
-              : "border-gray-300 bg-white",
+              : "border-gray-300 bg-gray-800",
             props.disabled ? "cursor-not-allowed opacity-50" : "",
             className,
           ]
