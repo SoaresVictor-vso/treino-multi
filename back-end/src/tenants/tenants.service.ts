@@ -44,13 +44,17 @@ export class TenantsService {
     return saved;
   }
 
-  async findAll(includeInactive = false): Promise<Tenant[]> {
+  async findAll(includeInactive = false, name?: string, filter?: string): Promise<Tenant[]> {
     const qb = this.tenantRepo
       .createQueryBuilder('t')
       .orderBy('t.name', 'ASC');
 
     if (!includeInactive) {
       qb.andWhere('t.is_active = :active', { active: true });
+    }
+
+    if (filter === 'name' && name) {
+      qb.andWhere('t.name ILIKE :name', { name: `%${name}%` });
     }
 
     return qb.getMany();

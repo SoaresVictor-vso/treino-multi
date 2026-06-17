@@ -1,5 +1,6 @@
 "use client";
 
+import { TenantService } from "@/api/services/tenant";
 import Button from "@/components/ui/Button";
 import ErrorBox from "@/components/ui/ErrorBox";
 import Input from "@/components/ui/Input";
@@ -27,12 +28,19 @@ export default function Tenants() {
     const [name, setName] = React.useState("");
     const [errors, setErrors] = React.useState<Record<string, string>>({});
 
-    const handleSubmit = async () => {
+    const tenantService = new TenantService();
+
+    const handleSubmit = async (filter?: "all" | "name", name?: string) => {
         try {
-            await filterSchema.validate({ tipoFiltro, name }, { abortEarly: false });
+            await filterSchema.validate({ tipoFiltro: filter, name }, { abortEarly: false });
             setErrors({});
             // Handle filter submission here
-            console.log("Filter applied:", { tipoFiltro, name });
+
+            const result = await tenantService.findMultiple({
+                filter: filter || undefined,
+                name: name || ""
+            });
+            console.log("Filter applied:", { tipoFiltro: filter, name }, result);
         } catch (error) {
             if (error instanceof yup.ValidationError) {
                 const newErrors: Record<string, string> = {};
@@ -50,16 +58,15 @@ export default function Tenants() {
         setTipoFiltro("all");
         setName("");
         setErrors({});
-        handleSubmit();
+        handleSubmit("all");
     }
 
     const buscarPorNome = (nome: string) => {
         nome = nome.trim();
         setName(nome);
-        if (!nome) 
-            return;
+        if (!nome) return;
         setTipoFiltro("name");
-        handleSubmit();
+        handleSubmit("name", nome);
     }
 
     return (

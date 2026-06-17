@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -49,8 +50,10 @@ export class TenantsController {
   @ApiResponse({ status: 200, description: 'Lista de tenants' })
   @Get()
   @RequirePermissions(Permission.TENANT_READ)
-  findAll(@Query('includeInactive') includeInactive?: string) {
-    return this.tenantsService.findAll(includeInactive === 'true');
+  findAll(@Query('includeInactive') includeInactive?: string, @Query('name') name?: string, @Query('filter') filter?: string) {
+    if (!["all", "name"].includes(filter || "")) 
+      throw new BadRequestException("Filtro inválido. Use 'all' ou 'name'.");
+    return this.tenantsService.findAll(includeInactive === 'true', name, filter);
   }
 
   /** GET /tenants/:id — detalhe de um tenant */
