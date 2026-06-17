@@ -12,6 +12,7 @@ import { setAuthCookie } from "@/lib/auth";
 import usePersistedState from "@/hooks/usePersistedState";
 
 export default function Login() {
+  
   const [accessToken, setAccessToken] = usePersistedState<string | null>('accessToken', null);
   const [__, setRefreshToken] = usePersistedState<string | null>('refreshToken', null);
   const router = useRouter();
@@ -62,17 +63,17 @@ export default function Login() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-md p-8 space-y-6">
+    <main className="min-h-screen flex items-center justify-center px-4">
+      <div className="w-full max-w-sm rounded-2xl bg-surface-container shadow-md p-8 space-y-6">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900">Entrar</h1>
-          <p className="mt-1 text-sm text-gray-500">Acesse sua conta</p>
+          <h1 className="text-2xl font-bold text-headline text-primary-container">Entrar</h1>
+          <p className="mt-1 text-sm text-body text-on-surface-variant ">Acesse sua conta</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             label="E-mail ou CPF"
-            placeholder="seu@email.com"
+            // placeholder="seu@email.com"
             value={login}
             onChange={(e) => setLogin(e.target.value)}
             onBlur={(e) => setError(validateAndCleanLogin(e.target.value))}
@@ -80,14 +81,14 @@ export default function Login() {
           <Input
             label="Senha"
             type="password"
-            placeholder="••••••••"
+            // placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
 
           <ErrorBox message={error} />
 
-          <Button buttonStyle="default" disabled={loading}>
+          <Button disabled={loading} className="w-full">
             <span>{loading ? "Entrando…" : "Entrar"}</span>
           </Button>
         </form>

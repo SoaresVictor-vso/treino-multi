@@ -14,9 +14,11 @@ export default async function AuthenticatedLayout({
   return (
     <div className="flex min-h-screen">
       <Sidebar items={navItems} />
-      <main className="flex-1 overflow-auto bg-gray-700">
+      <main className="flex-1 overflow-auto bg-background">
         <Header navItems={navItems} />
-        {children}
+        <div className="ml-32 p-32 space-y-8">
+          {children}
+        </div>
       </main>
     </div>
   );

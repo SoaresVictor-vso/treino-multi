@@ -20,27 +20,32 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
 
     return (
       <div className="flex flex-col gap-1">
-        {label && (
+        {/* {label && (
           <label htmlFor={inputId} className="text-lg font-bold text-gray-100 ps-1">
             {label}
           </label>
-        )}
+        )} */}
         <select
           ref={ref}
           id={inputId}
           aria-invalid={!!error}
           aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
-          className={[
-            "w-full rounded-lg border px-3 py-2 text-lg outline-none transition appearance-none bg-no-repeat text-gray-100",
-            "focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-800",
-            error
-              ? "border-red-500 bg-red-50 focus:ring-red-400 focus:border-red-500"
-              : "border-gray-300 bg-gray-800",
-            props.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
-            className,
-          ]
-            .filter(Boolean)
-            .join(" ")}
+          // className={[
+          //   "w-full rounded-lg border px-3 py-2 text-lg outline-none transition appearance-none bg-no-repeat text-gray-100",
+          //   "focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-800",
+          //   error
+          //     ? "border-red-500 bg-red-50 focus:ring-red-400 focus:border-red-500"
+          //     : "border-gray-300 bg-gray-800",
+          //   props.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+          //   className,
+          // ]
+          //   .filter(Boolean)
+          //   .join(" ")}
+          className={
+            "w-full bg-surface-container-high border border-outline-variant " +
+            "p-2 text-primary focus:ring-0 " +
+            "autofill:bg-surface-container-high autofill:text-primary autofill:shadow-[inset_0_0_0px_1000px_var(--color-surface-container-high)] autofill:[-webkit-text-fill-color:var(--color-primary)]"
+          }
           style={{
             backgroundPosition: "right 0.75rem center",
             backgroundSize: "12px",
@@ -48,9 +53,9 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
           }}
           {...props}
         >
-          {placeholder && (
+          {(placeholder || label) && (
             <option value="" disabled>
-              {placeholder}
+              {placeholder ?? label}
             </option>
           )}
           {options.map((opt) => (

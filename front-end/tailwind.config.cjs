@@ -1,53 +1,91 @@
-const defaultTheme = require('tailwindcss/defaultTheme');
+// NOTE: This project uses Tailwind CSS v4. Theme configuration is done via
+// `@theme` in app/globals.css. This file is kept for IDE tooling compatibility.
 
+/** @type {import('tailwindcss').Config} */
 module.exports = {
     content: [
         './app/**/*.{js,ts,jsx,tsx}',
         './components/**/*.{js,ts,jsx,tsx}',
         './pages/**/*.{js,ts,jsx,tsx}'
     ],
-    darkMode: 'media',
     theme: {
         extend: {
             colors: {
-                primary: 'var(--color-primary)',
-                'primary-foreground': 'var(--color-primary-foreground)',
-                secondary: 'var(--color-secondary)',
-                'secondary-foreground': 'var(--color-secondary-foreground)',
-                /* aliases for existing classes like bg-color-primary used in components */
-                'color-primary': 'var(--color-primary)',
-                'color-primary-foreground': 'var(--color-primary-foreground)',
-                'color-secondary': 'var(--color-secondary)',
-                'color-secondary-foreground': 'var(--color-secondary-foreground)',
+                background:                    '#131314',
+                'on-background':               '#e5e2e3',
+                surface:                       '#131314',
+                'surface-dim':                 '#131314',
+                'surface-bright':              '#39393a',
+                'surface-container-lowest':    '#0e0e0f',
+                'surface-container-low':       '#1b1b1c',
+                'surface-container':           '#1f1f20',
+                'surface-container-high':      '#2a2a2b',
+                'surface-container-highest':   '#353436',
+                'surface-variant':             '#353436',
+                'surface-tint':                '#abd600',
+                'on-surface':                  '#e5e2e3',
+                'on-surface-variant':          '#c4c9ac',
+                'inverse-surface':             '#e5e2e3',
+                'inverse-on-surface':          '#303031',
+                outline:                       '#8e9379',
+                'outline-variant':             '#444933',
+                primary:                       '#ffffff',
+                'on-primary':                  '#283500',
+                'primary-container':           '#c3f400',
+                'on-primary-container':        '#556d00',
+                'inverse-primary':             '#506600',
+                'primary-fixed':               '#c3f400',
+                'primary-fixed-dim':           '#abd600',
+                'on-primary-fixed':            '#161e00',
+                'on-primary-fixed-variant':    '#3c4d00',
+                secondary:                     '#c7c6ca',
+                'on-secondary':                '#303034',
+                'secondary-container':         '#49494d',
+                'on-secondary-container':      '#b9b8bc',
+                'secondary-fixed':             '#e4e1e6',
+                'secondary-fixed-dim':         '#c7c6ca',
+                'on-secondary-fixed':          '#1b1b1f',
+                'on-secondary-fixed-variant':  '#46464a',
+                tertiary:                      '#ffffff',
+                'on-tertiary':                 '#303031',
+                'tertiary-container':          '#e4e2e3',
+                'on-tertiary-container':       '#656465',
+                'tertiary-fixed':              '#e4e2e3',
+                'tertiary-fixed-dim':          '#c8c6c7',
+                'on-tertiary-fixed':           '#1b1b1c',
+                'on-tertiary-fixed-variant':   '#474648',
+                error:                         '#ffb4ab',
+                'on-error':                    '#690005',
+                'error-container':             '#93000a',
+                'on-error-container':          '#ffdad6',
             },
             fontFamily: {
-                sans: ['Inter', ...defaultTheme.fontFamily.sans]
-            }
-        }
+                sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+            },
+            borderRadius: {
+                sm:   '0.125rem',
+                DEFAULT: '0.25rem',
+                md:   '0.375rem',
+                lg:   '0.5rem',
+                xl:   '0.75rem',
+                full: '9999px',
+            },
+            fontSize: {
+                'headline-xl':        ['3rem',    { lineHeight: '3.5rem',  fontWeight: '800', letterSpacing: '-0.02em' }],
+                'headline-lg':        ['2rem',    { lineHeight: '2.5rem',  fontWeight: '700', letterSpacing: '-0.01em' }],
+                'headline-lg-mobile': ['1.5rem',  { lineHeight: '2rem',    fontWeight: '700' }],
+                'headline-md':        ['1.25rem', { lineHeight: '1.75rem', fontWeight: '600' }],
+                'body-lg':            ['1rem',    { lineHeight: '1.5rem' }],
+                'body-md':            ['0.875rem',{ lineHeight: '1.25rem' }],
+                'label-caps':         ['0.75rem', { lineHeight: '1rem',    fontWeight: '600', letterSpacing: '0.05em' }],
+                'data-display':       ['1.125rem',{ lineHeight: '1.5rem',  fontWeight: '700' }],
+            },
+            maxWidth: {
+                layout: '90rem',
+            },
+        },
     },
-    plugins: [
-        function ({ addBase, theme }) {
-            addBase({
-                ':root': {
-                    '--background': theme('colors.white'),
-                    '--foreground': theme('colors.gray.900'),
-
-                    '--color-primary': theme('colors.fuchsia.600'),
-                    '--color-primary-foreground': theme('colors.white'),
-
-                    '--color-secondary': theme('colors.gray.600'),
-                    '--color-secondary-foreground': theme('colors.white')
-                },
-                '@media (prefers-color-scheme: dark)': {
-                    ':root': {
-                        '--background': theme('colors.gray.900'),
-                        '--foreground': theme('colors.gray.100'),
-
-                        '--color-primary': theme('colors.blue.400'),
-                        '--color-secondary': theme('colors.gray.400')
-                    }
-                }
-            });
-        }
-    ]
+    plugins: [],
 };
+
