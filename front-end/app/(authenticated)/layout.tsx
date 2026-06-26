@@ -16,7 +16,7 @@ export default async function AuthenticatedLayout({
       <Sidebar items={navItems} />
       <main className="flex-1 overflow-auto bg-background">
         <Header navItems={navItems} />
-        <div className="ml-32 p-32 space-y-8">
+        <div className="md:ml-16 lg:p-16 ml-32 p-32 space-y-8">
           {children}
         </div>
       </main>

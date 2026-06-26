@@ -1,4 +1,5 @@
-import { apiRequest } from "../client";
+import { authenticatedRequest } from "../client";
+import { CreateTenantDto } from "../dto/create-tenant.dto";
 
 export type paramsFindMultiple = {
     filter?: "all" | "name";
@@ -12,8 +13,15 @@ export class TenantService {
 
 
     async findMultiple(params: paramsFindMultiple) {
-        return apiRequest(`${this.apiUrl}?${new URLSearchParams(params as Record<string, string>).toString()}`, {
+        return authenticatedRequest(`${this.apiUrl}?${new URLSearchParams(params as Record<string, string>).toString()}`, {
             method: 'GET',
+        });
+    }
+
+    async create(dto: CreateTenantDto) {
+        return authenticatedRequest(this.apiUrl, {
+            method: "POST",
+            body: JSON.stringify(dto),
         });
     }
 }

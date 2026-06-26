@@ -6,6 +6,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Ip,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -24,6 +25,8 @@ import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { Permission } from '../common/enums/permission.enum';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import * as jwtPayloadInterface from '../auth/interfaces/jwt-payload.interface';
 
 /**
  * CRUD de Tenant.
@@ -40,8 +43,12 @@ export class TenantsController {
   @ApiResponse({ status: 201, description: 'Tenant criado com sucesso' })
   @Post()
   @RequirePermissions(Permission.TENANT_CREATE)
-  create(@Body() dto: CreateTenantDto) {
-    return this.tenantsService.create(dto);
+  create(
+    @Body() dto: CreateTenantDto,
+    @CurrentUser() actor: jwtPayloadInterface.JwtPayload,
+    @Ip() ip: string,
+  ) {
+    return this.tenantsService.create(dto, actor.sub, ip);
   }
 
   /** GET /tenants — lista tenants (ativos por padrão) */
@@ -50,10 +57,18 @@ export class TenantsController {
   @ApiResponse({ status: 200, description: 'Lista de tenants' })
   @Get()
   @RequirePermissions(Permission.TENANT_READ)
-  findAll(@Query('includeInactive') includeInactive?: string, @Query('name') name?: string, @Query('filter') filter?: string) {
-    if (!["all", "name"].includes(filter || "")) 
+  findAll(
+    @Query('includeInactive') includeInactive?: string,
+    @Query('name') name?: string,
+    @Query('filter') filter?: string,
+  ) {
+    if (!['all', 'name'].includes(filter || ''))
       throw new BadRequestException("Filtro inválido. Use 'all' ou 'name'.");
-    return this.tenantsService.findAll(includeInactive === 'true', name, filter);
+    return this.tenantsService.findAll(
+      includeInactive === 'true',
+      name,
+      filter,
+    );
   }
 
   /** GET /tenants/:id — detalhe de um tenant */
