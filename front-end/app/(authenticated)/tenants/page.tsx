@@ -1,114 +1,58 @@
 "use client";
 
-import { CreateTenantDto } from "@/api/dto/create-tenant.dto";
-import { TenantService } from "@/api/services/tenant";
 import Button from "@/components/ui/Button";
+import {
+    createTenantInitialValues,
+    createTenantYupSchema,
+    type CreateTenantDto,
+} from "@/api/dto/create-tenant.dto";
+import {
+    createTenantAdminYupSchema,
+    createTenantAdminInitialValues,
+    type CreateTenantAdminDto,
+} from "@/api/dto/create-tenant-admin.dto";
 import ErrorBox from "@/components/ui/ErrorBox";
 import Input from "@/components/ui/Input";
-import Modal from "@/components/ui/Modal";
-import Stepper, { StepperStep } from "@/components/ui/Stepper";
-import Switch from "@/components/ui/Switch";
-import validateEmail from "@/utilities/validators/email";
 import React from "react";
 import { RiFunctionAddLine } from "react-icons/ri";
 import * as yup from "yup";
+import { TenantService } from "@/api/services/tenant";
+import Modal from "@/components/ui/Modal";
+import Switch from "@/components/ui/Switch";
+import Stepper, { StepperStep } from "@/components/ui/Stepper";
 
-type TenantStep = 1 | 2;
-type TenantField = keyof CreateTenantDto;
-type TenantErrorField = TenantField | "confirmAdminPassword";
-
-const STEP_1_FIELDS: TenantErrorField[] = ["name", "slug"];
-const STEP_2_FIELDS: TenantErrorField[] = [
-    "adminName",
-    "adminEmail",
-    "adminDocument",
-    "adminPhone",
-    "adminPassword",
-    "confirmAdminPassword",
-];
-
-const filterSchema = yup.object().shape({
-    tipoFiltro: yup.string().oneOf(["all", "name"]).required("Tipo de filtro é obrigatório"),
-    name: yup.string().when("tipoFiltro", (tipoFiltro, schema) => {
-        return String(tipoFiltro) === "name"
-            ? schema.required("Nome é obrigatório").min(1, "Nome deve ter pelo menos 1 caractere")
-            : schema;
-    }),
-});
-
-const tenantStepSchema = yup.object({
-    name: yup
-        .string()
-        .required("Nome é obrigatório")
-        .min(2, "Nome deve ter pelo menos 2 caracteres")
-        .max(120, "Nome deve ter no máximo 120 caracteres"),
-    slug: yup
-        .string()
-        .required("Slug é obrigatório")
-        .min(2, "Slug deve ter pelo menos 2 caracteres")
-        .max(60, "Slug deve ter no máximo 60 caracteres")
-        .matches(/^[a-z0-9-]+$/, "Slug deve conter apenas letras minúsculas, números e hífens"),
-});
-
-const adminStepSchema = yup.object({
-    adminName: yup
-        .string()
-        .required("Nome do administrador é obrigatório")
-        .min(2, "Nome do administrador deve ter pelo menos 2 caracteres")
-        .max(120, "Nome do administrador deve ter no máximo 120 caracteres"),
-    adminEmail: yup
-        .string()
-        .required("E-mail do administrador é obrigatório")
-        .test("is-valid-email", "Digite um e-mail válido", (value) => !!value && validateEmail(value)),
-    adminDocument: yup
-        .string()
-        .required("Documento do administrador é obrigatório")
-        .matches(/^\d{11}$/, "Documento deve conter exatamente 11 dígitos"),
-    adminPhone: yup
-        .string()
-        .optional()
-        .max(30, "Telefone deve ter no máximo 30 caracteres"),
-    adminPassword: yup
-        .string()
-        .required("Senha do administrador é obrigatória")
-        .min(8, "Senha deve ter pelo menos 8 caracteres"),
-    confirmAdminPassword: yup
-        .string()
-        .required("Confirmação de senha é obrigatória")
-        .oneOf([yup.ref("adminPassword")], "As senhas devem ser iguais"),
-    isActive: yup.boolean().required(),
-});
-
-export default function Tenants() {
-    const [tipoFiltro, setTipoFiltro] = React.useState<"all" | "name" | null>(null);
+export default function TenantsPage() {
+    const [tipoFiltro, setTipoFiltro] = React.useState<"all" | "name">("all");
     const [name, setName] = React.useState("");
-    const [errors, setErrors] = React.useState<Record<string, string>>({});
-    const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
-    const [tenantForm, setTenantForm] = React.useState(new CreateTenantDto());
-    const [confirmAdminPassword, setConfirmAdminPassword] = React.useState("");
-    const [tenantFormErrors, setTenantFormErrors] = React.useState<Record<string, string>>({});
-    const [submitError, setSubmitError] = React.useState<string | null>(null);
-    const [isSubmitting, setIsSubmitting] = React.useState(false);
-    const [currentStep, setCurrentStep] = React.useState<TenantStep>(1);
-    const [nextDisabled, setNextDisabled] = React.useState(false);
-    const [stepTouched, setStepTouched] = React.useState<Record<TenantStep, boolean>>({
-        1: false,
-        2: false,
-    });
-
+    const [errors, setErrors] = React.useState<{ name?: string }>({});
+    const [isModalOpen, setIsModalOpen] = React.useState(false);
     const tenantService = new TenantService();
 
-    const handleSubmit = async (filter?: "all" | "name", name?: string) => {
+    const buscarTodos = () => {
+        setTipoFiltro("all");
+        setName("");
+        setErrors({});
+        handleSubmit("all");
+    };
+
+    const buscarPorNome = (nome: string) => {
+        const trimmedName = nome.trim();
+        setName(trimmedName);
+        if (!trimmedName) return;
+        setTipoFiltro("name");
+        handleSubmit("name", trimmedName);
+    };
+
+    const handleSubmit = async (filter?: "all" | "name", filterName?: string) => {
         try {
-            await filterSchema.validate({ tipoFiltro: filter, name }, { abortEarly: false });
+            await filterSchema.validate({ tipoFiltro: filter, name: filterName }, { abortEarly: false });
             setErrors({});
-            // Handle filter submission here
 
             const result = await tenantService.findMultiple({
                 filter: filter || undefined,
-                name: name || ""
+                name: filterName || "",
             });
-            console.log("Filter applied:", { tipoFiltro: filter, name }, result);
+            console.log("Filter applied:", { tipoFiltro: filter, name: filterName }, result);
         } catch (error) {
             if (error instanceof yup.ValidationError) {
                 const newErrors: Record<string, string> = {};
@@ -122,252 +66,14 @@ export default function Tenants() {
         }
     };
 
-    const buscarTodos = () => {
-        setTipoFiltro("all");
-        setName("");
-        setErrors({});
-        handleSubmit("all");
-    }
-
-    const buscarPorNome = (nome: string) => {
-        nome = nome.trim();
-        setName(nome);
-        if (!nome) return;
-        setTipoFiltro("name");
-        handleSubmit("name", nome);
-    }
-
-    const handleOpenCreateModal = () => {
-        setTenantForm(new CreateTenantDto());
-        setConfirmAdminPassword("");
-        setTenantFormErrors({});
-        setSubmitError(null);
-        setCurrentStep(1);
-        setStepTouched({ 1: false, 2: false });
-        setIsCreateModalOpen(true);
-    };
-
-    const handleCloseCreateModal = () => {
-        if (isSubmitting) return;
-        setIsCreateModalOpen(false);
-    };
-
-    const clearFieldError = (field: TenantErrorField) => {
-        setTenantFormErrors((current) => {
-            if (!current[field]) return current;
-            const next = { ...current };
-            delete next[field];
-            return next;
-        });
-    };
-
-    const clearStepErrors = (fields: TenantErrorField[]) => {
-        setTenantFormErrors((current) => {
-            const next = { ...current };
-            fields.forEach((field) => {
-                delete next[field];
-            });
-            return next;
-        });
-    };
-
-    const getFieldError = (field: TenantErrorField, step: TenantStep) => {
-        return stepTouched[step] ? tenantFormErrors[field] : undefined;
-    };
-
-    const updateTenantForm = (field: keyof CreateTenantDto, value: string | boolean) => {
-        setTenantForm((current) => new CreateTenantDto({ ...current, [field]: value }));
-        clearFieldError(field);
-    };
-
-    const mapValidationErrors = (error: yup.ValidationError) => {
-        const newErrors: Record<string, string> = {};
-        error.inner.forEach((err) => {
-            if (err.path) {
-                newErrors[err.path] = err.message;
-            }
-        });
-        return newErrors;
-    };
-
-    const validateStep = async (step: TenantStep) => {
-        setStepTouched((current) => ({ ...current, [step]: true }));
-        try {
-            if (step === 1) {
-                await tenantStepSchema.validate(tenantForm, { abortEarly: false });
-                clearStepErrors(STEP_1_FIELDS);
-                return true;
-            }
-
-            await adminStepSchema.validate(
-                { ...tenantForm, confirmAdminPassword },
-                { abortEarly: false }
-            );
-            clearStepErrors(STEP_2_FIELDS);
-            return true;
-        } catch (error) {
-            if (error instanceof yup.ValidationError) {
-                const fieldsToClear = step === 1 ? STEP_1_FIELDS : STEP_2_FIELDS;
-                const nextErrors = mapValidationErrors(error);
-                setTenantFormErrors((current) => {
-                    const merged = { ...current };
-                    fieldsToClear.forEach((field) => {
-                        delete merged[field];
-                    });
-                    return { ...merged, ...nextErrors };
-                });
-            }
-            return false;
-        }
-    };
-
-    const handleNextStep = async () => {
-        const isValid = await validateStep(1);
-        if (!isValid) return;
-        // disable next button momentarily to prevent double clicks
-        setNextDisabled(true);
-        setTimeout(() => setNextDisabled(false), 100);
-        setCurrentStep(2);
-        clearStepErrors(STEP_2_FIELDS);
-    };
-
-    const handlePreviousStep = () => {
-        if (isSubmitting) return;
-        clearStepErrors(STEP_1_FIELDS);
-        setCurrentStep(1);
-    };
-
-    const handleCreateTenant = async (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        const isValid = await validateStep(2);
-        if (!isValid) return;
-
-        setIsSubmitting(true);
-        setSubmitError(null);
-
-        try {
-            setTenantFormErrors({});
-
-            const response = await tenantService.create(tenantForm);
-
-            if (!response.success) {
-                setSubmitError(response.error || "Não foi possível criar o contratante.");
-                return;
-            }
-
-            setIsCreateModalOpen(false);
-            setTenantForm(new CreateTenantDto());
-            setConfirmAdminPassword("");
-            setCurrentStep(1);
-            setStepTouched({ 1: false, 2: false });
-            await handleSubmit(tipoFiltro || "all", name);
-        } catch (error) {
-            if (error instanceof yup.ValidationError) {
-                setTenantFormErrors(mapValidationErrors(error));
-                return;
-            }
-
-            setSubmitError("Não foi possível criar o contratante.");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const steps: StepperStep[] = [
-        {
-            title: "Tenant",
-            children: (
-                <div className="space-y-3">
-                    <div>
-                        <h4 className="text-sm font-semibold text-primary">Dados do tenant</h4>
-                        <p className="text-xs text-on-surface-variant">Informe os dados básicos antes de seguir para o usuário administrador.</p>
-                    </div>
-                    <Input
-                        id="tenant-name"
-                        label="Nome"
-                        value={tenantForm.name}
-                        onChange={(e) => updateTenantForm("name", e.target.value)}
-                        error={getFieldError("name", 1)}
-                    />
-                    <Input
-                        id="tenant-slug"
-                        label="Slug"
-                        value={tenantForm.slug}
-                        onChange={(e) => updateTenantForm("slug", e.target.value.toLowerCase().trim())}
-                        error={getFieldError("slug", 1)}
-                    />
-                    <Switch
-                        id="tenant-is-active"
-                        label="Tenant ativo"
-                        description="Ativado por padrão para novos contratantes."
-                        checked={tenantForm.isActive}
-                        disabled
-                        onChange={() => undefined}
-                    />
-                </div>
-            ),
-        },
-        {
-            title: "Administrador",
-            children: (
-                <div className="space-y-3">
-                    <div>
-                        <h4 className="text-sm font-semibold text-primary">Administrador</h4>
-                        <p className="text-xs text-on-surface-variant">Crie o usuário inicial com acesso administrativo ao tenant.</p>
-                    </div>
-                    <Input
-                        id="tenant-admin-name"
-                        label="Nome do administrador"
-                        value={tenantForm.adminName}
-                        onChange={(e) => updateTenantForm("adminName", e.target.value)}
-                        error={getFieldError("adminName", 2)}
-                    />
-                    <Input
-                        id="tenant-admin-email"
-                        label="E-mail do administrador"
-                        type="email"
-                        value={tenantForm.adminEmail}
-                        onChange={(e) => updateTenantForm("adminEmail", e.target.value.trim())}
-                        error={getFieldError("adminEmail", 2)}
-                    />
-                    <Input
-                        id="tenant-admin-document"
-                        label="Documento do administrador"
-                        value={tenantForm.adminDocument}
-                        onChange={(e) => updateTenantForm("adminDocument", e.target.value.replace(/\D/g, "").slice(0, 11))}
-                        error={getFieldError("adminDocument", 2)}
-                        hint="Informe 11 dígitos, sem pontuação."
-                    />
-                    <Input
-                        id="tenant-admin-phone"
-                        label="Telefone do administrador"
-                        value={tenantForm.adminPhone}
-                        onChange={(e) => updateTenantForm("adminPhone", e.target.value)}
-                        error={getFieldError("adminPhone", 2)}
-                    />
-                    <Input
-                        id="tenant-admin-password"
-                        label="Senha do administrador"
-                        type="password"
-                        value={tenantForm.adminPassword}
-                        onChange={(e) => updateTenantForm("adminPassword", e.target.value)}
-                        error={getFieldError("adminPassword", 2)}
-                    />
-                    <Input
-                        id="tenant-admin-password-confirm"
-                        label="Confirme a senha"
-                        type="password"
-                                value={confirmAdminPassword}
-                                onChange={(e) => {
-                                    setConfirmAdminPassword(e.target.value);
-                                    clearFieldError("confirmAdminPassword");
-                                }}
-                                error={getFieldError("confirmAdminPassword", 2)}
-                            />
-                </div>
-            ),
-        },
-    ];
+    const filterSchema = yup.object().shape({
+        tipoFiltro: yup.string().oneOf(["all", "name"]).required("Tipo de filtro é obrigatório"),
+        name: yup.string().when("tipoFiltro", (tipoFiltro, schema) =>
+            String(tipoFiltro) === "name"
+                ? schema.required("Nome é obrigatório").min(1, "Nome deve ter pelo menos 1 caractere")
+                : schema,
+        ),
+    });
 
     return (
         <>
@@ -376,7 +82,7 @@ export default function Tenants() {
                     <h2 className="text-headline-lg text-primary tracking-tight">Contratantes</h2>
                     <p className="text-on-surface-variant text-body-md">Gerencie e monitore métricas de desempenho para todos os contratantes.</p>
                 </div>
-                <Button className="w-auto" onClick={handleOpenCreateModal}>
+                <Button className="w-auto" onClick={() => setIsModalOpen(true)} variant="default">
                     <span className="font-label-caps text-label-caps text-md flex items-center gap-2">
                         <RiFunctionAddLine size={20} />
                         Adicionar Contratante
@@ -384,13 +90,13 @@ export default function Tenants() {
                 </Button>
             </div>
             <div className="inline-flex items-center gap-4 mt-6">
-                <Button
-                    variant={tipoFiltro === "all" ? "default" : "outline"}
-                    onClick={buscarTodos}>
+                <Button variant={tipoFiltro === "all" ? "default" : "outline"} onClick={buscarTodos}>
                     Todos
                 </Button>
                 <Input
-                    label="Nome do Tenant" id="name" value={name}
+                    label="Nome do Tenant"
+                    id="name"
+                    value={name}
                     onBlur={(e) => buscarPorNome(e.target.value)}
                     onKeyDown={(e) => {
                         if (e.key === "Enter") {
@@ -400,70 +106,294 @@ export default function Tenants() {
                     }}
                     onChange={(e) => setName(e.target.value)}
                 />
-                <ErrorBox message={errors.name} />
-
+                <ErrorBox message={errors.name || null} />
             </div>
-
-            <Modal
-                isOpen={isCreateModalOpen}
-                onClose={handleCloseCreateModal}
-                title="Novo contratante"
-                description={currentStep === 1 ? "Etapa 1 de 2: dados do tenant." : "Etapa 2 de 2: crie o usuário administrador."}
-            >
-                <form className="space-y-4" onSubmit={handleCreateTenant}>
-                    <ErrorBox message={submitError} />
-                    <Stepper
-                        steps={steps}
-                        currentStep={currentStep - 1}
-                        labels={{
-                            cancel: "Cancelar",
-                            prev: "Voltar",
-                            next: "Avançar",
-                            done: isSubmitting ? "Salvando..." : "Criar contratante",
-                        }}
-                        onCancel={handleCloseCreateModal}
-                        onPrev={handlePreviousStep}
-                        onNext={handleNextStep}
-                        doneButtonType="submit"
-                        isSubmitting={isSubmitting}
-                        isNextDisabled={nextDisabled}
-                    />
-                </form>
-            </Modal>
+            <ModalTenant
+                isModalOpen={isModalOpen}
+                setIsModalOpen={setIsModalOpen}
+                onSubmit={async (data) => {
+                    try {
+                        await tenantService.create(data);
+                        setIsModalOpen(false);
+                        buscarTodos();
+                    } catch (error) {
+                        console.error("Erro ao criar contratante:", error);
+                    }
+                }}
+            />
         </>
-    )
+    );
+}
 
-    // return (
-    //     <div className="p-4">
-    //         <form onSubmit={handleSubmit}>
-    //             <div className="grid grid-cols-3 gap-4">
-    //                 <div>
-    //                     <Select
-    //                         options={TENTANT_SELECT_TYPES}
-    //                         label="Filtro" value={tipoFiltro}
-    //                         onChange={(e) => setTipoFiltro(e.target.value as "all" | "name")}
-    //                         error={errors.tipoFiltro}
-    //                     />
-    //                 </div>
+function ModalTenant(props: {
+    isModalOpen: boolean;
+    setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    onSubmit: (data: CreateTenantDto) => Promise<any>;
+}) {
+    const [currentStep, setCurrentStep] = React.useState(0);
+    const [tenantErrors, setTenantErrors] = React.useState<Partial<Record<keyof CreateTenantDto, string>>>({});
+    const [adminErrors, setAdminErrors] = React.useState<Partial<Record<keyof CreateTenantAdminDto, string>>>({});
+    const [submitError, setSubmitError] = React.useState<string | null>(null);
+    const tenantRef = React.useRef<CreateTenantDto>({
+        ...createTenantInitialValues,
+    });
+    const adminRef = React.useRef<CreateTenantAdminDto>({
+        ...createTenantAdminInitialValues,
+    });
 
-    //                 {tipoFiltro === "name" && (
-    //                     <div>
-    //                         <Input 
-    //                         label="Nome do Tenant" id="name" 
-    //                         value={name} 
-    //                         onChange={(e) => setName(e.target.value)}
-    //                         error={errors.name}
-    //                         />
-    //                     </div>
-    //                 )}
-    //                 <div className="mt-10 w-36">
-    //                     <Button type="submit" className="">
-    //                         Filtrar
-    //                     </Button>
-    //                 </div>
-    //             </div>
+    const mapYupErrors = (error: unknown) => {
+        if (!(error instanceof yup.ValidationError)) return {};
 
-    //         </form>
-    //     </div>
-    // );
+        const nextErrors: Record<string, string> = {};
+
+        error.inner.forEach((item) => {
+            if (item.path) {
+                nextErrors[item.path] = item.message;
+            }
+        });
+
+        return nextErrors;
+    };
+
+    const validateTenantForm = async () => {
+        try {
+            await createTenantYupSchema.validate(tenantRef.current, { abortEarly: false });
+            setTenantErrors({});
+            return true;
+        } catch (error) {
+            console.error("Erro de validação do tenant:", error);
+            setTenantErrors(mapYupErrors(error) as Partial<Record<keyof CreateTenantDto, string>>);
+            return false;
+        }
+    };
+
+    const validateAdminForm = async () => {
+        try {
+            await createTenantAdminYupSchema.validate(adminRef.current, { abortEarly: false });
+            setAdminErrors({});
+            return true;
+        } catch (error) {
+            setAdminErrors(mapYupErrors(error) as Partial<Record<keyof CreateTenantAdminDto, string>>);
+            return false;
+        }
+    };
+
+    const steppers = [
+        {
+            conf: {
+                title: "Empresa Contratante",
+                description: "Etapa 1 de 2: dados do contratante.",
+                children: <CompanyForm tenantRef={tenantRef} errors={tenantErrors} />,
+            },
+            validate: validateTenantForm,
+        }, {
+            conf: {
+                title: "Administrador",
+                description: "Etapa 2 de 2: crie o usuário administrador.",
+                children: <AdminForm adminRef={adminRef} errors={adminErrors} errorMessage={submitError} />,
+            },
+            validate: validateAdminForm,
+        }
+    ]
+
+
+
+    const handleSubmit = async () => {
+        const isAdminValid = await validateAdminForm();
+        if (!isAdminValid) return;
+
+
+        console.log("Submitting tenant data:", tenantRef.current, adminRef.current);
+        // await props.onSubmit(tenantRef.current);
+    };
+
+    const validateStep = async (): Promise<boolean> => {
+        console.log("Validating step:", currentStep);
+        return await steppers[currentStep].validate()
+    };
+
+    const onNextStep = async (target: number) => {
+        const isValid = await validateStep();
+        if (!isValid) return;
+
+
+        setCurrentStep(target);
+    }
+
+    return (
+        <Modal
+            isOpen={props.isModalOpen}
+            onClose={() => props.setIsModalOpen(false)}
+            title="Novo contratante"
+            description="Preencha os dados do contratante. O administrador sera mockado automaticamente."
+        >
+            <div className="space-y-4">
+                <Stepper
+                    steps={[steppers.map(s => s.conf) as StepperStep[]][0]}
+                    currentStep={currentStep}
+                    labels={{
+                        cancel: "Cancelar",
+                        prev: "Voltar",
+                        next: "Avançar",
+                        done: "Criar contratante",
+                    }}
+                    onCancel={() => props.setIsModalOpen(false)}
+                    onPrev={(target) => setCurrentStep(target)}
+                    onNext={onNextStep}
+                    onDone={handleSubmit}
+                />
+            </div>
+        </Modal>
+    );
+}
+
+function CompanyForm(props: {
+    tenantRef: React.RefObject<CreateTenantDto>;
+    errors: Partial<Record<keyof CreateTenantDto, string>>;
+}) {
+    const updateField = (field: keyof CreateTenantDto, value: string | boolean) => {
+        props.tenantRef.current = {
+            ...props.tenantRef.current,
+            [field]: value,
+        };
+    };
+
+    return (
+        <form className="space-y-3" onSubmit={(e) => e.preventDefault()}>
+            <div>
+                <h4 className="text-sm font-semibold text-primary">Dados do tenant</h4>
+                <p className="text-xs text-on-surface-variant">Informe os dados basicos. O usuario administrador sera criado com dados mockados.</p>
+            </div>
+            <Input
+                id="tenant-trade-name"
+                label="Nome fantasia"
+                defaultValue={props.tenantRef.current.trade_name}
+                error={props.errors.trade_name}
+                onChange={(e) => updateField("trade_name", e.target.value)}
+            />
+            <Input
+                id="tenant-slug"
+                label="Slug"
+                defaultValue={props.tenantRef.current.slug}
+                error={props.errors.slug}
+                onChange={(e) => updateField("slug", e.target.value.toLowerCase().trim())}
+            />
+            <Input
+                id="tenant-company-admin-name"
+                label="Nome do responsável"
+                defaultValue={props.tenantRef.current.company_admin_name}
+                error={props.errors.company_admin_name}
+                onChange={(e) => updateField("company_admin_name", e.target.value)}
+            />
+            <Input
+                id="tenant-company-admin-cpf"
+                label="CPF do responsável"
+                hint="Informe 11 dígitos, sem pontuação."
+                defaultValue={props.tenantRef.current.company_admin_cpf}
+                error={props.errors.company_admin_cpf}
+                onChange={(e) => updateField("company_admin_cpf", e.target.value.replace(/\D/g, "").slice(0, 11))}
+            />
+            <Input
+                id="tenant-cnpj"
+                label="CNPJ"
+                hint="Opcional. Informe 14 dígitos, sem pontuação."
+                defaultValue={props.tenantRef.current.cnpj || ""}
+                error={props.errors.cnpj}
+                onChange={(e) => updateField("cnpj", e.target.value.replace(/\D/g, "").slice(0, 14))}
+            />
+            <Input
+                id="tenant-registered-name"
+                label="Razão social"
+                defaultValue={props.tenantRef.current.registered_name || ""}
+                error={props.errors.registered_name}
+                onChange={(e) => updateField("registered_name", e.target.value)}
+            />
+            <Input
+                id="tenant-phone"
+                label="Telefone"
+                hint="Informe 11 dígitos, com DDD."
+                defaultValue={props.tenantRef.current.phone}
+                error={props.errors.phone}
+                onChange={(e) => updateField("phone", e.target.value.replace(/\D/g, "").slice(0, 11))}
+            />
+            <Input
+                id="tenant-email"
+                label="E-mail"
+                type="email"
+                defaultValue={props.tenantRef.current.email}
+                error={props.errors.email}
+                onChange={(e) => updateField("email", e.target.value.trim())}
+            />
+            <Switch
+                id="tenant-is-active"
+                label="Tenant ativo"
+                description="Ativado por padrão para novos contratantes."
+                checked={props.tenantRef.current.isActive}
+                disabled
+                onChange={() => updateField("isActive", !props.tenantRef.current.isActive)}
+            />
+        </form>
+    );
+}
+
+function AdminForm(props: {
+    adminRef: React.RefObject<CreateTenantAdminDto>;
+    errors: Partial<Record<keyof CreateTenantAdminDto, string>>;
+    errorMessage: string | null;
+}) {
+    const updateField = (field: keyof CreateTenantAdminDto, value: string) => {
+        props.adminRef.current = {
+            ...props.adminRef.current,
+            [field]: value,
+        };
+    };
+
+    return (
+        <form className="space-y-3" onSubmit={(e) => e.preventDefault()}>
+            <ErrorBox message={props.errorMessage || ""} />
+            <div>
+                <h4 className="text-sm font-semibold text-primary">Administrador</h4>
+                <p className="text-xs text-on-surface-variant">Formulario isolado para os dados do administrador.</p>
+            </div>
+            <Input
+                id="tenant-admin-name"
+                label="Nome do administrador"
+                defaultValue={props.adminRef.current.name}
+                error={props.errors.name}
+                onChange={(e) => updateField("name", e.target.value)}
+            />
+            <Input
+                id="tenant-admin-email"
+                label="E-mail do administrador"
+                type="email"
+                defaultValue={props.adminRef.current.email}
+                error={props.errors.email}
+                onChange={(e) => updateField("email", e.target.value.trim())}
+            />
+            <Input
+                id="tenant-admin-cpf"
+                label="CPF do administrador"
+                hint="Informe 11 dígitos, sem pontuação."
+                defaultValue={props.adminRef.current.cpf}
+                error={props.errors.cpf}
+                onChange={(e) => updateField("cpf", e.target.value.replace(/\D/g, "").slice(0, 11))}
+            />
+            <Input
+                id="tenant-admin-phone"
+                label="Telefone do administrador"
+                hint="Informe 11 dígitos, com DDD."
+                defaultValue={props.adminRef.current.phone}
+                error={props.errors.phone}
+                onChange={(e) => updateField("phone", e.target.value.replace(/\D/g, "").slice(0, 11))}
+            />
+            <Input
+                id="tenant-admin-password"
+                label="Senha do administrador"
+                type="password"
+                defaultValue={props.adminRef.current.password}
+                error={props.errors.password}
+                onChange={(e) => updateField("password", e.target.value)}
+            />
+        </form>
+    );
 }

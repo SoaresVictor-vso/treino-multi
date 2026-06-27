@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 export type StepperStep = {
   title: string;
   children: React.ReactNode;
+  description?: string;
 };
 
 export type StepperLabels = {
@@ -20,8 +21,8 @@ type StepperProps = {
   currentStep: number;
   labels: StepperLabels;
   onCancel: () => void;
-  onPrev: () => void;
-  onNext: () => void;
+  onPrev: (targetPage: number) => void;
+  onNext: (targetPage: number) => void;
   onDone?: () => void;
   isSubmitting?: boolean;
   isNextDisabled?: boolean;
@@ -61,6 +62,7 @@ export default function Stepper({
         ))}
       </div>
 
+      {activeStep.description && <p className="text-on-surface-variant text-body-sm">{activeStep.description}</p>}
       <div>{activeStep.children}</div>
 
       <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
@@ -79,7 +81,7 @@ export default function Stepper({
             type="button"
             variant="outline"
             className="w-full sm:w-auto"
-            onClick={onPrev}
+            onClick={() => onPrev(currentStep - 1)}
             disabled={isSubmitting}
           >
             {labels.prev}
@@ -90,7 +92,7 @@ export default function Stepper({
           <Button
             type="button"
             className="w-full sm:w-auto"
-            onClick={onNext}
+            onClick={() => onNext(currentStep + 1)}
             disabled={isSubmitting || isNextDisabled}
           >
             {labels.next}

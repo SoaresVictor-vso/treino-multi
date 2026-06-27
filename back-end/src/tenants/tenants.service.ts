@@ -42,28 +42,28 @@ export class TenantsService {
     }
 
     const existingPersonByEmail = await this.personRepo.findOne({
-      where: { email: dto.adminEmail },
+      where: { email: dto.admin.email },
     });
     if (existingPersonByEmail) {
-      throw new ConflictException(`E-mail ${dto.adminEmail} já está em uso.`);
+      throw new ConflictException(`E-mail ${dto.admin.email} já está em uso.`);
     }
 
     const existingPersonByDocument = await this.personRepo.findOne({
-      where: { document: dto.adminDocument },
+      where: { document: dto.admin.cpf },
     });
     if (existingPersonByDocument) {
       throw new ConflictException(
-        `Documento ${dto.adminDocument} já está em uso.`,
+        `Documento ${dto.admin.cpf} já está em uso.`,
       );
     }
 
-    const passwordHash = await bcrypt.hash(dto.adminPassword, 12);
+    const passwordHash = await bcrypt.hash(dto.admin.password, 12);
 
     const saved = await this.dataSource.transaction(async (em) => {
       const tenant = await em.save(
         Tenant,
         em.create(Tenant, {
-          name: dto.name,
+          name: dto.trade_name,
           slug: dto.slug,
           isActive: dto.isActive ?? true,
         }),
@@ -72,10 +72,10 @@ export class TenantsService {
       const person = await em.save(
         Person,
         em.create(Person, {
-          name: dto.adminName,
-          email: dto.adminEmail,
-          document: dto.adminDocument,
-          phone: dto.adminPhone ?? null,
+          name: dto.admin.name,
+          email: dto.admin.email,
+          document: dto.admin.cpf,
+          phone: dto.admin.phone,
         }),
       );
 
@@ -110,7 +110,7 @@ export class TenantsService {
       ipAddress: ipAddress ?? null,
     });
     const adminPerson = await this.personRepo.findOneOrFail({
-      where: { email: dto.adminEmail },
+      where: { email: dto.admin.email },
     });
     await this.auditLogService.logCriticalOperation({
       tenantId: saved.id,
@@ -182,7 +182,15 @@ export class TenantsService {
       }
     }
 
-    Object.assign(tenant, dto);
+    if (dto.trade_name !== undefined) {
+      tenant.name = dto.trade_name;
+    }
+    if (dto.slug !== undefined) {
+      tenant.slug = dto.slug;
+    }
+    if (dto.isActive !== undefined) {
+      tenant.isActive = dto.isActive;
+    }
     const saved = await this.tenantRepo.save(tenant);
     await this.auditLogService.logCriticalOperation({
       tenantId: null,

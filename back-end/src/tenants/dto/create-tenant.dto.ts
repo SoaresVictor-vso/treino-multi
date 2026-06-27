@@ -1,26 +1,25 @@
+import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsEmail,
   IsBoolean,
+  IsEmail,
   IsOptional,
   IsString,
   Length,
   Matches,
   MaxLength,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { CreateTenantAdminDto } from './create-tenant-admin.dto';
 
 export class CreateTenantDto {
-  @ApiProperty({ example: 'ACME Corp' })
+  @ApiProperty({ example: 'ACME Corp', maxLength: 120 })
   @IsString()
   @MinLength(2)
   @MaxLength(120)
-  name!: string;
+  trade_name!: string;
 
-  /**
-   * Slug único que identifica o tenant nas rotas e no JWT.
-   * Deve conter apenas letras minúsculas, dígitos e hífens.
-   */
   @ApiProperty({ example: 'acme-corp' })
   @IsString()
   @MinLength(2)
@@ -30,34 +29,45 @@ export class CreateTenantDto {
   })
   slug!: string;
 
-  @ApiProperty({ default: true })
+  @ApiProperty({ example: 'João da Silva', maxLength: 120 })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  company_admin_name!: string;
+
+  @ApiProperty({ example: '12345678901', minLength: 11, maxLength: 11 })
+  @IsString()
+  @Length(11, 11)
+  company_admin_cpf!: string;
+
+  @ApiProperty({ example: '12345678000199', required: false })
+  @IsOptional()
+  @IsString()
+  @Length(14, 14)
+  cnpj?: string;
+
+  @ApiProperty({ example: 'ACME Industria e Comercio LTDA', required: false, maxLength: 120 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  registered_name?: string;
+
+  @ApiProperty({ example: '11999990000', minLength: 11, maxLength: 11 })
+  @IsString()
+  @Length(11, 11)
+  phone!: string;
+
+  @ApiProperty({ example: 'contato@acme-corp.com' })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty({ default: true, required: false })
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
-  @ApiProperty({ example: 'Admin do Tenant' })
-  @IsString()
-  @MinLength(2)
-  @MaxLength(120)
-  adminName!: string;
-
-  @ApiProperty({ example: 'admin@acme-corp.com' })
-  @IsEmail()
-  adminEmail!: string;
-
-  @ApiProperty({ example: '12345678901' })
-  @IsString()
-  @Length(11, 14)
-  adminDocument!: string;
-
-  @ApiProperty({ example: '+5511999990000', required: false })
-  @IsOptional()
-  @IsString()
-  @MaxLength(30)
-  adminPhone?: string;
-
-  @ApiProperty({ example: 'S3nh@F0rt3!' })
-  @IsString()
-  @MinLength(8)
-  adminPassword!: string;
+  @ApiProperty({ type: () => CreateTenantAdminDto })
+  @ValidateNested()
+  @Type(() => CreateTenantAdminDto)
+  admin!: CreateTenantAdminDto;
 }

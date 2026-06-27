@@ -1,4 +1,4 @@
-const { CPF_REGEX } = require("@/lib/constants");
+import { CPF_REGEX } from "@/lib/constants";
 
 export default function validateCPF(cpf: string): boolean {
     if (!CPF_REGEX.test(cpf)) return false;

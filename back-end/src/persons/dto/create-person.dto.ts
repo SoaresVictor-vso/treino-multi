@@ -6,21 +6,22 @@ export class CreatePersonDto {
   @IsString()
   @MinLength(2)
   @MaxLength(120)
-  name: string;
+  name!: string;
 
   @ApiProperty({ example: 'joao@email.com' })
   @IsEmail()
-  email: string;
+  email!: string;
 
-  /** Documento de identificação da pessoa (CPF etc.) — exatamente 11 dígitos, sem pontuação. */
+  /** Documento de identificação da pessoa (CPF) — exatamente 11 dígitos, sem pontuação. */
   @ApiProperty({ example: '12345678901' })
-  @IsString()
-  @Length(11, 11)
-  document: string;
-
-  @ApiProperty({ example: '+5511999990000' })
   @IsOptional()
   @IsString()
-  @MaxLength(30)
+  @Length(11)
+  document?: string;
+
+  @ApiProperty({ example: '11999990000' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(11)
   phone?: string;
 }
