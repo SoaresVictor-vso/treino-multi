@@ -1,18 +1,36 @@
 import { ChangeEvent, forwardRef, InputHTMLAttributes, useEffect, useState } from "react";
 
+export type InputMask = {
+  regex: RegExp;
+  replacement: string;
+};
+
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   hint?: string;
+  mask?: InputMask;
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, id, className = "", placeholder, onChange, value, defaultValue, ...props }, ref) => {
+  ({ label, error, hint, id, className = "", placeholder, onChange, value, defaultValue, mask, type, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
+    if (props.required && label)
+      label = `${label} *`;
+
     const resolveHasValue = (currentValue: InputProps["value"] | InputProps["defaultValue"]) => {
       if (typeof currentValue === "number") return true;
       if (typeof currentValue === "string") return currentValue.length > 0;
       return false;
+    };
+    const canApplyMask = (type ?? "text") === "text" && !!mask;
+    const applyMask = (currentValue: string) => {
+      if (!canApplyMask) return currentValue;
+
+      const normalizedValue = currentValue.replace(/\D/g, "");
+      const maskedValue = normalizedValue.replace(mask.regex, mask.replacement);
+
+      return maskedValue.replace(/[^\dA-Za-z]+$/g, "");
     };
 
     const [hasValue, setHasValue] = useState(() => {
@@ -26,6 +44,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     }, [value]);
 
     const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+      if (canApplyMask) {
+        event.target.value = applyMask(event.target.value);
+      }
+
       if (value === undefined) {
         setHasValue(event.target.value.length > 0);
       }
@@ -56,8 +78,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               className
             }
             onChange={handleChange}
-            value={value}
-            defaultValue={defaultValue}
+            value={typeof value === "string" ? applyMask(value) : value}
+            defaultValue={typeof defaultValue === "string" ? applyMask(defaultValue) : defaultValue}
+            type={type}
             {...props}
           />
         </div>

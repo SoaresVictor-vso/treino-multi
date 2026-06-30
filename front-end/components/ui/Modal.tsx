@@ -73,7 +73,7 @@ export default function Modal({
               className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-variant"
               aria-label="Fechar modal"
             >
-              <RiCloseLine className="h-5 w-5" />
+              <RiCloseLine size={24} />
             </button>
           </div>
 

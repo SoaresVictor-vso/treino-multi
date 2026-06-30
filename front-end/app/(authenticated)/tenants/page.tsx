@@ -12,14 +12,15 @@ import {
     type CreateTenantAdminDto,
 } from "@/api/dto/create-tenant-admin.dto";
 import ErrorBox from "@/components/ui/ErrorBox";
-import Input from "@/components/ui/Input";
-import React from "react";
+import Input, { type InputMask } from "@/components/ui/Input";
+import React, { useEffect } from "react";
 import { RiFunctionAddLine } from "react-icons/ri";
 import * as yup from "yup";
 import { TenantService } from "@/api/services/tenant";
 import Modal from "@/components/ui/Modal";
 import Switch from "@/components/ui/Switch";
 import Stepper, { StepperStep } from "@/components/ui/Stepper";
+import { CNPJ_MASK_REGEX, CPF_MASK_REGEX, PHONE_MASK_REGEX } from "@/lib/constants";
 
 export default function TenantsPage() {
     const [tipoFiltro, setTipoFiltro] = React.useState<"all" | "name">("all");
@@ -141,6 +142,15 @@ function ModalTenant(props: {
         ...createTenantAdminInitialValues,
     });
 
+    useEffect(() => {
+        tenantRef.current = { ...createTenantInitialValues };
+        adminRef.current = { ...createTenantAdminInitialValues };
+        setTenantErrors({});
+        setAdminErrors({});
+        setSubmitError(null);
+        setCurrentStep(0);
+    }, [props.isModalOpen]);
+
     const mapYupErrors = (error: unknown) => {
         if (!(error instanceof yup.ValidationError)) return {};
 
@@ -225,7 +235,7 @@ function ModalTenant(props: {
             isOpen={props.isModalOpen}
             onClose={() => props.setIsModalOpen(false)}
             title="Novo contratante"
-            description="Preencha os dados do contratante. O administrador sera mockado automaticamente."
+            description="Preencha os dados do contratante."
         >
             <div className="space-y-4">
                 <Stepper
@@ -262,36 +272,21 @@ function CompanyForm(props: {
         <form className="space-y-3" onSubmit={(e) => e.preventDefault()}>
             <div>
                 <h4 className="text-sm font-semibold text-primary">Dados do tenant</h4>
-                <p className="text-xs text-on-surface-variant">Informe os dados basicos. O usuario administrador sera criado com dados mockados.</p>
+                <p className="text-xs text-on-surface-variant">Informe os dados basicos.</p>
             </div>
             <Input
                 id="tenant-trade-name"
-                label="Nome fantasia"
+                label="Nome fantasia *"
                 defaultValue={props.tenantRef.current.trade_name}
                 error={props.errors.trade_name}
                 onChange={(e) => updateField("trade_name", e.target.value)}
             />
             <Input
                 id="tenant-slug"
-                label="Slug"
+                label="Slug *"
                 defaultValue={props.tenantRef.current.slug}
                 error={props.errors.slug}
                 onChange={(e) => updateField("slug", e.target.value.toLowerCase().trim())}
-            />
-            <Input
-                id="tenant-company-admin-name"
-                label="Nome do responsável"
-                defaultValue={props.tenantRef.current.company_admin_name}
-                error={props.errors.company_admin_name}
-                onChange={(e) => updateField("company_admin_name", e.target.value)}
-            />
-            <Input
-                id="tenant-company-admin-cpf"
-                label="CPF do responsável"
-                hint="Informe 11 dígitos, sem pontuação."
-                defaultValue={props.tenantRef.current.company_admin_cpf}
-                error={props.errors.company_admin_cpf}
-                onChange={(e) => updateField("company_admin_cpf", e.target.value.replace(/\D/g, "").slice(0, 11))}
             />
             <Input
                 id="tenant-cnpj"
@@ -299,6 +294,7 @@ function CompanyForm(props: {
                 hint="Opcional. Informe 14 dígitos, sem pontuação."
                 defaultValue={props.tenantRef.current.cnpj || ""}
                 error={props.errors.cnpj}
+                mask={CNPJ_MASK_REGEX}
                 onChange={(e) => updateField("cnpj", e.target.value.replace(/\D/g, "").slice(0, 14))}
             />
             <Input
@@ -310,15 +306,16 @@ function CompanyForm(props: {
             />
             <Input
                 id="tenant-phone"
-                label="Telefone"
+                label="Telefone *"
                 hint="Informe 11 dígitos, com DDD."
                 defaultValue={props.tenantRef.current.phone}
                 error={props.errors.phone}
+                mask={PHONE_MASK_REGEX}
                 onChange={(e) => updateField("phone", e.target.value.replace(/\D/g, "").slice(0, 11))}
             />
             <Input
                 id="tenant-email"
-                label="E-mail"
+                label="E-mail *"
                 type="email"
                 defaultValue={props.tenantRef.current.email}
                 error={props.errors.email}
@@ -357,7 +354,7 @@ function AdminForm(props: {
             </div>
             <Input
                 id="tenant-admin-name"
-                label="Nome do administrador"
+                label="Nome do administrador *"
                 defaultValue={props.adminRef.current.name}
                 error={props.errors.name}
                 onChange={(e) => updateField("name", e.target.value)}
@@ -376,6 +373,7 @@ function AdminForm(props: {
                 hint="Informe 11 dígitos, sem pontuação."
                 defaultValue={props.adminRef.current.cpf}
                 error={props.errors.cpf}
+                mask={CPF_MASK_REGEX}
                 onChange={(e) => updateField("cpf", e.target.value.replace(/\D/g, "").slice(0, 11))}
             />
             <Input
@@ -384,6 +382,7 @@ function AdminForm(props: {
                 hint="Informe 11 dígitos, com DDD."
                 defaultValue={props.adminRef.current.phone}
                 error={props.errors.phone}
+                mask={PHONE_MASK_REGEX}
                 onChange={(e) => updateField("phone", e.target.value.replace(/\D/g, "").slice(0, 11))}
             />
             <Input

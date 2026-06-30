@@ -5,8 +5,6 @@ import validateEmail from "@/utilities/validators/email";
 export type CreateTenantDto = {
   trade_name: string;
   slug: string;
-  company_admin_name: string;
-  company_admin_cpf: string;
   cnpj?: string;
   registered_name?: string;
   phone: string;
@@ -17,8 +15,6 @@ export type CreateTenantDto = {
 export const createTenantInitialValues: CreateTenantDto = {
   trade_name: "",
   slug: "",
-  company_admin_name: "",
-  company_admin_cpf: "",
   cnpj: "",
   registered_name: "",
   phone: "",
@@ -38,16 +34,6 @@ export const createTenantYupSchema: yup.ObjectSchema<CreateTenantDto> = yup.obje
     .min(2, "Slug deve ter pelo menos 2 caracteres")
     .max(60, "Slug deve ter no máximo 60 caracteres")
     .matches(/^[a-z0-9-]+$/, "Slug deve conter apenas letras minúsculas, números e hífens"),
-  company_admin_name: yup
-    .string()
-    .required("Nome do responsável é obrigatório")
-    .min(2, "Nome do responsável deve ter pelo menos 2 caracteres")
-    .max(120, "Nome do responsável deve ter no máximo 120 caracteres"),
-  company_admin_cpf: yup
-    .string()
-    .required("CPF do responsável é obrigatório")
-    .length(11, "CPF do responsável deve conter 11 dígitos")
-    .test("is-valid-company-admin-cpf", "Digite um CPF válido", (value) => !!value && validateCPF(value)),
   cnpj: yup
     .string()
     .optional()

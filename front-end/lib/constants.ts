@@ -4,3 +4,12 @@ export const API_URL =
 export const CPF_REGEX = /^(\d{11}|\d{3}\.\d{3}\.\d{3}-\d{2})$/;
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const PHONE_REGEX = /^\(?\d{2}\)?[\s-]?\d{4,5}-?\d{4}$/;
+
+export type MaskRegex = {
+  regex: RegExp;
+  replacement: string;
+};
+
+export const CNPJ_MASK_REGEX: MaskRegex = { regex: /^(\d{0,2})(\d{0,3})(\d{0,3})(\d{0,4})(\d{0,2}).*$/, replacement: "$1.$2.$3/$4-$5" };
+export const CPF_MASK_REGEX: MaskRegex = { regex: /^(\d{0,3})(\d{0,3})(\d{0,3})(\d{0,2}).*$/, replacement: "$1.$2.$3-$4" };
+export const PHONE_MASK_REGEX: MaskRegex = { regex: /^(\d{0,2})(\d{0,5})(\d{0,4}).*$/, replacement: "($1) $2-$3" };
