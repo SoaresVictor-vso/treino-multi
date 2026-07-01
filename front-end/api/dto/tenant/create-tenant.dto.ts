@@ -5,21 +5,19 @@ import validateEmail from "@/utilities/validators/email";
 export type CreateTenantDto = {
   trade_name: string;
   slug: string;
-  cnpj?: string;
-  registered_name?: string;
+  cnpj?: string | null;
+  registered_name?: string | null;
   phone: string;
   email: string;
-  isActive: boolean;
 };
 
 export const createTenantInitialValues: CreateTenantDto = {
   trade_name: "",
   slug: "",
-  cnpj: "",
-  registered_name: "",
+  cnpj: undefined,
+  registered_name: undefined,
   phone: "",
   email: "",
-  isActive: true,
 };
 
 export const createTenantYupSchema: yup.ObjectSchema<CreateTenantDto> = yup.object({
@@ -50,5 +48,4 @@ export const createTenantYupSchema: yup.ObjectSchema<CreateTenantDto> = yup.obje
     .string()
     .required("E-mail é obrigatório")
     .test("is-valid-email", "Digite um e-mail válido", (value) => !!value && validateEmail(value)),
-  isActive: yup.boolean().required(),
 });

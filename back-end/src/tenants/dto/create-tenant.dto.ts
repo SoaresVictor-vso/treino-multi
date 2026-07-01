@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
-  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
@@ -8,10 +8,10 @@ import {
   Matches,
   MaxLength,
   MinLength,
-  ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { CreateTenantAdminDto } from './create-tenant-admin.dto';
+
+const emptyStringToNull = ({ value }: { value: unknown }) =>
+  value === '' ? null : value;
 
 export class CreateTenantDto {
   @ApiProperty({ example: 'ACME Corp', maxLength: 120 })
@@ -29,25 +29,16 @@ export class CreateTenantDto {
   })
   slug!: string;
 
-  @ApiProperty({ example: 'João da Silva', maxLength: 120 })
-  @IsString()
-  @MinLength(2)
-  @MaxLength(120)
-  company_admin_name!: string;
-
-  @ApiProperty({ example: '12345678901', minLength: 11, maxLength: 11 })
-  @IsString()
-  @Length(11, 11)
-  company_admin_cpf!: string;
-
   @ApiProperty({ example: '12345678000199', required: false })
   @IsOptional()
+  @Transform(emptyStringToNull)
   @IsString()
   @Length(14, 14)
   cnpj?: string;
 
   @ApiProperty({ example: 'ACME Industria e Comercio LTDA', required: false, maxLength: 120 })
   @IsOptional()
+  @Transform(emptyStringToNull)
   @IsString()
   @MaxLength(120)
   registered_name?: string;
@@ -60,14 +51,4 @@ export class CreateTenantDto {
   @ApiProperty({ example: 'contato@acme-corp.com' })
   @IsEmail()
   email!: string;
-
-  @ApiProperty({ default: true, required: false })
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
-
-  @ApiProperty({ type: () => CreateTenantAdminDto })
-  @ValidateNested()
-  @Type(() => CreateTenantAdminDto)
-  admin!: CreateTenantAdminDto;
 }

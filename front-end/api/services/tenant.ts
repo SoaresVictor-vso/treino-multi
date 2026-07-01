@@ -1,5 +1,6 @@
 import { authenticatedRequest } from "../client";
-import { CreateTenantDto } from "../dto/create-tenant.dto";
+import { CreateTenantAdminDto } from "../dto/tenant/create-tenant-admin.dto";
+import { CreateTenantDto } from "../dto/tenant/create-tenant.dto";
 
 export type paramsFindMultiple = {
     filter?: "all" | "name";
@@ -7,6 +8,12 @@ export type paramsFindMultiple = {
     page?: number;
     limit?: number;
 };
+
+export type ResultCreateTenant = {
+    error?: string;
+    status: number;
+    success: boolean;
+}
 
 export class TenantService {
     private readonly apiUrl = 'tenants';
@@ -18,10 +25,10 @@ export class TenantService {
         });
     }
 
-    async create(dto: CreateTenantDto) {
-        return authenticatedRequest(this.apiUrl, {
+    async create(tenant: CreateTenantDto, admin: CreateTenantAdminDto) {
+        return authenticatedRequest<ResultCreateTenant>(this.apiUrl, {
             method: "POST",
-            body: JSON.stringify(dto),
+            body: JSON.stringify({ tenant, admin }),
         });
     }
 }

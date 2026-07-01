@@ -21,12 +21,12 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { TenantsService } from './tenants.service';
-import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { Permission } from '../common/enums/permission.enum';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import * as jwtPayloadInterface from '../auth/interfaces/jwt-payload.interface';
+import { CreateTenantFullDto } from './dto/create-tenant-full.dto';
 
 /**
  * CRUD de Tenant.
@@ -44,7 +44,7 @@ export class TenantsController {
   @Post()
   @RequirePermissions(Permission.TENANT_CREATE)
   create(
-    @Body() dto: CreateTenantDto,
+    @Body() dto: CreateTenantFullDto,
     @CurrentUser() actor: jwtPayloadInterface.JwtPayload,
     @Ip() ip: string,
   ) {

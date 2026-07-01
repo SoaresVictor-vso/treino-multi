@@ -5,18 +5,18 @@ import {
     createTenantInitialValues,
     createTenantYupSchema,
     type CreateTenantDto,
-} from "@/api/dto/create-tenant.dto";
+} from "@/api/dto/tenant/create-tenant.dto";
 import {
     createTenantAdminYupSchema,
     createTenantAdminInitialValues,
     type CreateTenantAdminDto,
-} from "@/api/dto/create-tenant-admin.dto";
+} from "@/api/dto/tenant/create-tenant-admin.dto";
 import ErrorBox from "@/components/ui/ErrorBox";
 import Input, { type InputMask } from "@/components/ui/Input";
 import React, { useEffect } from "react";
 import { RiFunctionAddLine } from "react-icons/ri";
 import * as yup from "yup";
-import { TenantService } from "@/api/services/tenant";
+import { ResultCreateTenant, TenantService } from "@/api/services/tenant";
 import Modal from "@/components/ui/Modal";
 import Switch from "@/components/ui/Switch";
 import Stepper, { StepperStep } from "@/components/ui/Stepper";
@@ -112,15 +112,8 @@ export default function TenantsPage() {
             <ModalTenant
                 isModalOpen={isModalOpen}
                 setIsModalOpen={setIsModalOpen}
-                onSubmit={async (data) => {
-                    try {
-                        await tenantService.create(data);
-                        setIsModalOpen(false);
-                        buscarTodos();
-                    } catch (error) {
-                        console.error("Erro ao criar contratante:", error);
-                    }
-                }}
+                onSubmit={tenantService.create.bind(tenantService)}
+                callback={buscarTodos}
             />
         </>
     );
@@ -129,7 +122,8 @@ export default function TenantsPage() {
 function ModalTenant(props: {
     isModalOpen: boolean;
     setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
-    onSubmit: (data: CreateTenantDto) => Promise<any>;
+    onSubmit: (tenant: CreateTenantDto, admin: CreateTenantAdminDto) => Promise<ResultCreateTenant>;
+    callback?: () => void;
 }) {
     const [currentStep, setCurrentStep] = React.useState(0);
     const [tenantErrors, setTenantErrors] = React.useState<Partial<Record<keyof CreateTenantDto, string>>>({});
@@ -214,7 +208,22 @@ function ModalTenant(props: {
 
 
         console.log("Submitting tenant data:", tenantRef.current, adminRef.current);
-        // await props.onSubmit(tenantRef.current);
+        try {
+            const result =await props.onSubmit(tenantRef.current, adminRef.current);
+            if (!result.success) {
+                setSubmitError(result.error || "Não foi possível criar o contratante.");
+                return;
+            }
+
+            props.setIsModalOpen(false);
+            if (props.callback) {
+                props.callback();
+            }
+        } catch (error) {
+            console.error(error);
+            setSubmitError("Não foi possível criar o contratante.");
+            return;
+        }
     };
 
     const validateStep = async (): Promise<boolean> => {
@@ -324,10 +333,8 @@ function CompanyForm(props: {
             <Switch
                 id="tenant-is-active"
                 label="Tenant ativo"
-                description="Ativado por padrão para novos contratantes."
-                checked={props.tenantRef.current.isActive}
+                checked={true}
                 disabled
-                onChange={() => updateField("isActive", !props.tenantRef.current.isActive)}
             />
         </form>
     );
