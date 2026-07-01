@@ -16,12 +16,11 @@ const Switch = forwardRef<HTMLInputElement, SwitchProps>(
         <label
           htmlFor={inputId}
           className={[
-            "flex items-start gap-3",
+            "flex items-start gap-3 rounded-2xl border border-outline-variant bg-surface-container-high/70 px-4 py-3",
             props.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
           ].join(" ")}
         >
-          {/* Track */}
-          <div className="relative flex-shrink-0 mt-0.5">
+          <div className="relative mt-0.5 flex-shrink-0">
             <input
               ref={ref}
               id={inputId}
@@ -34,35 +33,33 @@ const Switch = forwardRef<HTMLInputElement, SwitchProps>(
             />
             <div
               className={[
-                "w-11 h-6 rounded-full transition-colors",
-                "peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-blue-500",
+                "h-6 w-11 rounded-full border transition-colors",
+                "peer-focus-visible:ring-2 peer-focus-visible:ring-primary-fixed-dim/30",
                 error
-                  ? "bg-red-200 peer-checked:bg-red-500"
-                  : "bg-gray-200 peer-checked:bg-blue-600",
+                  ? "border-error/50 bg-error/20 peer-checked:bg-error/60"
+                  : "border-outline-variant bg-surface-variant peer-checked:border-primary-fixed-dim/40 peer-checked:bg-primary-container",
                 className,
               ]
                 .filter(Boolean)
                 .join(" ")}
             />
-            {/* Thumb */}
-            <div className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5 pointer-events-none" />
+            <div className="pointer-events-none absolute top-1 left-1 h-4 w-4 rounded-full bg-primary transition-transform peer-checked:translate-x-5" />
           </div>
 
-          {/* Label + description */}
           {(label || description) && (
             <div className="flex flex-col">
               {label && (
-                <span className="text-sm font-medium text-gray-700">{label}</span>
+                <span className="text-sm font-medium text-primary">{label}</span>
               )}
               {description && (
-                <span className="text-xs text-gray-500">{description}</span>
+                <span className="text-xs text-on-surface-variant">{description}</span>
               )}
             </div>
           )}
         </label>
 
         {error && (
-          <p id={`${inputId}-error`} role="alert" className="text-xs text-red-600 ml-14">
+          <p id={`${inputId}-error`} role="alert" className="ml-14 text-xs text-error">
             {error}
           </p>
         )}

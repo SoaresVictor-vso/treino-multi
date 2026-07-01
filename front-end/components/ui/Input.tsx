@@ -1,4 +1,4 @@
-import { ChangeEvent, forwardRef, InputHTMLAttributes, useEffect, useState } from "react";
+import { ChangeEvent, ReactNode, forwardRef, InputHTMLAttributes, useEffect, useState } from "react";
 
 export type InputMask = {
   regex: RegExp;
@@ -10,10 +10,11 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: string;
   hint?: string;
   mask?: InputMask;
+  leadingIcon?: ReactNode;
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, id, className = "", placeholder, onChange, value, defaultValue, mask, type, ...props }, ref) => {
+  ({ label, error, hint, id, className = "", placeholder, onChange, value, defaultValue, mask, type, leadingIcon, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
     if (props.required && label)
       label = `${label} *`;
@@ -65,7 +66,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             {label}
           </label>
         )}
-        <div className="relative">
+        <div
+          className={`relative rounded-xl border border-outline-variant bg-surface-container-high transition-colors ${
+            error ? "border-error/60" : "focus-within:border-primary-fixed-dim/50"
+          }`}
+        >
+          {leadingIcon ? (
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
+              {leadingIcon}
+            </span>
+          ) : null}
           <input
             ref={ref}
             id={inputId}
@@ -73,7 +83,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
             placeholder={hasValue ? "" : (placeholder ?? label)}
             className={
-              "w-full bg-surface-container-high border border-outline-variant p-2 text-primary focus:ring-0 " +
+              "w-full rounded-xl bg-transparent px-3 py-3 text-primary outline-none focus:ring-0 " +
+              (leadingIcon ? " pl-10" : "") +
               "autofill:bg-surface-container-high autofill:text-primary autofill:shadow-[inset_0_0_0px_1000px_var(--color-surface-container-high)] autofill:[-webkit-text-fill-color:var(--color-primary)] " +
               className
             }
@@ -85,7 +96,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           />
         </div>
         {hint && !error && (
-          <p id={`${inputId}-hint`} className="text-xs text-gray-500">
+          <p id={`${inputId}-hint`} className="text-xs text-on-surface-variant/80">
             {hint}
           </p>
         )}

@@ -1,33 +1,47 @@
-export default function Button(
-    props: React.ButtonHTMLAttributes<HTMLButtonElement> & { text?: string; variant?: "default" | "outline" }
-) {
-    const { children, variant, ...rest } = props
-    // function getColor() {
-    //     switch (buttonStyle) {
-    //         case "danger":
-    //             return "bg-red-600 hover:bg-red-700 focus:ring-red-500";
-    //         case "default":
-    //         default:
-    //             return "bg-blue-600 hover:bg-blue-700 focus:ring-blue-500";
-    //     }
-    // }
-    const baseClass = "px-4 py-3 rounded-lg flex items-center justify-center gap-2 kinetic-glow transition-all  font-bold ";
+import { ButtonHTMLAttributes } from "react";
 
-    const classOutline = "px-4 rounded border border-outline-variant text-on-surface-variant hover:bg-surface-variant transition-colors"
-    const classDefault = "bg-primary-container text-on-primary-container";
+type ButtonVariant = "default" | "outline" | "ghost";
+type ButtonSize = "sm" | "md" | "icon";
+
+export default function Button(
+    props: ButtonHTMLAttributes<HTMLButtonElement> & {
+        text?: string;
+        variant?: ButtonVariant;
+        size?: ButtonSize;
+    },
+) {
+    const {
+        children,
+        variant = "default",
+        size = "md",
+        className = "",
+        text,
+        type = "button",
+        ...rest
+    } = props;
+
+    const baseClass =
+        "inline-flex items-center justify-center gap-2 rounded-xl font-bold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/30 disabled:cursor-not-allowed disabled:opacity-50";
+
+    const variantClasses: Record<ButtonVariant, string> = {
+        default: "bg-primary-container text-on-primary-fixed hover:shadow-[0_0_18px_rgba(195,244,0,0.18)] hover:-translate-y-0.5",
+        outline: "border border-outline-variant bg-transparent text-on-surface-variant hover:border-primary-fixed-dim/40 hover:bg-surface-variant/60 hover:text-primary",
+        ghost: "bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-primary",
+    };
+
+    const sizeClasses: Record<ButtonSize, string> = {
+        sm: "min-h-10 px-3 py-2 text-sm",
+        md: "min-h-12 px-4 py-3",
+        icon: "h-10 w-10 p-0",
+    };
+
     return (
         <button
             {...rest}
-            // className={
-            //     `w-full rounded-lg px-4 py-2 text-sm font-semibold text-white` +
-            //     ` focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50` +
-            //     `disabled:cursor-not-allowed transition-colors ${getColor()}` +
-            //     ` ${props.className || ""}`}
-
-            className={
-                `${variant === "outline" ? classOutline : classDefault} ${baseClass} ${props.className || ""}`}
+            type={type}
+            className={`${baseClass} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`.trim()}
         >
-            {children || (props.text ? <span className="text-white">{props.text}</span> : null)}
+            {children || (text ? <span>{text}</span> : null)}
         </button>
-    )
+    );
 }

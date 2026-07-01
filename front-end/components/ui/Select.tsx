@@ -1,4 +1,5 @@
-import { forwardRef, SelectHTMLAttributes } from "react";
+import { forwardRef, ReactNode, SelectHTMLAttributes } from "react";
+import { RiArrowDownSLine } from "react-icons/ri";
 
 export interface SelectOption {
   value: string | number;
@@ -12,65 +13,63 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   hint?: string;
   options: SelectOption[];
   placeholder?: string;
+  leadingIcon?: ReactNode;
 }
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, hint, id, options, placeholder, className = "", ...props }, ref) => {
+  ({ label, error, hint, id, options, placeholder, className = "", leadingIcon, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
 
     return (
       <div className="flex flex-col gap-1">
-        {/* {label && (
-          <label htmlFor={inputId} className="text-lg font-bold text-gray-100 ps-1">
-            {label}
-          </label>
-        )} */}
-        <select
-          ref={ref}
-          id={inputId}
-          aria-invalid={!!error}
-          aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
-          // className={[
-          //   "w-full rounded-lg border px-3 py-2 text-lg outline-none transition appearance-none bg-no-repeat text-gray-100",
-          //   "focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-800",
-          //   error
-          //     ? "border-red-500 bg-red-50 focus:ring-red-400 focus:border-red-500"
-          //     : "border-gray-300 bg-gray-800",
-          //   props.disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
-          //   className,
-          // ]
-          //   .filter(Boolean)
-          //   .join(" ")}
-          className={
-            "w-full bg-surface-container-high border border-outline-variant " +
-            "p-2 text-primary focus:ring-0 " +
-            "autofill:bg-surface-container-high autofill:text-primary autofill:shadow-[inset_0_0_0px_1000px_var(--color-surface-container-high)] autofill:[-webkit-text-fill-color:var(--color-primary)]"
-          }
-          style={{
-            backgroundPosition: "right 0.75rem center",
-            backgroundSize: "12px",
-            paddingRight: "2.5rem",
-          }}
-          {...props}
+        <div
+          className={`relative rounded-xl border border-outline-variant bg-surface-container-high transition-colors ${
+            error ? "border-error/60" : "focus-within:border-primary-fixed-dim/50"
+          }`}
         >
-          {(placeholder || label) && (
-            <option value="" disabled>
-              {placeholder ?? label}
-            </option>
-          )}
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value} disabled={opt.disabled}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          {leadingIcon ? (
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
+              {leadingIcon}
+            </span>
+          ) : null}
+          <select
+            ref={ref}
+            id={inputId}
+            aria-invalid={!!error}
+            aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
+            className={
+              "w-full appearance-none rounded-xl bg-surface-container-high px-3 py-3 text-primary outline-none focus:ring-0 " +
+              (leadingIcon ? " pl-10" : "") +
+              " pr-10 [color-scheme:dark] autofill:bg-surface-container-high autofill:text-primary autofill:shadow-[inset_0_0_0px_1000px_var(--color-surface-container-high)] autofill:[-webkit-text-fill-color:var(--color-primary)] " +
+              className
+            }
+            {...props}
+          >
+            {(placeholder || label) && (
+              <option value="" disabled className="bg-surface-container-high text-on-surface-variant">
+                {placeholder ?? label}
+              </option>
+            )}
+            {options.map((opt) => (
+              <option
+                key={opt.value}
+                value={opt.value}
+                disabled={opt.disabled}
+                className="bg-surface-container-high text-primary"
+              >
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <RiArrowDownSLine className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant" />
+        </div>
         {hint && !error && (
-          <p id={`${inputId}-hint`} className="text-xs text-gray-500">
+          <p id={`${inputId}-hint`} className="text-xs text-on-surface-variant/80">
             {hint}
           </p>
         )}
         {error && (
-          <p id={`${inputId}-error`} role="alert" className="text-xs text-red-600">
+          <p id={`${inputId}-error`} role="alert" className="text-xs text-error">
             {error}
           </p>
         )}

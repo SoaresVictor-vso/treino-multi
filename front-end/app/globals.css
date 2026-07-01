@@ -161,10 +161,66 @@
     font-weight: 700;
     line-height: 1.5rem;
   }
+
+  .surface-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-primary-fixed-dim) var(--color-surface-container-low);
+  }
+
+  .surface-scrollbar::-webkit-scrollbar {
+    width: 0.75rem;
+    height: 0.75rem;
+  }
+
+  .surface-scrollbar::-webkit-scrollbar-track {
+    background: var(--color-surface-container-low);
+  }
+
+  .surface-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--color-primary-fixed-dim);
+    border: 3px solid var(--color-surface-container-low);
+    border-radius: 9999px;
+  }
+
+  .surface-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--color-primary-container);
+  }
 }
 
+html,
 body {
   background-color: var(--color-background);
   color: var(--color-on-surface);
   font-family: var(--font-sans);
+}
+
+body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary-fixed-dim) var(--color-surface-container-low);
+}
+
+body::-webkit-scrollbar {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+body::-webkit-scrollbar-track {
+  background: var(--color-surface-container-low);
+}
+
+body::-webkit-scrollbar-thumb {
+  background: var(--color-primary-fixed-dim);
+  border: 3px solid var(--color-surface-container-low);
+  border-radius: 9999px;
+}
+
+body::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-container);
+}
+
+select,
+option,
+optgroup {
+  background-color: var(--color-surface-container-high);
+  color: var(--color-on-surface);
 }
