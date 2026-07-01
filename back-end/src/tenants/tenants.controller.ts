@@ -81,6 +81,15 @@ export class TenantsController {
     return this.tenantsService.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Busca tenant por ID com dados do administrador' })
+  @ApiResponse({ status: 200, description: 'Detalhe do tenant encontrado' })
+  @ApiResponse({ status: 404, description: 'Tenant não encontrado' })
+  @Get(':id/details')
+  @RequirePermissions(Permission.TENANT_READ)
+  findDetails(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.tenantsService.findDetails(id);
+  }
+
   /** PATCH /tenants/:id — atualiza dados de um tenant */
   @ApiOperation({ summary: 'Atualiza dados do tenant' })
   @ApiResponse({ status: 200, description: 'Tenant atualizado' })

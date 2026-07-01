@@ -5,6 +5,7 @@ import TenantStatusBadge from "./TenantStatusBadge";
 
 type TenantsTableProps = {
   tenants: TenantListItemDto[];
+  onViewTenant: (tenant: TenantListItemDto) => void;
 };
 
 function formatPhone(phone: string | null) {
@@ -38,7 +39,7 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-outline-variant bg-surface-variant/20 text-primary-fixed-dim">
-        <RiBox3Line className="text-2xl" />
+        <RiBox3Line size={24} />
       </div>
       <div className="space-y-1">
         <h3 className="text-lg font-semibold text-primary">Nenhum tenant encontrado</h3>
@@ -54,7 +55,7 @@ function TenantIdentity({ tenant }: { tenant: TenantListItemDto }) {
   return (
     <div className="flex items-center gap-3">
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-outline-variant bg-surface-variant/20 text-primary-fixed-dim">
-        <RiBuildingLine className="text-xl" />
+        <RiBuildingLine size={20} />
       </div>
       <div className="min-w-0">
         <p className="truncate text-base font-semibold text-primary">{tenant.tradeName || tenant.name}</p>
@@ -64,23 +65,28 @@ function TenantIdentity({ tenant }: { tenant: TenantListItemDto }) {
   );
 }
 
-function TenantActions() {
+function TenantActions(props: { tenant: TenantListItemDto; onViewTenant: (tenant: TenantListItemDto) => void }) {
   return (
     <div className="flex items-center justify-end gap-1">
-      <Button variant="ghost" size="icon" title="Visualizar">
-        <RiEyeLine className="text-lg" />
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Visualizar"
+        onClick={() => props.onViewTenant(props.tenant)}
+      >
+        <RiEyeLine size={18} />
       </Button>
       <Button variant="ghost" size="icon" title="Editar">
-        <RiEditLine className="text-lg" />
+        <RiEditLine size={18} />
       </Button>
       <Button variant="ghost" size="icon" title="Mais acoes">
-        <RiMore2Fill className="text-lg" />
+        <RiMore2Fill size={18} />
       </Button>
     </div>
   );
 }
 
-export default function TenantsTable({ tenants }: TenantsTableProps) {
+export default function TenantsTable({ tenants, onViewTenant }: TenantsTableProps) {
   if (!tenants.length) {
     return (
       <section className="overflow-hidden rounded-[20px] border border-outline-variant bg-surface-container shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
@@ -123,7 +129,7 @@ export default function TenantsTable({ tenants }: TenantsTableProps) {
                 <p>{formatDate(tenant.createdAt)}</p>
               </div>
             </div>
-            <TenantActions />
+            <TenantActions tenant={tenant} onViewTenant={onViewTenant} />
           </article>
         ))}
       </div>
@@ -165,7 +171,7 @@ export default function TenantsTable({ tenants }: TenantsTableProps) {
                   <TenantStatusBadge tenant={tenant} />
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <TenantActions />
+                  <TenantActions tenant={tenant} onViewTenant={onViewTenant} />
                 </td>
               </tr>
             ))}

@@ -76,6 +76,7 @@ describe('TenantsService', () => {
   let service: TenantsService;
   let tenantRepo: jest.Mocked<Repository<Tenant>>;
   let personRepo: jest.Mocked<Repository<Person>>;
+  let userRepo: jest.Mocked<Repository<User>>;
   let dataSource: { transaction: jest.Mock };
   let auditLogService: { logCriticalOperation: jest.Mock };
 
@@ -107,6 +108,12 @@ describe('TenantsService', () => {
           },
         },
         {
+          provide: getRepositoryToken(User),
+          useValue: {
+            createQueryBuilder: jest.fn(),
+          },
+        },
+        {
           provide: DataSource,
           useValue: dataSource,
         },
@@ -120,6 +127,7 @@ describe('TenantsService', () => {
     service = module.get(TenantsService);
     tenantRepo = module.get(getRepositoryToken(Tenant));
     personRepo = module.get(getRepositoryToken(Person));
+    userRepo = module.get(getRepositoryToken(User));
   });
 
   describe('create()', () => {
@@ -324,6 +332,60 @@ describe('TenantsService', () => {
       await expect(service.findOne('id-inexistente')).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe('findDetails()', () => {
+    it('deve retornar o tenant com os dados do admin principal', async () => {
+      const tenant = makeTenant();
+      const adminUser = makeUser();
+      tenantRepo.findOne.mockResolvedValue(tenant);
+
+      const qb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(adminUser),
+      };
+      userRepo.createQueryBuilder.mockReturnValue(qb as any);
+
+      const result = await service.findDetails('tenant-uuid-1');
+
+      expect(result).toEqual({
+        ...tenant,
+        admin: {
+          name: adminUser.person.name,
+          email: adminUser.person.email,
+          cpf: adminUser.person.document,
+          phone: adminUser.person.phone,
+        },
+      });
+    });
+
+    it('deve retornar admin null quando não existir usuário admin para o tenant', async () => {
+      const tenant = makeTenant();
+      tenantRepo.findOne.mockResolvedValue(tenant);
+
+      const qb = {
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      };
+      userRepo.createQueryBuilder.mockReturnValue(qb as any);
+
+      const result = await service.findDetails('tenant-uuid-1');
+
+      expect(result).toEqual({
+        ...tenant,
+        admin: null,
+      });
     });
   });
 

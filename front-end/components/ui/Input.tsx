@@ -83,9 +83,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
             placeholder={hasValue ? "" : (placeholder ?? label)}
             className={
-              "w-full rounded-xl bg-transparent px-3 py-3 text-primary outline-none focus:ring-0 " +
-              (leadingIcon ? " pl-10" : "") +
-              "autofill:bg-surface-container-high autofill:text-primary autofill:shadow-[inset_0_0_0px_1000px_var(--color-surface-container-high)] autofill:[-webkit-text-fill-color:var(--color-primary)] " +
+              "w-full rounded-xl bg-transparent py-3 text-primary outline-none focus:ring-0 " +
+              (leadingIcon ? " ps-12 pe-3" : " px-3") +
+              " autofill:bg-surface-container-high autofill:text-primary autofill:shadow-[inset_0_0_0px_1000px_var(--color-surface-container-high)] autofill:[-webkit-text-fill-color:var(--color-primary)] " +
               className
             }
             onChange={handleChange}

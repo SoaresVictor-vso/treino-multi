@@ -21,6 +21,7 @@ type StepperProps = {
   currentStep: number;
   labels: StepperLabels;
   onCancel: () => void;
+  onStepChange?: (targetPage: number) => void;
   onPrev: (targetPage: number) => void;
   onNext: (targetPage: number) => void;
   onDone?: () => void;
@@ -34,6 +35,7 @@ export default function Stepper({
   currentStep,
   labels,
   onCancel,
+  onStepChange,
   onPrev,
   onNext,
   onDone,
@@ -73,13 +75,16 @@ export default function Stepper({
             const isCompleted = index < currentStep;
 
             return (
-              <div
+              <button
                 key={step.title}
+                type="button"
+                onClick={() => onStepChange?.(index)}
+                disabled={isSubmitting || !onStepChange}
                 className={`rounded-2xl border px-3 py-3 text-left transition-colors ${
                   isActive
                     ? "border-primary-fixed-dim/30 bg-primary-fixed-dim/10"
                     : "border-outline-variant bg-surface-container"
-                }`}
+                } ${onStepChange ? "hover:border-primary-fixed-dim/40 hover:bg-surface-variant/50" : ""}`}
               >
                 <div className="flex items-center gap-3">
                   <div
@@ -102,7 +107,7 @@ export default function Stepper({
                     ) : null}
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

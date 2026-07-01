@@ -41,7 +41,7 @@ export default function TenantsFilters(props: TenantsFiltersProps) {
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
         <div className="flex items-center gap-3 text-on-surface-variant">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-outline-variant bg-surface-variant/20 text-primary-fixed-dim">
-            <RiFilter3Line className="text-lg" />
+            <RiFilter3Line size={22} />
           </div>
           <div>
             <p className="type-label-caps text-secondary-fixed-dim">Filtros</p>
@@ -55,21 +55,21 @@ export default function TenantsFilters(props: TenantsFiltersProps) {
             value={props.search}
             onChange={(event) => props.onSearchChange(event.target.value)}
             placeholder="Buscar por nome do tenant"
-            leadingIcon={<RiSearchLine className="text-lg" />}
+            leadingIcon={<RiSearchLine size={22} />}
           />
           <Select
             id="tenants-status"
             value={props.status}
             onChange={(event) => props.onStatusChange(event.target.value as TenantStatusFilter)}
             options={statusOptions}
-            leadingIcon={<RiListCheck3 className="text-lg" />}
+            leadingIcon={<RiListCheck3 size={22} />}
           />
           <Select
             id="tenants-sort"
             value={props.sort}
             onChange={(event) => props.onSortChange(event.target.value as TenantSortOption)}
             options={sortOptions}
-            leadingIcon={<RiSortDesc className="text-lg" />}
+            leadingIcon={<RiSortDesc size={22} />}
           />
           <Button
             variant={hasActiveFilters ? "outline" : "ghost"}

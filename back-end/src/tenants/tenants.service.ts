@@ -25,6 +25,17 @@ const normalizeNullableString = (
   return value;
 };
 
+type TenantAdminDetails = {
+  name: string | null;
+  email: string | null;
+  cpf: string | null;
+  phone: string | null;
+};
+
+type TenantDetails = Tenant & {
+  admin: TenantAdminDetails | null;
+};
+
 @Injectable()
 export class TenantsService {
   constructor(
@@ -32,6 +43,8 @@ export class TenantsService {
     private readonly tenantRepo: Repository<Tenant>,
     @InjectRepository(Person)
     private readonly personRepo: Repository<Person>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly auditLogService: AuditLogService,
   ) {}
@@ -169,6 +182,37 @@ export class TenantsService {
       throw new NotFoundException(`Tenant ${id} não encontrado.`);
     }
     return tenant;
+  }
+
+  async findDetails(id: string): Promise<TenantDetails> {
+    const tenant = await this.findOne(id);
+    const adminUser = await this.userRepo
+      .createQueryBuilder('user')
+      .innerJoinAndSelect('user.person', 'person')
+      .innerJoin(
+        'user.userRoles',
+        'userRole',
+        'userRole.role = :role AND userRole.deleted_at IS NULL',
+        { role: Role.TENANT_ADMIN },
+      )
+      .where('user.tenant_id = :tenantId', { tenantId: id })
+      .andWhere('user.context = :context', { context: 'tenant' })
+      .andWhere('user.deleted_at IS NULL')
+      .orderBy('userRole.assigned_at', 'ASC')
+      .addOrderBy('user.created_at', 'ASC')
+      .getOne();
+
+    return {
+      ...tenant,
+      admin: adminUser?.person
+        ? {
+            name: adminUser.person.name ?? null,
+            email: adminUser.person.email ?? null,
+            cpf: adminUser.person.document ?? null,
+            phone: adminUser.person.phone ?? null,
+          }
+        : null,
+    };
   }
 
   async findBySlug(slug: string): Promise<Tenant | null> {

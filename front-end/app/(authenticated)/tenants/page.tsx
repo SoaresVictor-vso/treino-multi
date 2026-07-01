@@ -10,6 +10,7 @@ import {
     createTenantAdminYupSchema,
     type CreateTenantAdminDto,
 } from "@/api/dto/tenant/create-tenant-admin.dto";
+import { TenantDetailsDto } from "@/api/dto/tenant/detail-tenant.dto";
 import { TenantListItemDto } from "@/api/dto/tenant/list-tenant.dto";
 import { ApiResponse } from "@/api/client";
 import { TenantService } from "@/api/services/tenant";
@@ -29,16 +30,27 @@ import React, { startTransition, useDeferredValue, useEffect } from "react";
 import { RiAddLine, RiAdminLine, RiBuilding2Line, RiLoader4Line, RiRefreshLine, RiShieldCheckLine } from "react-icons/ri";
 import * as yup from "yup";
 
+type TenantModalState =
+    | { mode: "create" }
+    | {
+        mode: "view";
+        tenantId: string;
+        tenantDetails: TenantDetailsDto | null;
+        isLoadingDetails: boolean;
+        detailsError: string | null;
+    };
+
 export default function TenantsPage() {
     const tenantServiceRef = React.useRef(new TenantService());
     const [tenants, setTenants] = React.useState<TenantListItemDto[]>([]);
     const [search, setSearch] = React.useState("");
     const [statusFilter, setStatusFilter] = React.useState<TenantStatusFilter>("all");
     const [sortBy, setSortBy] = React.useState<TenantSortOption>("recent");
-    const [isModalOpen, setIsModalOpen] = React.useState(false);
+    const [modalState, setModalState] = React.useState<TenantModalState | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [loadError, setLoadError] = React.useState<string | null>(null);
     const deferredSearch = useDeferredValue(search);
+    const debounceTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const requestTenants = async (searchValue: string) => {
         const trimmedSearch = searchValue.trim();
@@ -62,34 +74,66 @@ export default function TenantsPage() {
 
     useEffect(() => {
         let isCancelled = false;
+        const trimmedSearch = deferredSearch.trim();
 
-        const syncTenants = async () => {
-            const trimmedSearch = deferredSearch.trim();
-            const result = await tenantServiceRef.current.findMultiple({
-                filter: trimmedSearch ? "name" : "all",
-                name: trimmedSearch || undefined,
-                includeInactive: true,
-            });
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
 
-            if (isCancelled) return;
+        if (!trimmedSearch) {
+            const syncAllTenants = async () => {
+                const result = await tenantServiceRef.current.findMultiple({
+                    filter: "all",
+                    includeInactive: true,
+                });
 
-            if (!result.success || !result.data) {
-                setLoadError(result.error || "Nao foi possivel carregar a listagem de tenants.");
+                if (isCancelled) return;
+
+                if (!result.success || !result.data) {
+                    setLoadError(result.error || "Nao foi possivel carregar a listagem de tenants.");
+                    setIsLoading(false);
+                    return;
+                }
+
+                startTransition(() => {
+                    setTenants(result.data || []);
+                });
+                setLoadError(null);
                 setIsLoading(false);
-                return;
-            }
+            };
 
-            startTransition(() => {
-                setTenants(result.data || []);
-            });
-            setLoadError(null);
-            setIsLoading(false);
-        };
+            void syncAllTenants();
+        } else if (trimmedSearch.length > 3) {
+            debounceTimeoutRef.current = setTimeout(() => {
+                void (async () => {
+                    const result = await tenantServiceRef.current.findMultiple({
+                        filter: "name",
+                        name: trimmedSearch,
+                        includeInactive: true,
+                    });
 
-        void syncTenants();
+                    if (isCancelled) return;
+
+                    if (!result.success || !result.data) {
+                        setLoadError(result.error || "Nao foi possivel carregar a listagem de tenants.");
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    startTransition(() => {
+                        setTenants(result.data || []);
+                    });
+                    setLoadError(null);
+                    setIsLoading(false);
+                })();
+            }, 1000);
+        }
 
         return () => {
             isCancelled = true;
+            if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current);
+            }
         };
     }, [deferredSearch]);
 
@@ -136,6 +180,41 @@ export default function TenantsPage() {
         return result;
     };
 
+    const handleViewTenant = (tenant: TenantListItemDto) => {
+        setModalState({
+            mode: "view",
+            tenantId: tenant.id,
+            tenantDetails: null,
+            isLoadingDetails: true,
+            detailsError: null,
+        });
+
+        void (async () => {
+            const result = await tenantServiceRef.current.findDetails(tenant.id);
+
+            setModalState((current) => {
+                if (!current || current.mode !== "view" || current.tenantId !== tenant.id) {
+                    return current;
+                }
+
+                if (!result.success || !result.data) {
+                    return {
+                        ...current,
+                        isLoadingDetails: false,
+                        detailsError: result.error || "Nao foi possivel carregar os dados do tenant.",
+                    };
+                }
+
+                return {
+                    ...current,
+                    tenantDetails: result.data,
+                    isLoadingDetails: false,
+                    detailsError: null,
+                };
+            });
+        })();
+    };
+
     return (
         <>
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -166,7 +245,7 @@ export default function TenantsPage() {
                                     Atualizar
                                 </span>
                             </Button>
-                            <Button className="w-full lg:w-auto" onClick={() => setIsModalOpen(true)}>
+                            <Button className="w-full lg:w-auto" onClick={() => setModalState({ mode: "create" })}>
                                 <span className="type-label-caps flex items-center gap-2">
                                     <RiAddLine size={22} />
                                     Novo tenant
@@ -218,18 +297,21 @@ export default function TenantsPage() {
             {isLoading && tenants.length === 0 ? (
                 <section className="rounded-[20px] border border-outline-variant bg-surface-container p-8 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                     <div className="flex items-center justify-center gap-3 text-on-surface-variant">
-                        <RiLoader4Line className="animate-spin text-xl text-primary-fixed-dim" />
+                        <span className="animate-spin text-xl text-primary-fixed-dim">
+                            <RiLoader4Line size={20} />
+                        </span>
                         <span>Carregando tenants...</span>
                     </div>
                 </section>
             ) : (
-                <TenantsTable tenants={filteredTenants} />
+                <TenantsTable tenants={filteredTenants} onViewTenant={handleViewTenant} />
             )}
 
-            {isModalOpen ? (
+            {modalState ? (
                 <ModalTenant
-                    isModalOpen={isModalOpen}
-                    setIsModalOpen={setIsModalOpen}
+                    key={modalState.mode === "view" ? `view-${modalState.tenantId}` : "create-tenant"}
+                    state={modalState}
+                    onClose={() => setModalState(null)}
                     onSubmit={handleCreateTenant}
                 />
             ) : null}
@@ -248,8 +330,8 @@ function MetricCard(props: { label: string; value: number; description: string }
 }
 
 function ModalTenant(props: {
-    isModalOpen: boolean;
-    setIsModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    state: TenantModalState;
+    onClose: () => void;
     onSubmit: (tenant: CreateTenantDto, admin: CreateTenantAdminDto) => Promise<ApiResponse<TenantListItemDto>>;
 }) {
     const [currentStep, setCurrentStep] = React.useState(0);
@@ -262,6 +344,31 @@ function ModalTenant(props: {
     const [tenantErrors, setTenantErrors] = React.useState<Partial<Record<keyof CreateTenantDto, string>>>({});
     const [adminErrors, setAdminErrors] = React.useState<Partial<Record<keyof CreateTenantAdminDto, string>>>({});
     const [submitError, setSubmitError] = React.useState<string | null>(null);
+    const isViewMode = props.state.mode === "view";
+    const isLoadingDetails = props.state.mode === "view" ? props.state.isLoadingDetails : false;
+    const detailsError = props.state.mode === "view" ? props.state.detailsError : null;
+    const effectiveTenant = props.state.mode === "view" && props.state.tenantDetails
+        ? {
+            trade_name: props.state.tenantDetails.tradeName || props.state.tenantDetails.name,
+            slug: props.state.tenantDetails.slug,
+            cnpj: props.state.tenantDetails.cnpj || undefined,
+            registered_name: props.state.tenantDetails.registeredName || undefined,
+            phone: props.state.tenantDetails.phone || "",
+            email: props.state.tenantDetails.email || "",
+        }
+        : tenant;
+    const effectiveAdmin = props.state.mode === "view" && props.state.tenantDetails
+        ? {
+            name: props.state.tenantDetails.admin?.name || "",
+            email: props.state.tenantDetails.admin?.email || "",
+            cpf: props.state.tenantDetails.admin?.cpf || "",
+            phone: props.state.tenantDetails.admin?.phone || "",
+            password: "",
+        }
+        : admin;
+    const isTenantActive = props.state.mode === "view"
+        ? !!(props.state.tenantDetails?.isActive && !props.state.tenantDetails?.deletedAt)
+        : true;
 
     const mapYupErrors = (error: unknown) => {
         if (!(error instanceof yup.ValidationError)) return {};
@@ -303,16 +410,20 @@ function ModalTenant(props: {
         {
             conf: {
                 title: "Empresa contratante",
-                description: "Etapa 1 de 2: dados principais do tenant.",
-                children: <CompanyForm tenant={tenant} setTenant={setTenant} errors={tenantErrors} />,
+                description: isViewMode
+                    ? "Etapa 1 de 2: consulte os dados principais do tenant."
+                    : "Etapa 1 de 2: dados principais do tenant.",
+                children: <CompanyForm tenant={effectiveTenant} setTenant={setTenant} errors={tenantErrors} disabled={isViewMode} isActive={isTenantActive} />,
             },
             validate: validateTenantForm,
         },
         {
             conf: {
                 title: "Administrador",
-                description: "Etapa 2 de 2: crie o usuario administrador.",
-                children: <AdminForm admin={admin} setAdmin={setAdmin} errors={adminErrors} errorMessage={submitError} />,
+                description: isViewMode
+                    ? "Etapa 2 de 2: consulte os dados do administrador responsavel."
+                    : "Etapa 2 de 2: crie o usuario administrador.",
+                children: <AdminForm admin={effectiveAdmin} setAdmin={setAdmin} errors={adminErrors} errorMessage={submitError} disabled={isViewMode} />,
             },
             validate: validateAdminForm,
         },
@@ -320,6 +431,11 @@ function ModalTenant(props: {
     const stepConfigs: StepperStep[] = steppers.map((step) => step.conf);
 
     const handleSubmit = async () => {
+        if (isViewMode) {
+            props.onClose();
+            return;
+        }
+
         const isAdminValid = await validateAdminForm();
         if (!isAdminValid) return;
 
@@ -330,10 +446,11 @@ function ModalTenant(props: {
             return;
         }
 
-        props.setIsModalOpen(false);
+        props.onClose();
     };
 
     const validateStep = async (): Promise<boolean> => {
+        if (isViewMode) return true;
         return steppers[currentStep].validate();
     };
 
@@ -344,12 +461,30 @@ function ModalTenant(props: {
         setCurrentStep(target);
     };
 
+    const handleStepChange = async (target: number) => {
+        if (target === currentStep) return;
+
+        if (target < currentStep || isViewMode) {
+            setCurrentStep(target);
+            return;
+        }
+
+        const isValid = await validateStep();
+        if (!isValid) return;
+
+        setCurrentStep(target);
+    };
+
     return (
         <Modal
-            isOpen={props.isModalOpen}
-            onClose={() => props.setIsModalOpen(false)}
-            title="Novo contratante"
-            description="Preencha os dados do contratante e finalize a criacao do administrador responsavel pelo tenant."
+            isOpen
+            onClose={props.onClose}
+            title={isViewMode ? "Visualizar contratante" : "Novo contratante"}
+            description={
+                isViewMode
+                    ? "Consulte os dados do tenant e do administrador responsavel. Todos os campos ficam bloqueados para edicao."
+                    : "Preencha os dados do contratante e finalize a criacao do administrador responsavel pelo tenant."
+            }
         >
             <div className="space-y-4">
                 <div className="grid gap-3 lg:grid-cols-3">
@@ -369,20 +504,35 @@ function ModalTenant(props: {
                         description="Validacao por etapa para evitar cadastros incompletos."
                     />
                 </div>
-                <Stepper
-                    steps={stepConfigs}
-                    currentStep={currentStep}
-                    labels={{
-                        cancel: "Cancelar",
-                        prev: "Voltar",
-                        next: "Avancar",
-                        done: "Criar contratante",
-                    }}
-                    onCancel={() => props.setIsModalOpen(false)}
-                    onPrev={(target) => setCurrentStep(target)}
-                    onNext={onNextStep}
-                    onDone={handleSubmit}
-                />
+
+                {detailsError ? <ErrorBox message={detailsError} /> : null}
+
+                {isLoadingDetails ? (
+                    <div className="rounded-[22px] border border-outline-variant bg-surface-container p-8">
+                        <div className="flex items-center justify-center gap-3 text-on-surface-variant">
+                            <span className="animate-spin text-xl text-primary-fixed-dim">
+                                <RiLoader4Line size={20} />
+                            </span>
+                            <span>Carregando dados do tenant...</span>
+                        </div>
+                    </div>
+                ) : detailsError ? null : (
+                    <Stepper
+                        steps={stepConfigs}
+                        currentStep={currentStep}
+                        labels={{
+                            cancel: isViewMode ? "Fechar" : "Cancelar",
+                            prev: "Voltar",
+                            next: "Avancar",
+                            done: isViewMode ? "Fechar" : "Criar contratante",
+                        }}
+                        onCancel={props.onClose}
+                        onStepChange={handleStepChange}
+                        onPrev={(target) => setCurrentStep(target)}
+                        onNext={onNextStep}
+                        onDone={handleSubmit}
+                    />
+                )}
             </div>
         </Modal>
     );
@@ -422,8 +572,12 @@ function CompanyForm(props: {
     tenant: CreateTenantDto;
     setTenant: React.Dispatch<React.SetStateAction<CreateTenantDto>>;
     errors: Partial<Record<keyof CreateTenantDto, string>>;
+    disabled?: boolean;
+    isActive?: boolean;
 }) {
     const updateField = (field: keyof CreateTenantDto, value: string | boolean) => {
+        if (props.disabled) return;
+
         props.setTenant((current) => ({
             ...current,
             [field]: value,
@@ -443,6 +597,7 @@ function CompanyForm(props: {
                         label="Nome fantasia *"
                         value={props.tenant.trade_name}
                         error={props.errors.trade_name}
+                        disabled={props.disabled}
                         onChange={(event) => updateField("trade_name", event.target.value)}
                     />
                     <Input
@@ -451,6 +606,7 @@ function CompanyForm(props: {
                         hint="Usado na identificacao tecnica do tenant."
                         value={props.tenant.slug}
                         error={props.errors.slug}
+                        disabled={props.disabled}
                         onChange={(event) => updateField("slug", event.target.value.toLowerCase().trim())}
                     />
                     <Input
@@ -458,6 +614,7 @@ function CompanyForm(props: {
                         label="Razao social"
                         value={props.tenant.registered_name || ""}
                         error={props.errors.registered_name}
+                        disabled={props.disabled}
                         onChange={(event) => updateField("registered_name", event.target.value)}
                         className="md:col-span-2"
                     />
@@ -467,6 +624,7 @@ function CompanyForm(props: {
                         hint="Opcional. Informe 14 digitos, sem pontuacao."
                         value={props.tenant.cnpj || ""}
                         error={props.errors.cnpj}
+                        disabled={props.disabled}
                         mask={CNPJ_MASK_REGEX}
                         onChange={(event) => updateField("cnpj", event.target.value.replace(/\D/g, "").slice(0, 14))}
                     />
@@ -474,8 +632,8 @@ function CompanyForm(props: {
                         <Switch
                             id="tenant-is-active"
                             label="Tenant ativo"
-                            description="Novos tenants sao criados como ativos neste fluxo."
-                            checked
+                            description={props.disabled ? "Status atual do tenant no ambiente." : "Novos tenants sao criados como ativos neste fluxo."}
+                            checked={props.isActive}
                             disabled
                         />
                     </div>
@@ -494,6 +652,7 @@ function CompanyForm(props: {
                         hint="Informe 11 digitos, com DDD."
                         value={props.tenant.phone}
                         error={props.errors.phone}
+                        disabled={props.disabled}
                         mask={PHONE_MASK_REGEX}
                         onChange={(event) => updateField("phone", event.target.value.replace(/\D/g, "").slice(0, 11))}
                     />
@@ -503,6 +662,7 @@ function CompanyForm(props: {
                         type="email"
                         value={props.tenant.email}
                         error={props.errors.email}
+                        disabled={props.disabled}
                         onChange={(event) => updateField("email", event.target.value.trim())}
                     />
                 </div>
@@ -516,8 +676,11 @@ function AdminForm(props: {
     setAdmin: React.Dispatch<React.SetStateAction<CreateTenantAdminDto>>;
     errors: Partial<Record<keyof CreateTenantAdminDto, string>>;
     errorMessage: string | null;
+    disabled?: boolean;
 }) {
     const updateField = (field: keyof CreateTenantAdminDto, value: string) => {
+        if (props.disabled) return;
+
         props.setAdmin((current) => ({
             ...current,
             [field]: value,
@@ -538,6 +701,7 @@ function AdminForm(props: {
                         label="Nome do administrador *"
                         value={props.admin.name}
                         error={props.errors.name}
+                        disabled={props.disabled}
                         onChange={(event) => updateField("name", event.target.value)}
                         className="md:col-span-2"
                     />
@@ -547,6 +711,7 @@ function AdminForm(props: {
                         type="email"
                         value={props.admin.email}
                         error={props.errors.email}
+                        disabled={props.disabled}
                         onChange={(event) => updateField("email", event.target.value.trim())}
                     />
                     <Input
@@ -555,6 +720,7 @@ function AdminForm(props: {
                         hint="Informe 11 digitos, com DDD."
                         value={props.admin.phone}
                         error={props.errors.phone}
+                        disabled={props.disabled}
                         mask={PHONE_MASK_REGEX}
                         onChange={(event) => updateField("phone", event.target.value.replace(/\D/g, "").slice(0, 11))}
                     />
@@ -564,16 +730,18 @@ function AdminForm(props: {
                         hint="Informe 11 digitos, sem pontuacao."
                         value={props.admin.cpf}
                         error={props.errors.cpf}
+                        disabled={props.disabled}
                         mask={CPF_MASK_REGEX}
                         onChange={(event) => updateField("cpf", event.target.value.replace(/\D/g, "").slice(0, 11))}
                     />
                     <Input
                         id="tenant-admin-password"
                         label="Senha do administrador"
-                        type="password"
-                        hint="Minimo de 8 caracteres."
-                        value={props.admin.password}
+                        type={props.disabled ? "text" : "password"}
+                        hint={props.disabled ? "A senha nao e exibida por seguranca." : "Minimo de 8 caracteres."}
+                        value={props.disabled ? "Nao disponivel" : props.admin.password}
                         error={props.errors.password}
+                        disabled={props.disabled}
                         onChange={(event) => updateField("password", event.target.value)}
                     />
                 </div>
