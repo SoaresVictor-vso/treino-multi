@@ -1,5 +1,4 @@
 import * as yup from "yup";
-import validateCPF from "@/utilities/validators/cpf";
 import validateEmail from "@/utilities/validators/email";
 
 export type CreateTenantDto = {

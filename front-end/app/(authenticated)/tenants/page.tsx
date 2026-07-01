@@ -472,7 +472,7 @@ function ModalTenant(props: {
                     : isEditMode
                         ? "Etapa 1 de 2: atualize os dados editaveis do tenant."
                         : "Etapa 1 de 2: dados principais do tenant.",
-                children: <CompanyForm tenant={effectiveTenant} setTenant={setTenantDraft} errors={tenantErrors} disabled={isViewMode} isSlugLocked={isEditMode} />,
+                children: <CompanyForm tenant={effectiveTenant} setTenant={setTenantDraft} errors={tenantErrors} disabled={isViewMode} isSlugLocked={isEditMode} mode={props.state.mode} />,
             },
             validate: validateTenantForm,
         },
@@ -506,9 +506,10 @@ function ModalTenant(props: {
         }
 
         setIsSubmitting(true);
+        const { isActive: _isActive, ...createTenantPayload } = effectiveTenant;
         const result = props.state.mode === "edit"
             ? await props.onUpdate(props.state.tenantId, mapTenantFormToUpdatePayload(effectiveTenant))
-            : await props.onCreate(effectiveTenant, admin);
+            : await props.onCreate(createTenantPayload, admin);
         setIsSubmitting(false);
 
         if (!result.success) {
@@ -649,6 +650,7 @@ function CompanyForm(props: {
     errors: Partial<Record<keyof CreateTenantDto, string>>;
     disabled?: boolean;
     isSlugLocked?: boolean;
+    mode: TenantModalState["mode"]
 }) {
     const updateField = (field: keyof CreateTenantDto, value: string | boolean) => {
         if (props.disabled) return;
@@ -707,11 +709,8 @@ function CompanyForm(props: {
                         <Switch
                             id="tenant-is-active"
                             label="Tenant ativo"
-                            description={props.disabled
-                                ? "Status atual do tenant no ambiente."
-                                : "Ative ou inative o tenant diretamente por esta tela."}
-                            checked={props.tenant.isActive}
-                            disabled={props.disabled}
+                            checked={props.mode === "create" ? true : props.tenant.isActive}
+                            disabled={props.disabled || props.mode === "create"}
                             onChange={(event) => props.setTenant((current) => ({
                                 ...(current || props.tenant),
                                 isActive: event.target.checked,
@@ -788,7 +787,7 @@ function AdminForm(props: {
                     />
                     <Input
                         id="tenant-admin-email"
-                        label="E-mail do administrador"
+                        label="E-mail do administrador *"
                         type="email"
                         value={props.admin.email}
                         error={props.errors.email}
@@ -797,7 +796,7 @@ function AdminForm(props: {
                     />
                     <Input
                         id="tenant-admin-phone"
-                        label="Telefone do administrador"
+                        label="Telefone do administrador *"
                         hint="Informe 11 digitos, com DDD."
                         value={props.admin.phone}
                         error={props.errors.phone}
@@ -807,7 +806,7 @@ function AdminForm(props: {
                     />
                     <Input
                         id="tenant-admin-cpf"
-                        label="CPF do administrador"
+                        label="CPF do administrador *"
                         hint="Informe 11 digitos, sem pontuacao."
                         value={props.admin.cpf}
                         error={props.errors.cpf}
@@ -817,7 +816,7 @@ function AdminForm(props: {
                     />
                     <Input
                         id="tenant-admin-password"
-                        label="Senha do administrador"
+                        label="Senha do administrador *"
                         type={props.disabled ? "text" : "password"}
                         hint={props.disabled ? "A senha nao e exibida por seguranca." : "Minimo de 8 caracteres."}
                         value={props.disabled ? "Nao disponivel" : props.admin.password}

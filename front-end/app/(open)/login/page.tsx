@@ -88,7 +88,7 @@ export default function Login() {
 
           <ErrorBox message={error} />
 
-          <Button disabled={loading} className="w-full">
+          <Button disabled={loading} className="w-full" type="submit">
             <span>{loading ? "Entrando…" : "Entrar"}</span>
           </Button>
         </form>
