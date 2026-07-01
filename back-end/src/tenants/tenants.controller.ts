@@ -98,8 +98,10 @@ export class TenantsController {
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateTenantDto,
+    @CurrentUser() actor: jwtPayloadInterface.JwtPayload,
+    @Ip() ip: string,
   ) {
-    return this.tenantsService.update(id, dto);
+    return this.tenantsService.update(id, dto, actor.sub, ip);
   }
 
   /** DELETE /tenants/:id — exclusão lógica (soft delete) */

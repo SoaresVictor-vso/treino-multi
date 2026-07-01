@@ -421,12 +421,14 @@ describe('TenantsService', () => {
         tradeName: 'Novo Nome',
         phone: '11999990000',
         email: 'novo@acme.com',
+        isActive: false,
       } as Tenant);
 
       const dto: UpdateTenantDto = {
         trade_name: 'Novo Nome',
         phone: '11999990000',
         email: 'novo@acme.com',
+        isActive: false,
       };
       const result = await service.update('tenant-uuid-1', dto);
 
@@ -434,6 +436,7 @@ describe('TenantsService', () => {
       expect(result.tradeName).toBe('Novo Nome');
       expect(result.phone).toBe('11999990000');
       expect(result.email).toBe('novo@acme.com');
+      expect(result.isActive).toBe(false);
     });
 
     it('deve converter cnpj e registered_name vazios para null no update', async () => {
@@ -448,21 +451,6 @@ describe('TenantsService', () => {
 
       expect(result.cnpj).toBeNull();
       expect(result.registeredName).toBeNull();
-    });
-
-    it('deve lançar ConflictException ao trocar para slug já existente', async () => {
-      const tenant = makeTenant();
-      tenantRepo.findOne
-        .mockResolvedValueOnce(tenant)
-        .mockResolvedValueOnce(
-          makeTenant({ id: 'outro-uuid', slug: 'outro-slug' }),
-        );
-
-      await expect(
-        service.update('tenant-uuid-1', { slug: 'outro-slug' }),
-      ).rejects.toThrow(ConflictException);
-
-      expect(tenantRepo.save).not.toHaveBeenCalled();
     });
 
     it('deve lançar NotFoundException quando o id não existe', async () => {

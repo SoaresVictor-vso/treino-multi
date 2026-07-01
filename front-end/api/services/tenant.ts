@@ -3,6 +3,7 @@ import { TenantListItemDto } from "../dto/tenant/list-tenant.dto";
 import { authenticatedRequest } from "../client";
 import { CreateTenantAdminDto } from "../dto/tenant/create-tenant-admin.dto";
 import { CreateTenantDto } from "../dto/tenant/create-tenant.dto";
+import { UpdateTenantDto } from "../dto/tenant/update-tenant.dto";
 
 type TenantDetailsRequest = ReturnType<typeof authenticatedRequest<TenantDetailsDto>>;
 
@@ -35,6 +36,13 @@ export class TenantService {
         return authenticatedRequest<TenantListItemDto>(this.apiUrl, {
             method: "POST",
             body: JSON.stringify({ tenant, admin }),
+        });
+    }
+
+    async update(id: string, tenant: UpdateTenantDto) {
+        return authenticatedRequest<TenantListItemDto>(`${this.apiUrl}/${id}`, {
+            method: "PATCH",
+            body: JSON.stringify(tenant),
         });
     }
 

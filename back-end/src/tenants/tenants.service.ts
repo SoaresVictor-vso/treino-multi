@@ -227,22 +227,9 @@ export class TenantsService {
   ): Promise<Tenant> {
     const tenant = await this.findOne(id);
 
-    if (dto.slug && dto.slug !== tenant.slug) {
-      const conflict = await this.tenantRepo.findOne({
-        where: { slug: dto.slug },
-        withDeleted: true,
-      });
-      if (conflict) {
-        throw new ConflictException(`Slug "${dto.slug}" já está em uso.`);
-      }
-    }
-
     if (dto.trade_name !== undefined) {
       tenant.name = dto.trade_name;
       tenant.tradeName = dto.trade_name;
-    }
-    if (dto.slug !== undefined) {
-      tenant.slug = dto.slug;
     }
     if (dto.cnpj !== undefined) {
       tenant.cnpj = normalizeNullableString(dto.cnpj);
@@ -255,6 +242,9 @@ export class TenantsService {
     }
     if (dto.registered_name !== undefined) {
       tenant.registeredName = normalizeNullableString(dto.registered_name);
+    }
+    if (dto.isActive !== undefined) {
+      tenant.isActive = dto.isActive;
     }
     const saved = await this.tenantRepo.save(tenant);
     await this.auditLogService.logCriticalOperation({

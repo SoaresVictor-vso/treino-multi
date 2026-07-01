@@ -6,6 +6,7 @@ import TenantStatusBadge from "./TenantStatusBadge";
 type TenantsTableProps = {
   tenants: TenantListItemDto[];
   onViewTenant: (tenant: TenantListItemDto) => void;
+  onEditTenant: (tenant: TenantListItemDto) => void;
 };
 
 function formatPhone(phone: string | null) {
@@ -65,7 +66,11 @@ function TenantIdentity({ tenant }: { tenant: TenantListItemDto }) {
   );
 }
 
-function TenantActions(props: { tenant: TenantListItemDto; onViewTenant: (tenant: TenantListItemDto) => void }) {
+function TenantActions(props: {
+  tenant: TenantListItemDto;
+  onViewTenant: (tenant: TenantListItemDto) => void;
+  onEditTenant: (tenant: TenantListItemDto) => void;
+}) {
   return (
     <div className="flex items-center justify-end gap-1">
       <Button
@@ -76,7 +81,12 @@ function TenantActions(props: { tenant: TenantListItemDto; onViewTenant: (tenant
       >
         <RiEyeLine size={18} />
       </Button>
-      <Button variant="ghost" size="icon" title="Editar">
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Editar"
+        onClick={() => props.onEditTenant(props.tenant)}
+      >
         <RiEditLine size={18} />
       </Button>
       <Button variant="ghost" size="icon" title="Mais acoes">
@@ -86,7 +96,7 @@ function TenantActions(props: { tenant: TenantListItemDto; onViewTenant: (tenant
   );
 }
 
-export default function TenantsTable({ tenants, onViewTenant }: TenantsTableProps) {
+export default function TenantsTable({ tenants, onViewTenant, onEditTenant }: TenantsTableProps) {
   if (!tenants.length) {
     return (
       <section className="overflow-hidden rounded-[20px] border border-outline-variant bg-surface-container shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
@@ -129,7 +139,7 @@ export default function TenantsTable({ tenants, onViewTenant }: TenantsTableProp
                 <p>{formatDate(tenant.createdAt)}</p>
               </div>
             </div>
-            <TenantActions tenant={tenant} onViewTenant={onViewTenant} />
+            <TenantActions tenant={tenant} onViewTenant={onViewTenant} onEditTenant={onEditTenant} />
           </article>
         ))}
       </div>
@@ -171,7 +181,7 @@ export default function TenantsTable({ tenants, onViewTenant }: TenantsTableProp
                   <TenantStatusBadge tenant={tenant} />
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <TenantActions tenant={tenant} onViewTenant={onViewTenant} />
+                  <TenantActions tenant={tenant} onViewTenant={onViewTenant} onEditTenant={onEditTenant} />
                 </td>
               </tr>
             ))}

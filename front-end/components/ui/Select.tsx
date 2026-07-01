@@ -61,7 +61,9 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
               </option>
             ))}
           </select>
-          <RiArrowDownSLine className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant" />
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant">
+            <RiArrowDownSLine />
+          </span>
         </div>
         {hint && !error && (
           <p id={`${inputId}-hint`} className="text-xs text-on-surface-variant/80">

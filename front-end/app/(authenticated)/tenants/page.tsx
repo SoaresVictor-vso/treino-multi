@@ -6,6 +6,10 @@ import {
     type CreateTenantDto,
 } from "@/api/dto/tenant/create-tenant.dto";
 import {
+    updateTenantYupSchema,
+    type UpdateTenantDto,
+} from "@/api/dto/tenant/update-tenant.dto";
+import {
     createTenantAdminInitialValues,
     createTenantAdminYupSchema,
     type CreateTenantAdminDto,
@@ -38,10 +42,46 @@ type TenantModalState =
         tenantDetails: TenantDetailsDto | null;
         isLoadingDetails: boolean;
         detailsError: string | null;
+    }
+    | {
+        mode: "edit";
+        tenantId: string;
+        tenantDetails: TenantDetailsDto | null;
+        isLoadingDetails: boolean;
+        detailsError: string | null;
     };
 
+type TenantFormValues = CreateTenantDto & {
+    isActive: boolean;
+};
+
+const createTenantFormInitialValues = (): TenantFormValues => ({
+    ...createTenantInitialValues,
+    isActive: true,
+});
+
+const mapTenantDetailsToFormValues = (tenantDetails: TenantDetailsDto): TenantFormValues => ({
+    trade_name: tenantDetails.tradeName || tenantDetails.name,
+    slug: tenantDetails.slug,
+    cnpj: tenantDetails.cnpj || undefined,
+    registered_name: tenantDetails.registeredName || undefined,
+    phone: tenantDetails.phone || "",
+    email: tenantDetails.email || "",
+    isActive: !!(tenantDetails.isActive && !tenantDetails.deletedAt),
+});
+
+const mapTenantFormToUpdatePayload = (tenant: TenantFormValues): UpdateTenantDto => ({
+    trade_name: tenant.trade_name,
+    cnpj: tenant.cnpj || "",
+    registered_name: tenant.registered_name || "",
+    phone: tenant.phone,
+    email: tenant.email,
+    isActive: tenant.isActive,
+});
+
+const tenantService = new TenantService();
+
 export default function TenantsPage() {
-    const tenantServiceRef = React.useRef(new TenantService());
     const [tenants, setTenants] = React.useState<TenantListItemDto[]>([]);
     const [search, setSearch] = React.useState("");
     const [statusFilter, setStatusFilter] = React.useState<TenantStatusFilter>("all");
@@ -54,7 +94,7 @@ export default function TenantsPage() {
 
     const requestTenants = async (searchValue: string) => {
         const trimmedSearch = searchValue.trim();
-        const result = await tenantServiceRef.current.findMultiple({
+        const result = await tenantService.findMultiple({
             filter: trimmedSearch ? "name" : "all",
             name: trimmedSearch || undefined,
             includeInactive: true,
@@ -82,7 +122,7 @@ export default function TenantsPage() {
 
         if (!trimmedSearch) {
             const syncAllTenants = async () => {
-                const result = await tenantServiceRef.current.findMultiple({
+                const result = await tenantService.findMultiple({
                     filter: "all",
                     includeInactive: true,
                 });
@@ -106,7 +146,7 @@ export default function TenantsPage() {
         } else if (trimmedSearch.length > 3) {
             debounceTimeoutRef.current = setTimeout(() => {
                 void (async () => {
-                    const result = await tenantServiceRef.current.findMultiple({
+                    const result = await tenantService.findMultiple({
                         filter: "name",
                         name: trimmedSearch,
                         includeInactive: true,
@@ -169,7 +209,7 @@ export default function TenantsPage() {
     };
 
     const handleCreateTenant = async (tenant: CreateTenantDto, admin: CreateTenantAdminDto) => {
-        const result = await tenantServiceRef.current.create(tenant, admin);
+        const result = await tenantService.create(tenant, admin);
 
         if (result.success) {
             setIsLoading(true);
@@ -180,9 +220,9 @@ export default function TenantsPage() {
         return result;
     };
 
-    const handleViewTenant = (tenant: TenantListItemDto) => {
+    const handleOpenTenant = (mode: "view" | "edit", tenant: TenantListItemDto) => {
         setModalState({
-            mode: "view",
+            mode,
             tenantId: tenant.id,
             tenantDetails: null,
             isLoadingDetails: true,
@@ -190,10 +230,10 @@ export default function TenantsPage() {
         });
 
         void (async () => {
-            const result = await tenantServiceRef.current.findDetails(tenant.id);
+            const result = await tenantService.findDetails(tenant.id);
 
             setModalState((current) => {
-                if (!current || current.mode !== "view" || current.tenantId !== tenant.id) {
+                if (!current || current.mode !== mode || current.tenantId !== tenant.id) {
                     return current;
                 }
 
@@ -213,6 +253,24 @@ export default function TenantsPage() {
                 };
             });
         })();
+    };
+
+    const handleViewTenant = (tenant: TenantListItemDto) => {
+        handleOpenTenant("view", tenant);
+    };
+
+    const handleEditTenant = (tenant: TenantListItemDto) => {
+        handleOpenTenant("edit", tenant);
+    };
+
+    const handleUpdateTenant = async (tenantId: string, tenant: UpdateTenantDto) => {
+        const result = await tenantService.update(tenantId, tenant);
+
+        if (result.success) {
+            await requestTenants(search);
+        }
+
+        return result;
     };
 
     return (
@@ -304,15 +362,16 @@ export default function TenantsPage() {
                     </div>
                 </section>
             ) : (
-                <TenantsTable tenants={filteredTenants} onViewTenant={handleViewTenant} />
+                <TenantsTable tenants={filteredTenants} onViewTenant={handleViewTenant} onEditTenant={handleEditTenant} />
             )}
 
             {modalState ? (
                 <ModalTenant
-                    key={modalState.mode === "view" ? `view-${modalState.tenantId}` : "create-tenant"}
+                    key={modalState.mode === "create" ? "create-tenant" : `${modalState.mode}-${modalState.tenantId}`}
                     state={modalState}
                     onClose={() => setModalState(null)}
-                    onSubmit={handleCreateTenant}
+                    onCreate={handleCreateTenant}
+                    onUpdate={handleUpdateTenant}
                 />
             ) : null}
         </>
@@ -332,32 +391,30 @@ function MetricCard(props: { label: string; value: number; description: string }
 function ModalTenant(props: {
     state: TenantModalState;
     onClose: () => void;
-    onSubmit: (tenant: CreateTenantDto, admin: CreateTenantAdminDto) => Promise<ApiResponse<TenantListItemDto>>;
+    onCreate: (tenant: CreateTenantDto, admin: CreateTenantAdminDto) => Promise<ApiResponse<TenantListItemDto>>;
+    onUpdate: (tenantId: string, tenant: UpdateTenantDto) => Promise<ApiResponse<TenantListItemDto>>;
 }) {
     const [currentStep, setCurrentStep] = React.useState(0);
-    const [tenant, setTenant] = React.useState<CreateTenantDto>({
-        ...createTenantInitialValues,
-    });
+    const [tenantDraft, setTenantDraft] = React.useState<TenantFormValues | null>(
+        props.state.mode === "create" ? createTenantFormInitialValues : null,
+    );
     const [admin, setAdmin] = React.useState<CreateTenantAdminDto>({
         ...createTenantAdminInitialValues,
     });
     const [tenantErrors, setTenantErrors] = React.useState<Partial<Record<keyof CreateTenantDto, string>>>({});
     const [adminErrors, setAdminErrors] = React.useState<Partial<Record<keyof CreateTenantAdminDto, string>>>({});
     const [submitError, setSubmitError] = React.useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
     const isViewMode = props.state.mode === "view";
-    const isLoadingDetails = props.state.mode === "view" ? props.state.isLoadingDetails : false;
-    const detailsError = props.state.mode === "view" ? props.state.detailsError : null;
-    const effectiveTenant = props.state.mode === "view" && props.state.tenantDetails
-        ? {
-            trade_name: props.state.tenantDetails.tradeName || props.state.tenantDetails.name,
-            slug: props.state.tenantDetails.slug,
-            cnpj: props.state.tenantDetails.cnpj || undefined,
-            registered_name: props.state.tenantDetails.registeredName || undefined,
-            phone: props.state.tenantDetails.phone || "",
-            email: props.state.tenantDetails.email || "",
-        }
-        : tenant;
-    const effectiveAdmin = props.state.mode === "view" && props.state.tenantDetails
+    const isEditMode = props.state.mode === "edit";
+    const isReadOnlyAdmin = props.state.mode !== "create";
+    const isLoadingDetails = props.state.mode === "create" ? false : props.state.isLoadingDetails;
+    const detailsError = props.state.mode === "create" ? null : props.state.detailsError;
+    const effectiveTenant = tenantDraft
+        ?? (props.state.mode !== "create" && props.state.tenantDetails
+            ? mapTenantDetailsToFormValues(props.state.tenantDetails)
+            : createTenantFormInitialValues());
+    const effectiveAdmin = props.state.mode !== "create" && props.state.tenantDetails
         ? {
             name: props.state.tenantDetails.admin?.name || "",
             email: props.state.tenantDetails.admin?.email || "",
@@ -366,9 +423,6 @@ function ModalTenant(props: {
             password: "",
         }
         : admin;
-    const isTenantActive = props.state.mode === "view"
-        ? !!(props.state.tenantDetails?.isActive && !props.state.tenantDetails?.deletedAt)
-        : true;
 
     const mapYupErrors = (error: unknown) => {
         if (!(error instanceof yup.ValidationError)) return {};
@@ -386,7 +440,10 @@ function ModalTenant(props: {
 
     const validateTenantForm = async () => {
         try {
-            await createTenantYupSchema.validate(tenant, { abortEarly: false });
+            const validationSchema = isEditMode ? updateTenantYupSchema : createTenantYupSchema;
+            const values = isEditMode ? mapTenantFormToUpdatePayload(effectiveTenant) : effectiveTenant;
+
+            await validationSchema.validate(values, { abortEarly: false });
             setTenantErrors({});
             return true;
         } catch (error) {
@@ -412,8 +469,10 @@ function ModalTenant(props: {
                 title: "Empresa contratante",
                 description: isViewMode
                     ? "Etapa 1 de 2: consulte os dados principais do tenant."
-                    : "Etapa 1 de 2: dados principais do tenant.",
-                children: <CompanyForm tenant={effectiveTenant} setTenant={setTenant} errors={tenantErrors} disabled={isViewMode} isActive={isTenantActive} />,
+                    : isEditMode
+                        ? "Etapa 1 de 2: atualize os dados editaveis do tenant."
+                        : "Etapa 1 de 2: dados principais do tenant.",
+                children: <CompanyForm tenant={effectiveTenant} setTenant={setTenantDraft} errors={tenantErrors} disabled={isViewMode} isSlugLocked={isEditMode} />,
             },
             validate: validateTenantForm,
         },
@@ -422,8 +481,10 @@ function ModalTenant(props: {
                 title: "Administrador",
                 description: isViewMode
                     ? "Etapa 2 de 2: consulte os dados do administrador responsavel."
-                    : "Etapa 2 de 2: crie o usuario administrador.",
-                children: <AdminForm admin={effectiveAdmin} setAdmin={setAdmin} errors={adminErrors} errorMessage={submitError} disabled={isViewMode} />,
+                    : isEditMode
+                        ? "Etapa 2 de 2: consulte os dados do administrador. Essa tela nao altera esse usuario."
+                        : "Etapa 2 de 2: crie o usuario administrador.",
+                children: <AdminForm admin={effectiveAdmin} setAdmin={setAdmin} errors={adminErrors} errorMessage={submitError} disabled={isReadOnlyAdmin} />,
             },
             validate: validateAdminForm,
         },
@@ -436,13 +497,24 @@ function ModalTenant(props: {
             return;
         }
 
-        const isAdminValid = await validateAdminForm();
-        if (!isAdminValid) return;
+        if (isEditMode) {
+            const isTenantValid = await validateTenantForm();
+            if (!isTenantValid) return;
+        } else {
+            const isAdminValid = await validateAdminForm();
+            if (!isAdminValid) return;
+        }
 
-        const result = await props.onSubmit(tenant, admin);
+        setIsSubmitting(true);
+        const result = props.state.mode === "edit"
+            ? await props.onUpdate(props.state.tenantId, mapTenantFormToUpdatePayload(effectiveTenant))
+            : await props.onCreate(effectiveTenant, admin);
+        setIsSubmitting(false);
 
         if (!result.success) {
-            setSubmitError(result.error || "Nao foi possivel criar o contratante.");
+            setSubmitError(result.error || (isEditMode
+                ? "Nao foi possivel salvar as alteracoes do contratante."
+                : "Nao foi possivel criar o contratante."));
             return;
         }
 
@@ -479,11 +551,13 @@ function ModalTenant(props: {
         <Modal
             isOpen
             onClose={props.onClose}
-            title={isViewMode ? "Visualizar contratante" : "Novo contratante"}
+            title={isViewMode ? "Visualizar contratante" : isEditMode ? "Editar contratante" : "Novo contratante"}
             description={
                 isViewMode
                     ? "Consulte os dados do tenant e do administrador responsavel. Todos os campos ficam bloqueados para edicao."
-                    : "Preencha os dados do contratante e finalize a criacao do administrador responsavel pelo tenant."
+                    : isEditMode
+                        ? "Atualize os dados do tenant. O slug permanece bloqueado e o administrador e exibido apenas para consulta."
+                        : "Preencha os dados do contratante e finalize a criacao do administrador responsavel pelo tenant."
             }
         >
             <div className="space-y-4">
@@ -524,13 +598,14 @@ function ModalTenant(props: {
                             cancel: isViewMode ? "Fechar" : "Cancelar",
                             prev: "Voltar",
                             next: "Avancar",
-                            done: isViewMode ? "Fechar" : "Criar contratante",
+                            done: isViewMode ? "Fechar" : isEditMode ? "Salvar alteracoes" : "Criar contratante",
                         }}
                         onCancel={props.onClose}
                         onStepChange={handleStepChange}
                         onPrev={(target) => setCurrentStep(target)}
                         onNext={onNextStep}
                         onDone={handleSubmit}
+                        isSubmitting={isSubmitting}
                     />
                 )}
             </div>
@@ -569,17 +644,17 @@ function FormSection(props: {
 }
 
 function CompanyForm(props: {
-    tenant: CreateTenantDto;
-    setTenant: React.Dispatch<React.SetStateAction<CreateTenantDto>>;
+    tenant: TenantFormValues;
+    setTenant: React.Dispatch<React.SetStateAction<TenantFormValues | null>>;
     errors: Partial<Record<keyof CreateTenantDto, string>>;
     disabled?: boolean;
-    isActive?: boolean;
+    isSlugLocked?: boolean;
 }) {
     const updateField = (field: keyof CreateTenantDto, value: string | boolean) => {
         if (props.disabled) return;
 
         props.setTenant((current) => ({
-            ...current,
+            ...(current || props.tenant),
             [field]: value,
         }));
     };
@@ -603,10 +678,10 @@ function CompanyForm(props: {
                     <Input
                         id="tenant-slug"
                         label="Slug *"
-                        hint="Usado na identificacao tecnica do tenant."
+                        hint={props.isSlugLocked ? "Slug bloqueado apos a criacao do tenant." : "Usado na identificacao tecnica do tenant."}
                         value={props.tenant.slug}
                         error={props.errors.slug}
-                        disabled={props.disabled}
+                        disabled={props.disabled || props.isSlugLocked}
                         onChange={(event) => updateField("slug", event.target.value.toLowerCase().trim())}
                     />
                     <Input
@@ -632,9 +707,15 @@ function CompanyForm(props: {
                         <Switch
                             id="tenant-is-active"
                             label="Tenant ativo"
-                            description={props.disabled ? "Status atual do tenant no ambiente." : "Novos tenants sao criados como ativos neste fluxo."}
-                            checked={props.isActive}
-                            disabled
+                            description={props.disabled
+                                ? "Status atual do tenant no ambiente."
+                                : "Ative ou inative o tenant diretamente por esta tela."}
+                            checked={props.tenant.isActive}
+                            disabled={props.disabled}
+                            onChange={(event) => props.setTenant((current) => ({
+                                ...(current || props.tenant),
+                                isActive: event.target.checked,
+                            }))}
                         />
                     </div>
                 </div>
