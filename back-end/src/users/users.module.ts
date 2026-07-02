@@ -6,9 +6,13 @@ import { RefreshToken } from './entities/refresh-token.entity';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
+import { Person } from '../persons/entities/person.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, UserRole, RefreshToken]), AuditLogsModule],
+  imports: [
+    TypeOrmModule.forFeature([User, UserRole, RefreshToken, Person]),
+    AuditLogsModule,
+  ],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],

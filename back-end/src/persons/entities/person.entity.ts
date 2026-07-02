@@ -17,14 +17,14 @@ export class Person {
   name!: string;
 
   @Column({ type: 'varchar', unique: true, nullable: true })
-  email?: string;
+  email?: string | null;
 
   /**
    * documento de identificação da pessoa (CPF etc.).
    * 11 caracteres, obrigatório, único.
    */
   @Column({ type: 'char', length: 11, unique: true, nullable: true })
-  document?: string;
+  document?: string | null;
 
   @Column({ type: 'varchar', nullable: true })
   phone?: string | null;
@@ -38,4 +38,3 @@ export class Person {
   @OneToMany(() => User, (user) => user.person)
   users?: User[];
 }
-

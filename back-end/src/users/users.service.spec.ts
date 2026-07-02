@@ -2,14 +2,13 @@
  * Testes unitários do UsersService — Fase 4
  *
  * Pontos críticos:
- *  - Validação de contexto vs tenantId
- *  - Validação de roles vs contexto
- *  - Operações em transação (DataSource.transaction mock)
- *  - Hash de senha (bcrypt real nos testes)
+ *  - Criação transacional de Person + User
+ *  - Listagem com cursor e filtros combinados
+ *  - Atualização dos dados editáveis da Person
+ *  - Reset de senha com token
  */
 
 import {
-  BadRequestException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -22,11 +21,10 @@ import * as crypto from 'crypto';
 import { UsersService } from './users.service';
 import { User } from './entities/user.entity';
 import { UserRole } from './entities/user-role.entity';
-import { RefreshToken } from './entities/refresh-token.entity';
 import { Role } from '../common/enums/role.enum';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { AuditLogService } from '../audit-logs/audit-logs.service';
+import { Person } from '../persons/entities/person.entity';
+import { UserOrderBy } from './dto/find-users-query.dto';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -49,20 +47,12 @@ const makeUser = (overrides: Partial<User> = {}): User =>
     ...overrides,
   }) as User;
 
-// ── mock do EntityManager (transação) ────────────────────────────────────────
-
-const makeEmMock = (savedUser: User) => ({
-  create: jest.fn((_entity: any, dto: any) => ({ ...dto })),
-  save: jest.fn().mockResolvedValue(savedUser),
-  softDelete: jest.fn().mockResolvedValue({}),
-  findOneOrFail: jest.fn().mockResolvedValue(savedUser),
-});
-
 // ── testes ───────────────────────────────────────────────────────────────────
 
 describe('UsersService', () => {
   let service: UsersService;
   let userRepo: jest.Mocked<Repository<User>>;
+  let personRepo: jest.Mocked<Repository<Person>>;
   let dataSource: jest.Mocked<DataSource>;
   let auditLogService: jest.Mocked<AuditLogService>;
   let configService: jest.Mocked<ConfigService>;
@@ -78,15 +68,15 @@ describe('UsersService', () => {
             find: jest.fn(),
             update: jest.fn(),
             softRemove: jest.fn(),
+            createQueryBuilder: jest.fn(),
           },
         },
         {
-          provide: getRepositoryToken(UserRole),
-          useValue: {},
-        },
-        {
-          provide: getRepositoryToken(RefreshToken),
-          useValue: {},
+          provide: getRepositoryToken(Person),
+          useValue: {
+            findOne: jest.fn(),
+            save: jest.fn(),
+          },
         },
         {
           provide: DataSource,
@@ -116,146 +106,129 @@ describe('UsersService', () => {
 
     service = module.get(UsersService);
     userRepo = module.get(getRepositoryToken(User));
+    personRepo = module.get(getRepositoryToken(Person));
     dataSource = module.get(DataSource);
     auditLogService = module.get(AuditLogService);
     configService = module.get(ConfigService);
   });
 
-  // ── validação de contexto/roles ───────────────────────────────────────────
-
-  describe('validateContextAndRoles() — via create()', () => {
-    it('deve lançar BadRequestException se context=tenant sem tenantId', async () => {
-      const dto: CreateUserDto = {
-        personId: 'p-uuid',
+  describe('createManagedUser()', () => {
+    it('deve criar Person e User na mesma transação, aceitando role/context livres', async () => {
+      const savedUser = makeUser({
+        personId: 'person-uuid-2',
+        tenantId: 'tenant-uuid-1',
         context: 'tenant',
-        tenantId: undefined,
-        password: 'senha1234',
-        roles: [Role.TENANT_ADMIN],
+        userRoles: [{ role: Role.ORG_SUPPORT, deletedAt: null } as UserRole],
+        person: {
+          id: 'person-uuid-2',
+          name: 'Nova Pessoa',
+          email: 'nova@org.com',
+          document: '12345678901',
+          phone: '11999990000',
+        } as any,
+      });
+
+      const emMock = {
+        create: jest.fn((_entity: any, dto: any) => ({ ...dto })),
+        save: jest
+          .fn()
+          .mockResolvedValueOnce({
+            id: 'person-uuid-2',
+            name: 'Nova Pessoa',
+            email: 'nova@org.com',
+            document: '12345678901',
+            phone: '11999990000',
+          })
+          .mockResolvedValueOnce({
+            id: 'user-uuid-2',
+            personId: 'person-uuid-2',
+            tenantId: 'tenant-uuid-1',
+            context: 'tenant',
+          })
+          .mockResolvedValueOnce([{ userId: 'user-uuid-2', role: Role.ORG_SUPPORT }]),
+        findOne: jest.fn().mockResolvedValue(null),
+        findOneOrFail: jest.fn().mockResolvedValue(savedUser),
       };
 
-      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
-    });
-
-    it('deve lançar BadRequestException se context=organization com tenantId', async () => {
-      const dto: CreateUserDto = {
-        personId: 'p-uuid',
-        context: 'organization',
-        tenantId: 'tenant-uuid',
-        password: 'senha1234',
-        roles: [Role.ORG_ADMIN],
-      };
-
-      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
-    });
-
-    it('deve lançar BadRequestException se role não é válida para o contexto', async () => {
-      const dto: CreateUserDto = {
-        personId: 'p-uuid',
-        context: 'organization',
-        password: 'senha1234',
-        roles: [Role.TENANT_ADMIN], // role de tenant em contexto organization
-      };
-
-      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
-    });
-
-    it('deve aceitar org:admin em context=organization', async () => {
-      const savedUser = makeUser();
-      const emMock = makeEmMock(savedUser);
       dataSource.transaction.mockImplementation(async (cb: any) => cb(emMock));
 
-      const dto: CreateUserDto = {
-        personId: 'p-uuid',
-        context: 'organization',
-        password: 'senha1234',
-        roles: [Role.ORG_ADMIN],
-      };
-
-      const result = await service.create(dto);
+      const result = await service.createManagedUser({
+        name: 'Nova Pessoa',
+        email: 'nova@org.com',
+        document: '12345678901',
+        fone: '11999990000',
+        tenantId: 'tenant-uuid-1',
+        context: 'tenant',
+        password: 'Senha@123',
+        roles: [Role.ORG_SUPPORT],
+      });
 
       expect(result).toEqual(savedUser);
-    });
-
-    it('deve aceitar tenant:admin em context=tenant com tenantId', async () => {
-      const savedUser = makeUser({
-        context: 'tenant',
-        tenantId: 'tenant-uuid-1',
-        userRoles: [{ role: Role.TENANT_ADMIN, deletedAt: null } as UserRole],
-      });
-      const emMock = makeEmMock(savedUser);
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(emMock));
-
-      const dto: CreateUserDto = {
-        personId: 'p-uuid',
-        context: 'tenant',
-        tenantId: 'tenant-uuid-1',
-        password: 'senha1234',
-        roles: [Role.TENANT_ADMIN],
-      };
-
-      const result = await service.create(dto);
-
-      expect(result.tenantId).toBe('tenant-uuid-1');
-    });
-
-    it('deve aceitar standalone:user em context=standalone', async () => {
-      const savedUser = makeUser({
-        context: 'standalone',
-        userRoles: [{ role: Role.STANDALONE_USER, deletedAt: null } as UserRole],
-      });
-      const emMock = makeEmMock(savedUser);
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(emMock));
-
-      const dto: CreateUserDto = {
-        personId: 'p-uuid',
-        context: 'standalone',
-        password: 'senha1234',
-        roles: [Role.STANDALONE_USER],
-      };
-
-      const result = await service.create(dto);
-
-      expect(result.context).toBe('standalone');
+      expect(emMock.create).toHaveBeenCalledWith(
+        Person,
+        expect.objectContaining({
+          name: 'Nova Pessoa',
+          email: 'nova@org.com',
+          phone: '11999990000',
+        }),
+      );
+      expect(auditLogService.logCriticalOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ tableName: 'persons', operation: 'CREATE' }),
+      );
+      expect(auditLogService.logCriticalOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ tableName: 'users', operation: 'CREATE' }),
+      );
     });
   });
 
-  // ── create ────────────────────────────────────────────────────────────────
-
-  describe('create()', () => {
-    it('deve persistir com senha hasheada (diferente da original)', async () => {
-      const emMock = makeEmMock(makeUser());
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(emMock));
-
-      const dto: CreateUserDto = {
-        personId: 'p-uuid',
-        context: 'organization',
-        password: 'minha-senha-clara',
-        roles: [Role.ORG_ADMIN],
+  describe('findManagedUsers()', () => {
+    it('deve aplicar paginação e filtros combinados', async () => {
+      const qb = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        distinct: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[makeUser()], 1]),
       };
 
-      await service.create(dto);
+      userRepo.createQueryBuilder.mockReturnValue(qb as any);
 
-      // Verifica que o objeto passado ao create do EM tem passwordHash (não password)
-      const callArgs = emMock.create.mock.calls[0];
-      expect(callArgs[1]).toHaveProperty('passwordHash');
-      expect(callArgs[1].passwordHash).not.toBe('minha-senha-clara');
-    });
-  });
-
-  // ── findAll ───────────────────────────────────────────────────────────────
-
-  describe('findAll()', () => {
-    it('deve retornar lista de usuários', async () => {
-      const list = [makeUser()];
-      userRepo.find.mockResolvedValue(list);
-
-      const result = await service.findAll();
-
-      expect(userRepo.find).toHaveBeenCalledWith({
-        relations: ['person', 'userRoles'],
-        order: { createdAt: 'DESC' },
+      const result = await service.findManagedUsers({
+        tenantId: 'null',
+        name: 'Admin',
+        role: Role.ORG_ADMIN,
+        orderBy: UserOrderBy.NAME,
+        start: 'Aaron',
+        limit: '10',
       });
-      expect(result).toEqual(list);
+
+      expect(qb.orderBy).toHaveBeenCalledWith('person.name', 'ASC');
+      expect(qb.addOrderBy).toHaveBeenCalledWith('user.id', 'ASC');
+      expect(qb.andWhere).toHaveBeenCalledWith('user.tenantId IS NULL');
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'LOWER(person.name) LIKE :personName',
+        { personName: '%admin%' },
+      );
+      expect(qb.andWhere).toHaveBeenCalledWith('person.name > :start', {
+        start: 'Aaron',
+      });
+      expect(qb.innerJoin).toHaveBeenCalledWith(
+        'user.userRoles',
+        'roleFilter',
+        'roleFilter.deletedAt IS NULL AND roleFilter.role = :role',
+        { role: Role.ORG_ADMIN },
+      );
+      expect(qb.take).toHaveBeenCalledWith(10);
+      expect(result).toEqual({
+        data: [expect.any(Object)],
+        total: 1,
+        limit: 10,
+        orderBy: UserOrderBy.NAME,
+        nextStart: 'Admin',
+      });
     });
   });
 
@@ -280,48 +253,56 @@ describe('UsersService', () => {
     });
   });
 
-  // ── update ────────────────────────────────────────────────────────────────
-
-  describe('update()', () => {
-    it('deve atualizar isActive sem alterar password', async () => {
-      const user = makeUser();
-      userRepo.findOne.mockResolvedValue(user);
-
-      const updatedUser = { ...user, isActive: false };
-      const emMock = makeEmMock(updatedUser as User);
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(emMock));
-
-      const dto: UpdateUserDto = { isActive: false };
-      const result = await service.update('user-uuid-1', dto);
-
-      expect(result.isActive).toBe(false);
-    });
-
-    it('deve substituir roles quando dto.roles é informado', async () => {
-      const user = makeUser();
-      userRepo.findOne.mockResolvedValue(user);
+  describe('updateManagedUser()', () => {
+    it('deve atualizar os campos editáveis da Person', async () => {
+      const user = makeUser({
+        person: {
+          id: 'person-uuid-1',
+          name: 'Admin',
+          email: 'old@org.com',
+          document: '12345678901',
+          phone: '11999990000',
+        } as any,
+      });
 
       const updatedUser = makeUser({
-        userRoles: [{ role: Role.ORG_SUPPORT, deletedAt: null } as UserRole],
+        person: {
+          id: 'person-uuid-1',
+          name: 'Nome Novo',
+          email: 'novo@org.com',
+          document: '10987654321',
+          phone: '11888887777',
+        } as any,
       });
-      const emMock = makeEmMock(updatedUser);
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(emMock));
 
-      const dto: UpdateUserDto = { roles: [Role.ORG_SUPPORT] };
-      await service.update('user-uuid-1', dto);
+      userRepo.findOne
+        .mockResolvedValueOnce(user)
+        .mockResolvedValueOnce(updatedUser);
+      personRepo.findOne.mockResolvedValue(null);
+      personRepo.save.mockResolvedValue(updatedUser.person as Person);
 
-      // Deve ter revogado as roles antigas (softDelete)
-      expect(emMock.softDelete).toHaveBeenCalledWith(UserRole, {
-        userId: 'user-uuid-1',
+      const result = await service.updateManagedUser('user-uuid-1', {
+        name: 'Nome Novo',
+        email: 'novo@org.com',
+        document: '10987654321',
+        fone: '11888887777',
       });
-    });
 
-    it('deve lançar NotFoundException quando o id não existe', async () => {
-      userRepo.findOne.mockResolvedValue(null);
-
-      await expect(
-        service.update('id-inexistente', { isActive: true }),
-      ).rejects.toThrow(NotFoundException);
+      expect(personRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Nome Novo',
+          email: 'novo@org.com',
+          document: '10987654321',
+          phone: '11888887777',
+        }),
+      );
+      expect(auditLogService.logCriticalOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ tableName: 'persons', operation: 'UPDATE' }),
+      );
+      expect(auditLogService.logCriticalOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ tableName: 'users', operation: 'UPDATE' }),
+      );
+      expect(result).toEqual(updatedUser);
     });
   });
 

@@ -4,6 +4,14 @@ import * as jwt from 'jsonwebtoken';
 export const CurrentUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
+    if (request.currentUser && typeof request.currentUser === 'object') {
+      return request.currentUser;
+    }
+
+    if (request.user && typeof request.user === 'object') {
+      return request.user;
+    }
+
     const authHeader = request.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

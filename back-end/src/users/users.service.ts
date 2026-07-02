@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,94 +8,112 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { User } from './entities/user.entity';
 import { UserRole } from './entities/user-role.entity';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { Role } from '../common/enums/role.enum';
 import { AuditLogService } from '../audit-logs/audit-logs.service';
+import { Person } from '../persons/entities/person.entity';
+import { CreateManagedUserDto } from './dto/create-managed-user.dto';
+import { UpdateManagedUserDto } from './dto/update-managed-user.dto';
+import { FindUsersQueryDto, UserOrderBy } from './dto/find-users-query.dto';
 
-/** Roles permitidas por contexto de usuário */
-const ROLES_BY_CONTEXT: Record<string, Role[]> = {
-  organization: [Role.ORG_ADMIN, Role.ORG_SUPPORT],
-  tenant: [Role.TENANT_ADMIN],
-  standalone: [Role.STANDALONE_USER],
-};
+const USER_ORDERING = {
+  [UserOrderBy.ID]: {
+    column: 'user.id',
+    direction: 'ASC' as const,
+    readValue: (user: User) => user.id,
+  },
+  [UserOrderBy.CREATED_AT]: {
+    column: 'user.createdAt',
+    direction: 'DESC' as const,
+    readValue: (user: User) => user.createdAt.toISOString(),
+  },
+  [UserOrderBy.UPDATED_AT]: {
+    column: 'user.updatedAt',
+    direction: 'DESC' as const,
+    readValue: (user: User) => user.updatedAt.toISOString(),
+  },
+  [UserOrderBy.NAME]: {
+    column: 'person.name',
+    direction: 'ASC' as const,
+    readValue: (user: User) => user.person.name,
+  },
+} satisfies Record<
+  UserOrderBy,
+  {
+    column: string;
+    direction: 'ASC' | 'DESC';
+    readValue: (user: User) => string;
+  }
+>;
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-    @InjectRepository(UserRole)
-    private readonly userRoleRepo: Repository<UserRole>,
+    @InjectRepository(Person)
+    private readonly personRepo: Repository<Person>,
     private readonly dataSource: DataSource,
     private readonly auditLogService: AuditLogService,
     private readonly configService: ConfigService,
   ) { }
 
-  /**
-   * Garante que:
-   *  - context='tenant' → tenantId obrigatório
-   *  - context='organization'|'standalone' → tenantId deve ser omitido
-   *  - roles fornecidas são compatíveis com o contexto
-   */
-  private validateContextAndRoles(
-    context: string,
-    tenantId: string | null | undefined,
-    roles: Role[],
-  ): void {
-    if (context === 'tenant' && !tenantId) {
-      throw new BadRequestException(
-        "context 'tenant' exige tenantId preenchido.",
-      );
-    }
-    if (context !== 'tenant' && tenantId) {
-      throw new BadRequestException(
-        `context '${context}' não pode ter tenantId.`,
-      );
-    }
-
-    const allowed = ROLES_BY_CONTEXT[context] ?? [];
-    const invalid = roles.filter((r) => !allowed.includes(r));
-    if (invalid.length > 0) {
-      throw new BadRequestException(
-        `Roles inválidas para contexto '${context}': ${invalid.join(', ')}`,
-      );
-    }
-  }
-
-  async create(
-    dto: CreateUserDto,
+  async createManagedUser(
+    dto: CreateManagedUserDto,
     actorUserId?: string | null,
     ipAddress?: string | null,
   ): Promise<User> {
-    this.validateContextAndRoles(dto.context, dto.tenantId, dto.roles);
-
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
     return this.dataSource.transaction(async (em) => {
-      const user = em.create(User, {
-        personId: dto.personId,
-        tenantId: dto.tenantId ?? null,
-        context: dto.context,
-        passwordHash,
-        isActive: true,
-      });
-      const saved = await em.save(User, user);
+      await this.ensurePersonUniqueness(
+        em,
+        dto.email,
+        dto.document ?? null,
+      );
 
-      const roleEntities = dto.roles.map((r) =>
-        em.create(UserRole, { userId: saved.id, role: r }),
+      const person = await em.save(
+        Person,
+        em.create(Person, {
+          name: dto.name,
+          email: dto.email,
+          document: dto.document ?? null,
+          phone: dto.fone ?? null,
+        }),
+      );
+
+      const user = await em.save(
+        User,
+        em.create(User, {
+          personId: person.id,
+          tenantId: dto.tenantId ?? null,
+          context: dto.context,
+          passwordHash,
+          isActive: true,
+        }),
+      );
+
+      const roleEntities = dto.roles.map((role) =>
+        em.create(UserRole, { userId: user.id, role }),
       );
       await em.save(UserRole, roleEntities);
 
       const result = await em.findOneOrFail(User, {
-        where: { id: saved.id },
-        relations: ['userRoles', 'person'],
+        where: { id: user.id },
+        relations: ['person', 'tenant', 'userRoles'],
+      });
+
+      await this.auditLogService.logCriticalOperation({
+        tenantId: result.tenantId,
+        tableName: 'persons',
+        operation: 'CREATE',
+        recordId: person.id,
+        userId: actorUserId ?? null,
+        ipAddress: ipAddress ?? null,
       });
 
       await this.auditLogService.logCriticalOperation({
@@ -110,13 +129,6 @@ export class UsersService {
     });
   }
 
-  async findAll(): Promise<User[]> {
-    return this.userRepo.find({
-      relations: ['person', 'userRoles'],
-      order: { createdAt: 'DESC' },
-    });
-  }
-
   async findOne(id: string): Promise<User> {
     const user = await this.userRepo.findOne({
       where: { id },
@@ -126,102 +138,155 @@ export class UsersService {
     return user;
   }
 
-  /**
-   * Altera a senha do usuário e gera log de password-change.
-   *
-   * @param isSession  true = troca com sessão ativa; false = fluxo de reset
-   */
-  async changePassword(
-    userId: string,
-    newPassword: string,
-    opts: {
-      isSession: boolean;
-      tenantId?: string | null;
-      actorUserId?: string | null;
-      ipAddress?: string | null;
-      usedToken?: string | null;
-    },
-  ): Promise<void> {
-    const hash = await bcrypt.hash(newPassword, 12);
-    await this.userRepo.update(userId, { passwordHash: hash });
-    await this.auditLogService.logPasswordChange({
-      tenantId: opts.tenantId ?? null,
-      userId,
-      isSession: opts.isSession,
-      ipAddress: opts.ipAddress ?? null,
-      usedToken: opts.usedToken ?? null,
-    });
+  async findManagedUsers(
+    dto: FindUsersQueryDto,
+  ): Promise<{
+    data: User[];
+    total: number;
+    limit: number;
+    orderBy: UserOrderBy;
+    nextStart: string | null;
+  }> {
+    const limit = Math.min(100, Math.max(1, this.parsePositiveInt(dto.limit, 20)));
+    const tenantId = this.normalizeTenantId(dto.tenantId);
+    const orderBy = dto.orderBy ?? UserOrderBy.CREATED_AT;
+    const ordering = USER_ORDERING[orderBy];
+    const start = this.normalizeStart(dto.start, orderBy);
+
+    const qb = this.userRepo
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.person', 'person')
+      .leftJoinAndSelect('user.tenant', 'tenant')
+      .leftJoinAndSelect(
+        'user.userRoles',
+        'userRole',
+        'userRole.deletedAt IS NULL',
+      )
+      .orderBy(ordering.column, ordering.direction)
+      .distinct(true);
+
+    if (ordering.column !== 'user.id') {
+      qb.addOrderBy('user.id', ordering.direction);
+    }
+
+    if (tenantId !== undefined) {
+      if (tenantId === null) {
+        qb.andWhere('user.tenantId IS NULL');
+      } else {
+        qb.andWhere('user.tenantId = :tenantId', { tenantId });
+      }
+    }
+
+    if (dto.name?.trim()) {
+      qb.andWhere('LOWER(person.name) LIKE :personName', {
+        personName: `%${dto.name.trim().toLowerCase()}%`,
+      });
+    }
+
+    if (dto.role) {
+      qb.innerJoin(
+        'user.userRoles',
+        'roleFilter',
+        'roleFilter.deletedAt IS NULL AND roleFilter.role = :role',
+        { role: dto.role },
+      );
+    }
+
+    if (start !== undefined) {
+      const operator = ordering.direction === 'ASC' ? '>' : '<';
+      qb.andWhere(`${ordering.column} ${operator} :start`, { start });
+    }
+
+    qb.take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+    const last = data[data.length - 1];
+
+    return {
+      data,
+      total,
+      limit,
+      orderBy,
+      nextStart: last ? ordering.readValue(last) : null,
+    };
   }
 
-  async update(
+  async findManagedUser(id: string, tenantId?: string | null): Promise<User> {
+    const user = await this.findOne(id);
+
+    if (tenantId && user.tenantId !== tenantId)
+      throw new ForbiddenException('Acesso negado: usuário não pertence à empresa.');
+
+    return user;
+  }
+
+  async updateManagedUser(
     id: string,
-    dto: UpdateUserDto,
+    dto: UpdateManagedUserDto,
     actorUserId?: string | null,
     ipAddress?: string | null,
+    tenantId?: string | null,
   ): Promise<User> {
     const user = await this.findOne(id);
 
-    // Se apenas a senha mudou, registra password-change e retorna sem log crítico
-    const onlyPasswordChange =
-      dto.password !== undefined &&
-      dto.isActive === undefined &&
-      dto.roles === undefined;
+    if (tenantId && user.tenantId !== tenantId) 
+      throw new ForbiddenException('Acesso negado: usuário não pertence à empresa.');
 
-    if (dto.password !== undefined) {
-      await this.changePassword(id, dto.password, {
-        isSession: true,
-        tenantId: user.tenantId,
-        actorUserId: actorUserId ?? null,
-        ipAddress: ipAddress,
-      });
+    if (dto.email !== undefined || dto.document !== undefined) {
+      await this.ensurePersonUniqueness(
+        this.personRepo,
+        dto.email !== undefined ? dto.email : (user.person.email ?? null),
+        dto.document !== undefined
+          ? dto.document
+          : (user.person.document ?? null),
+        user.personId,
+      );
     }
 
-    if (onlyPasswordChange) {
-      return this.findOne(id);
+    const person = user.person;
+    if (dto.name !== undefined) {
+      person.name = dto.name;
+    }
+    if (dto.email !== undefined) {
+      person.email = dto.email;
+    }
+    if (dto.document !== undefined) {
+      person.document = dto.document;
+    }
+    if (dto.fone !== undefined) {
+      person.phone = dto.fone;
     }
 
-    if (dto.isActive !== undefined) {
-      user.isActive = dto.isActive;
-    }
+    await this.personRepo.save(person);
 
-    return this.dataSource.transaction(async (em) => {
-      await em.save(User, user);
-
-      if (dto.roles !== undefined) {
-        // Revoga roles existentes via soft delete
-        await em.softDelete(UserRole, { userId: id });
-
-        // Insere novas roles
-        const roleEntities = dto.roles.map((r) =>
-          em.create(UserRole, { userId: id, role: r }),
-        );
-        await em.save(UserRole, roleEntities);
-      }
-
-      const result = await em.findOneOrFail(User, {
-        where: { id },
-        relations: ['userRoles', 'person', 'tenant'],
-      });
-
-      await this.auditLogService.logCriticalOperation({
-        tenantId: result.tenantId,
-        tableName: 'users',
-        operation: 'UPDATE',
-        recordId: id,
-        userId: actorUserId ?? null,
-        ipAddress: ipAddress ?? null,
-      });
-
-      return result;
+    await this.auditLogService.logCriticalOperation({
+      tenantId: user.tenantId,
+      tableName: 'persons',
+      operation: 'UPDATE',
+      recordId: person.id,
+      userId: actorUserId ?? null,
+      ipAddress: ipAddress ?? null,
     });
+
+    await this.auditLogService.logCriticalOperation({
+      tenantId: user.tenantId,
+      tableName: 'users',
+      operation: 'UPDATE',
+      recordId: id,
+      userId: actorUserId ?? null,
+      ipAddress: ipAddress ?? null,
+    });
+
+    return this.findManagedUser(id, tenantId);
   }
 
   async remove(
     id: string,
     actorUserId?: string | null,
     ipAddress?: string | null,
+    tenantId?: string | null,
   ): Promise<void> {
-    const user = await this.findOne(id);
+    const user = await this.findManagedUser(id, tenantId);
     await this.userRepo.softRemove(user);
     await this.auditLogService.logCriticalOperation({
       tenantId: user.tenantId,
@@ -243,13 +308,7 @@ export class UsersService {
     userId: string,
     actorTenantId: string | null,
   ): Promise<{ token: string; expiresInMinutes: number }> {
-    const user = await this.findOne(userId);
-
-    if (actorTenantId && user.tenantId !== actorTenantId) {
-      throw new ForbiddenException(
-        'Acesso negado: usuário pertence a outro tenant.',
-      );
-    }
+    const user = await this.findManagedUser(userId, actorTenantId);
 
     const secret = this.configService.get<string>('PASSWORD_RESET_SECRET')!;
     const token = jwt.sign(
@@ -305,12 +364,115 @@ export class UsersService {
 
     const user = await this.findOne(payload.sub as string);
 
-    await this.changePassword(user.id, newPassword, {
+    await this.updatePassword(user.id, newPassword, {
       isSession: false,
       tenantId: user.tenantId,
-      actorUserId: null,
       ipAddress: ipAddress,
       usedToken: usedTokenHash,
+    });
+  }
+
+  private async ensurePersonUniqueness(
+    repo: Repository<Person> | EntityManager,
+    email?: string | null,
+    document?: string | null,
+    ignorePersonId?: string,
+  ): Promise<void> {
+    if (email) {
+      const whereByEmail = ignorePersonId
+        ? { email, id: Not(ignorePersonId) }
+        : { email };
+      const existingByEmail =
+        repo instanceof EntityManager
+          ? await repo.findOne(Person, { where: whereByEmail })
+          : await repo.findOne({ where: whereByEmail });
+
+      if (existingByEmail) {
+        throw new ConflictException(`E-mail ${email} já está em uso.`);
+      }
+    }
+
+    if (document) {
+      const whereByDocument = ignorePersonId
+        ? { document, id: Not(ignorePersonId) }
+        : { document };
+      const existingByDocument =
+        repo instanceof EntityManager
+          ? await repo.findOne(Person, { where: whereByDocument })
+          : await repo.findOne({ where: whereByDocument });
+
+      if (existingByDocument) {
+        throw new ConflictException(`Documento ${document} já está em uso.`);
+      }
+    }
+  }
+
+  private normalizeTenantId(
+    tenantId?: string,
+  ): string | null | undefined {
+    if (tenantId === undefined) {
+      return undefined;
+    }
+
+    return tenantId === 'null' ? null : tenantId;
+  }
+
+  private normalizeStart(
+    start: string | undefined,
+    orderBy: UserOrderBy,
+  ): string | Date | undefined {
+    if (!start) {
+      return undefined;
+    }
+
+    if (
+      orderBy === UserOrderBy.CREATED_AT ||
+      orderBy === UserOrderBy.UPDATED_AT
+    ) {
+      const parsed = new Date(start);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new BadRequestException(
+          `Valor inválido para cursor ${orderBy}: ${start}`,
+        );
+      }
+
+      return parsed;
+    }
+
+    return start;
+  }
+
+  private parsePositiveInt(value: string | undefined, fallback: number): number {
+    if (!value) {
+      return fallback;
+    }
+
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) {
+      return fallback;
+    }
+
+    return Math.max(1, parsed);
+  }
+
+  private async updatePassword(
+    userId: string,
+    newPassword: string,
+    opts: {
+      isSession: boolean;
+      tenantId?: string | null;
+      ipAddress?: string | null;
+      usedToken?: string | null;
+    },
+  ): Promise<void> {
+    const hash = await bcrypt.hash(newPassword, 12);
+    await this.userRepo.update(userId, { passwordHash: hash });
+    await this.auditLogService.logPasswordChange({
+      tenantId: opts.tenantId ?? null,
+      userId,
+      isSession: opts.isSession,
+      ipAddress: opts.ipAddress ?? null,
+      usedToken: opts.usedToken ?? null,
     });
   }
 }
