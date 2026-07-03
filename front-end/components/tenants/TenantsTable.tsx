@@ -1,7 +1,9 @@
 import { TenantListItemDto } from "@/api/dto/tenant/list-tenant.dto";
 import Button from "@/components/ui/Button";
+import EntityTableShell from "@/components/shared/table/EntityTableShell";
 import { RiBox3Line, RiBuildingLine, RiEditLine, RiEyeLine, RiMore2Fill } from "react-icons/ri";
 import TenantStatusBadge from "./TenantStatusBadge";
+import { applyMask, CNPJ_MASK_REGEX, PHONE_MASK_REGEX } from "@/lib/constants";
 
 type TenantsTableProps = {
   tenants: TenantListItemDto[];
@@ -16,7 +18,7 @@ function formatPhone(phone: string | null) {
 
   if (digits.length !== 11) return phone;
 
-  return digits.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3");
+  return applyMask(digits, PHONE_MASK_REGEX);
 }
 
 function formatCnpj(cnpj: string | null) {
@@ -25,7 +27,7 @@ function formatCnpj(cnpj: string | null) {
   const digits = cnpj.replace(/\D/g, "");
   if (digits.length !== 14) return cnpj;
 
-  return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+  return applyMask(digits, CNPJ_MASK_REGEX);
 }
 
 function formatDate(date: string) {
@@ -89,34 +91,17 @@ function TenantActions(props: {
       >
         <RiEditLine size={18} />
       </Button>
-      <Button variant="ghost" size="icon" title="Mais acoes">
-        <RiMore2Fill size={18} />
-      </Button>
     </div>
   );
 }
 
 export default function TenantsTable({ tenants, onViewTenant, onEditTenant }: TenantsTableProps) {
   if (!tenants.length) {
-    return (
-      <section className="overflow-hidden rounded-[20px] border border-outline-variant bg-surface-container shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-        <EmptyState />
-      </section>
-    );
+    return <EntityTableShell title="Listagem de tenants" subtitle="Directory" emptyState={<EmptyState />}>{null}</EntityTableShell>;
   }
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-outline-variant bg-surface-container shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-      <div className="border-b border-outline-variant bg-surface-variant/10 px-6 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="type-label-caps text-secondary-fixed-dim">Directory</p>
-            <h3 className="text-lg font-semibold text-primary">Listagem de tenants</h3>
-          </div>
-          <p className="hidden text-sm text-on-surface-variant md:block">Visual pensado para leitura rapida e alta densidade.</p>
-        </div>
-      </div>
-
+    <EntityTableShell title="Listagem de tenants" subtitle="Directory" emptyState={null}>
       <div className="divide-y divide-outline-variant/40 md:hidden">
         {tenants.map((tenant) => (
           <article key={tenant.id} className="space-y-4 px-5 py-5">
@@ -188,6 +173,6 @@ export default function TenantsTable({ tenants, onViewTenant, onEditTenant }: Te
           </tbody>
         </table>
       </div>
-    </section>
+    </EntityTableShell>
   );
 }

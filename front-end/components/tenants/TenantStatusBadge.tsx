@@ -1,4 +1,5 @@
 import { TenantListItemDto } from "@/api/dto/tenant/list-tenant.dto";
+import StatusBadge from "@/components/ui/Badge";
 
 type TenantStatus = "active" | "inactive" | "archived";
 
@@ -29,11 +30,5 @@ export default function TenantStatusBadge({ tenant }: { tenant: TenantListItemDt
   const status = getTenantStatus(tenant);
   const meta = STATUS_META[status];
 
-  return (
-    <span
-      className={`inline-flex items-center rounded-md border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${meta.className}`}
-    >
-      {meta.label}
-    </span>
-  );
+  return <StatusBadge label={meta.label} className={meta.className} />;
 }

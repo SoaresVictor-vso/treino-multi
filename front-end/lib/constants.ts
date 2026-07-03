@@ -10,6 +10,17 @@ export type MaskRegex = {
   replacement: string;
 };
 
-export const CNPJ_MASK_REGEX: MaskRegex = { regex: /^(\d{0,2})(\d{0,3})(\d{0,3})(\d{0,4})(\d{0,2}).*$/, replacement: "$1.$2.$3/$4-$5" };
-export const CPF_MASK_REGEX: MaskRegex = { regex: /^(\d{0,3})(\d{0,3})(\d{0,3})(\d{0,2}).*$/, replacement: "$1.$2.$3-$4" };
-export const PHONE_MASK_REGEX: MaskRegex = { regex: /^(\d{0,2})(\d{0,5})(\d{0,4}).*$/, replacement: "($1) $2-$3" };
+export const CNPJ_MASK_REGEX: MaskRegex = {
+  regex: /^(\d{0,2})(\d{0,3})(\d{0,3})(\d{0,4})(\d{0,2}).*$/,
+  replacement: "$1.$2.$3/$4-$5",
+};
+export const CPF_MASK_REGEX: MaskRegex = {
+  regex: /^(\d{0,3})(\d{0,3})(\d{0,3})(\d{0,2}).*$/,
+  replacement: "$1.$2.$3-$4",
+};
+export const PHONE_MASK_REGEX: MaskRegex = {
+  regex: /^(\d{0,2})(\d{0,5})(\d{0,4}).*$/,
+  replacement: "($1) $2-$3",
+};
+
+export const applyMask = (value: string, mask: MaskRegex) => value.replace(mask.regex, mask.replacement);
