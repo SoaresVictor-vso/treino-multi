@@ -35,6 +35,13 @@ const NAV_ITEMS: { [href: string]: NavItem } = {
         allowedRoles: [Role.ORG_ADMIN, Role.ORG_SUPPORT],
         hidden: false,
     },
+    "/users": {
+        href: "/users",
+        label: "Usuários",
+        icon: "RiGroupLine",
+        allowedRoles: [Role.ORG_ADMIN, Role.ORG_SUPPORT],
+        hidden: false,
+    },
     "/teste": {
         href: "/tenants",
         label: "Tenants",

@@ -1,23 +1,23 @@
 import { TenantListItemDto } from "@/api/dto/tenant/list-tenant.dto";
-import StatusBadge from "@/components/ui/Badge";
+import StatusBadge, { BadgeTypes } from "@/components/ui/Badge";
 
 type TenantStatus = "active" | "inactive" | "archived";
 
 const STATUS_META: Record<
   TenantStatus,
-  { label: string; className: string }
+  { label: string; type: BadgeTypes }
 > = {
   active: {
     label: "Ativo",
-    className: "border-primary-fixed-dim/20 bg-primary-fixed-dim/10 text-primary-fixed-dim",
+    type: "primary",
   },
   inactive: {
     label: "Inativo",
-    className: "border-outline-variant/70 bg-surface-variant/40 text-secondary-fixed-dim",
+    type: "secondary",
   },
   archived: {
     label: "Arquivado",
-    className: "border-error/20 bg-error/10 text-error",
+    type: "error",
   },
 };
 
@@ -30,5 +30,5 @@ export default function TenantStatusBadge({ tenant }: { tenant: TenantListItemDt
   const status = getTenantStatus(tenant);
   const meta = STATUS_META[status];
 
-  return <StatusBadge label={meta.label} className={meta.className} />;
+  return <StatusBadge label={meta.label} type={meta.type} />;
 }

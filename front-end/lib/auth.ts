@@ -3,12 +3,14 @@ import { Role } from "./roles";
 interface JwtPayload {
   sub: string;
   roles: Role[];
+  tenantId: string | null;
   exp: number;
 }
 
 export interface SessionUser {
   sub: string;
   roles: Role[];
+  tenantId: string | null;
 }
 
 /** Token fixo utilizado durante o desenvolvimento até o fluxo real de auth estar pronto. */
@@ -33,7 +35,7 @@ export function getSessionUser(): SessionUser | null {
     const encodedPayload = token.split(".")[1];
     const decodedPayload = atob(encodedPayload);
     const payload = JSON.parse(decodedPayload) as JwtPayload;
-    return { sub: payload.sub, roles: payload.roles ?? [] };
+    return { sub: payload.sub, roles: payload.roles ?? [], tenantId: payload.tenantId ?? null };
   } catch {
     return null;
   }

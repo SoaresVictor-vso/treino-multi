@@ -54,6 +54,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   handleRequest(err: any, user: any, _info: any, context: ExecutionContext): any {
     if (err) throw err;
 
+    console.log('JwtAuthGuard.handleRequest: user', user);
+
     if (!user || typeof user !== 'object') {
       throw new UnauthorizedException('Invalid or missing user');
     }
