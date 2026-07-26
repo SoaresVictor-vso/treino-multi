@@ -22,7 +22,7 @@ export default function Sidebar({ items }: { items: NavItemPublic[] }) {
     return (
         <aside
             className={
-                `${collapsed ? "w-16" : "w-64"} min-h-screen flex flex-col ` +
+                `${collapsed ? "w-16" : "w-64"} sticky top-0 h-screen min-h-0 shrink-0 flex flex-col ` +
                 `transition-all duration-300 bg-surface-container `
             }        >
             <div className="px-3 py-4 border-b-4 border-outline-variant flex items-center justify-between">
@@ -41,7 +41,7 @@ export default function Sidebar({ items }: { items: NavItemPublic[] }) {
                 </button>
             </div>
 
-            <nav className="flex-1 px-2 py-4 space-y-1 ">
+            <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-4 space-y-1 ">
                 {items.map((item) => {
                     const isActive = pathname.startsWith(item.href);
                     const rawIcon = icons[item.icon as keyof typeof icons] || icons.RiFileForbidLine;
