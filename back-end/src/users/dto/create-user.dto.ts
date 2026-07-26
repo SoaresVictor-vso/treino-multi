@@ -15,7 +15,7 @@ export type UserContext = 'organization' | 'tenant' | 'standalone';
 export class CreateUserDto {
   @ApiProperty({ example: 'uuid-da-person' })
   @IsUUID()
-  personId: string;
+  personId!: string;
 
   /**
    * Obrigatório quando context = 'tenant'.
@@ -24,23 +24,23 @@ export class CreateUserDto {
   @ApiProperty({ example: 'uuid-do-tenant' })
   @IsOptional()
   @IsUUID()
-  tenantId?: string;
+  tenantId!: string | null;
 
   /** Contexto de autenticação: 'organization', 'tenant' ou 'standalone'. */
   @ApiProperty({ example: 'tenant' })
   @IsEnum(['organization', 'tenant', 'standalone'], {
     message: "context deve ser 'organization', 'tenant' ou 'standalone'",
   })
-  context: UserContext;
+  context!: UserContext;
 
   @ApiProperty({ example: 'S3nh@F0rt3!' })
   @IsString()
   @MinLength(8)
-  password: string;
+  password!: string;
 
   @ApiProperty({ example: [Role.TENANT_ADMIN] })
   @IsArray()
   @ArrayMinSize(1)
   @IsEnum(Role, { each: true })
-  roles: Role[];
+  roles!: Role[];
 }

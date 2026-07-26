@@ -64,8 +64,8 @@ export class UsersService {
 
   async createManagedUser(
     dto: CreateManagedUserDto,
-    actorUserId?: string | null,
-    ipAddress?: string | null,
+    actorUserId: string | null,
+    ipAddress: string,
   ): Promise<User> {
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
@@ -82,7 +82,7 @@ export class UsersService {
           name: dto.name,
           email: dto.email,
           document: dto.document ?? null,
-          phone: dto.fone ?? null,
+          phone: dto.phone ?? null,
         }),
       );
 
@@ -93,7 +93,7 @@ export class UsersService {
           tenantId: dto.tenantId ?? null,
           context: dto.context,
           passwordHash,
-          isActive: true,
+          isActive: dto.isActive ?? true,
         }),
       );
 

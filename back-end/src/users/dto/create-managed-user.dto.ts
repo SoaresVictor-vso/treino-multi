@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMinSize,
+  IsBoolean,
   IsArray,
   IsEmail,
   IsIn,
@@ -38,7 +39,7 @@ export class CreateManagedUserDto {
   @ValidateIf((_obj, value) => value !== undefined && value !== null)
   @IsString()
   @MaxLength(11)
-  fone?: string | null;
+  phone?: string | null;
 
   @ApiPropertyOptional({ example: 'f7b3b53b-d6f6-431f-814c-cb8406f00121', nullable: true })
   @ValidateIf((_obj, value) => value !== undefined && value !== null)
@@ -55,6 +56,11 @@ export class CreateManagedUserDto {
   @IsString()
   @MinLength(8)
   password!: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 
   @ApiProperty({ example: [Role.TENANT_ADMIN], enum: Role, isArray: true })
   @IsArray()

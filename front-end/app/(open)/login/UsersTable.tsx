@@ -2,7 +2,8 @@ import EntityTableShell from "@/components/shared/table/EntityTableShell";
 import Button from "@/components/ui/Button";
 import { UserListItemDto } from "@/api/dto/user/list-user.dto";
 import { RiUser3Line, RiEyeLine } from "react-icons/ri";
-import Badge, { BadgeTypes } from "../ui/Badge";
+import Badge, { BadgeTypes } from "../../../components/ui/Badge";
+import { mask } from "@/lib/tools";
 
 type UsersTableProps = {
   users: UserListItemDto[];
@@ -85,7 +86,7 @@ export default function UsersTable({ users }: UsersTableProps) {
                     <p className="text-sm text-on-surface-variant">{user.person.email || "Sem e-mail"}</p>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">{user.person.document || "Sem documento"}</td>
+                <td className="px-6 py-4 text-sm text-on-surface-variant text-nowrap">{mask(user.person.document, "cpf") || "Sem documento"}</td>
                 <td className="px-6 py-4 text-sm text-on-surface-variant">{user.tenant?.tradeName || user.tenant?.name || "Sem tenant"}</td>
                 <td className="px-6 py-4">
                   <RoleBadges roles={user.userRoles} userId={user.id} />

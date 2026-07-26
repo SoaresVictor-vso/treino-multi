@@ -48,13 +48,14 @@ export default function Login() {
         return;
       }
 
-      setAccessToken(res.data!.accessToken);
-      setRefreshToken(res.data!.refreshToken);
+      const { accessToken: newAccessToken, refreshToken: newRefreshToken } = res.data!;
+      setAccessToken(newAccessToken);
+      setRefreshToken(newRefreshToken);
 
       console.log("Login bem-sucedido!");
       console.log(res.success);
-      if (accessToken)
-        setAuthCookie(accessToken);
+      setAuthCookie(newAccessToken);
+      setLoading(false);
       router.push("/home");
     } catch (error) {
       setLoading(false);
