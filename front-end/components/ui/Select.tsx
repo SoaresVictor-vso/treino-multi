@@ -1,5 +1,7 @@
-import { forwardRef, ReactNode, SelectHTMLAttributes } from "react";
-import { RiArrowDownSLine } from "react-icons/ri";
+"use client";
+
+import { ChangeEvent, forwardRef, MouseEvent, ReactNode, SelectHTMLAttributes } from "react";
+import { RiArrowDownSLine, RiCloseLine } from "react-icons/ri";
 
 export interface SelectOption {
   value: string | number;
@@ -14,16 +16,27 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   options: SelectOption[];
   placeholder?: string;
   leadingIcon?: ReactNode;
+  canClear?: boolean;
 }
 
 const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, hint, id, options, placeholder, className = "", leadingIcon, ...props }, ref) => {
+  ({ label, error, hint, id, options, placeholder, className = "", leadingIcon, canClear, value, defaultValue, onChange, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
+    const handleChange = (event: ChangeEvent<HTMLSelectElement>) => {
+      onChange?.(event);
+    };
+
+    const clearValue = (event: MouseEvent<HTMLButtonElement>) => {
+      const select = event.currentTarget.parentElement?.querySelector<HTMLSelectElement>("select");
+      if (!select) return;
+      select.value = "";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    };
 
     return (
       <div className="flex flex-col gap-1">
         <div
-          className={`relative rounded-xl border border-outline-variant bg-surface-container-high transition-colors ${
+          className={`group relative rounded-xl border border-outline-variant bg-surface-container-high transition-colors ${
             error ? "border-error/60" : "focus-within:border-primary-fixed-dim/50"
           }`}
         >
@@ -43,6 +56,9 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
               " pr-10 [color-scheme:dark] autofill:bg-surface-container-high autofill:text-primary autofill:shadow-[inset_0_0_0px_1000px_var(--color-surface-container-high)] autofill:[-webkit-text-fill-color:var(--color-primary)] " +
               className
             }
+            value={value}
+            defaultValue={defaultValue}
+            onChange={handleChange}
             {...props}
           >
             {(placeholder || label) && (
@@ -61,9 +77,20 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
               </option>
             ))}
           </select>
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant">
-            <RiArrowDownSLine />
-          </span>
+          {canClear ? (
+            <button
+              type="button"
+              aria-label="Limpar seleção"
+              onClick={clearValue}
+              className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded p-1 text-on-surface-variant transition-colors group-has-[select>option:checked:not([value=''])]:block hover:bg-surface-container hover:text-primary"
+            >
+              <RiCloseLine />
+            </button>
+          ) : (
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-lg text-on-surface-variant">
+              <RiArrowDownSLine />
+            </span>
+          )}
         </div>
         {hint && !error && (
           <p id={`${inputId}-hint`} className="text-xs text-on-surface-variant/80">

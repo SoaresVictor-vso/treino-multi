@@ -2,7 +2,7 @@
 
 import React, { startTransition, useDeferredValue, useEffect } from "react";
 import Button from "@/components/ui/Button";
-import Checkbox from "@/components/ui/Checkbox";
+import Switch from "@/components/ui/Switch";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { TenantService } from "@/api/services/tenant";
@@ -17,7 +17,7 @@ import { Role } from "@/lib/roles";
 import UsersFilters, { type UserRoleFilter, type UserSortOption } from "@/app/(open)/login/UsersFilters";
 import UsersTable from "@/app/(open)/login/UsersTable";
 import * as yup from "yup";
-import { CPF_REGEX, EMAIL_REGEX, PHONE_REGEX } from "@/lib/constants";
+import { CNPJ_MASK_REGEX, CPF_MASK_REGEX, CPF_REGEX, EMAIL_REGEX, PHONE_MASK_REGEX, PHONE_REGEX } from "@/lib/constants";
 
 const usersService = new UsersService();
 const tenantService = new TenantService();
@@ -236,52 +236,88 @@ function UserModal(props: {
     });
   };
 
+  async function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    try {
+      await createUserSchema.validate(form, { abortEarly: false });
+      setErrors({});
+    } catch (error) {
+      if (!(error instanceof yup.ValidationError)) return;
+
+      const nextErrors: Record<string, string> = {};
+      error.inner.forEach((validationError) => {
+        if (validationError.path && !nextErrors[validationError.path]) {
+          nextErrors[validationError.path] = validationError.message;
+        }
+      });
+      setErrors(nextErrors);
+      return;
+    }
+
+    await props.onSubmit({
+      name: form.name.trim(),
+      email: form.email.trim(),
+      document: form.document.trim() || null,
+      phone: form.phone.trim() || null,
+      tenantId: effectiveTenantId,
+      context,
+      password: form.password,
+      isActive: form.isActive,
+      roles,
+    });
+  }
+
   return (
     <Modal
       isOpen={props.isOpen}
       title="Novo usuário"
-      description="Cadastre os dados pessoais e de acesso. O tenant só aparece para atores org."
+      description="Cadastre os dados pessoais e de acesso."
       onClose={props.onClose}
     >
       <form
         className="space-y-6"
-        onSubmit={async (event) => {
-          event.preventDefault();
-
-          try {
-            await createUserSchema.validate(form, { abortEarly: false });
-            setErrors({});
-          } catch (error) {
-            if (!(error instanceof yup.ValidationError)) return;
-
-            const nextErrors: Record<string, string> = {};
-            error.inner.forEach((validationError) => {
-              if (validationError.path && !nextErrors[validationError.path]) {
-                nextErrors[validationError.path] = validationError.message;
-              }
-            });
-            setErrors(nextErrors);
-            return;
-          }
-
-          await props.onSubmit({
-            name: form.name.trim(),
-            email: form.email.trim(),
-            document: form.document.trim() || null,
-            phone: form.phone.trim() || null,
-            tenantId: effectiveTenantId,
-            context,
-            password: form.password,
-            isActive: form.isActive,
-            roles,
-          });
-        }}
+        onSubmit={handleSubmit}
       >
         <section className="grid gap-4 md:grid-cols-2">
-          <Input id="user-name" label="Nome da pessoa" required error={errors.name} value={form.name} onChange={(event) => updateField("name", event.target.value)} />
-          <Input id="user-email" label="E-mail" type="email" required error={errors.email} value={form.email} onChange={(event) => updateField("email", event.target.value)} />
-          <Input id="user-document" label="Documento" required error={errors.document} value={form.document} onChange={(event) => updateField("document", event.target.value.replace(/\D/g, "").slice(0, 11))} />
-          <Input id="user-phone" label="Telefone" required error={errors.phone} value={form.phone} onChange={(event) => updateField("phone", event.target.value.replace(/\D/g, "").slice(0, 11))} />
+          <Input
+            id="user-name"
+            label="Nome da pessoa"
+            required
+            error={errors.name}
+            value={form.name}
+            onChange={(event) => updateField("name", event.target.value)}
+          />
+          <Input
+            id="user-email"
+            label="E-mail"
+            type="email"
+            required
+            error={errors.email}
+            value={form.email}
+            onChange={(event) => updateField("email", event.target.value)}
+          />
+          <Input
+            id="user-document"
+            label="Documento"
+            required
+            error={errors.document}
+            value={form.document}
+            onChange={(event) => updateField("document", event.target.value.replace(/\D/g, "").slice(0, 14))}
+            mask={[
+              { ...CPF_MASK_REGEX, maxLength: 11 },
+              { ...CNPJ_MASK_REGEX, minLength: 12 }
+            ]}
+          />
+          <Input
+            id="user-phone"
+            label="Telefone"
+            required
+            error={errors.phone}
+            value={form.phone}
+            onChange={(event) => updateField("phone", event.target.value.replace(/\D/g, "").slice(0, 11))}
+            mask={PHONE_MASK_REGEX}
+          />
         </section>
 
         {props.isOrgActor ? (
@@ -290,12 +326,15 @@ function UserModal(props: {
             label="Tenant"
             value={form.tenantId}
             onChange={(event) => updateField("tenantId", event.target.value)}
-            placeholder="Organization (tenant nulo)"
-            options={props.tenants.map((tenant) => ({
+            placeholder="Organização"
+            options={[
+              // { tradeName: "Limpar", id: '', name: '' },
+              ...props.tenants
+            ].map((tenant) => ({
               value: tenant.id,
               label: tenant.tradeName || tenant.name,
             }))}
-            hint="Deixe vazio para criar um usuário organizational."
+            canClear
           />
         ) : (
           <div className="rounded-xl border border-outline-variant bg-surface-container-high px-4 py-3 text-sm text-on-surface-variant">
@@ -324,7 +363,7 @@ function UserModal(props: {
           />
         </section>
 
-        <Checkbox
+        <Switch
           id="user-active"
           label="Ativo"
           checked={form.isActive}

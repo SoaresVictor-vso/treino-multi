@@ -1,15 +1,18 @@
 import { ChangeEvent, ReactNode, forwardRef, InputHTMLAttributes, useEffect, useState } from "react";
 
+// ignora máscara se acima de maxLength, ou abaixo de minLength
 export type InputMask = {
   regex: RegExp;
   replacement: string;
+  maxLength?: number;
+  minLength?: number;
 };
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   hint?: string;
-  mask?: InputMask;
+  mask?: InputMask | InputMask[];
   leadingIcon?: ReactNode;
 }
 
@@ -24,12 +27,22 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       if (typeof currentValue === "string") return currentValue.length > 0;
       return false;
     };
-    const canApplyMask = (type ?? "text") === "text" && !!mask;
+    const masks = Array.isArray(mask) ? mask : [mask];
+
     const applyMask = (currentValue: string) => {
+      const inuseMask = masks.find((m) => {
+        if (m?.maxLength && currentValue.length > m.maxLength) return false;
+        if (m?.minLength && currentValue.length < m.minLength) return false;
+        return true;
+      });
+      const canApplyMask = (type ?? "text") === "text" && !!inuseMask;
       if (!canApplyMask) return currentValue;
 
       const normalizedValue = currentValue.replace(/\D/g, "");
-      const maskedValue = normalizedValue.replace(mask.regex, mask.replacement);
+      const maskedValue = normalizedValue.replace(
+        inuseMask.regex,
+        inuseMask.replacement
+      );
 
       return maskedValue.replace(/[^\dA-Za-z]+$/g, "");
     };
@@ -45,13 +58,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     }, [value]);
 
     const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-      if (canApplyMask) {
-        event.target.value = applyMask(event.target.value);
-      }
+      event.target.value = applyMask(event.target.value);
 
-      if (value === undefined) {
+      if (value === undefined) 
         setHasValue(event.target.value.length > 0);
-      }
 
       onChange?.(event);
     };
@@ -67,9 +77,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           </label>
         )}
         <div
-          className={`relative rounded-xl border border-outline-variant bg-surface-container-high transition-colors ${
-            error ? "border-error/60" : "focus-within:border-primary-fixed-dim/50"
-          }`}
+          className={`relative rounded-xl border border-outline-variant bg-surface-container-high transition-colors ${error ? "border-error/60" : "focus-within:border-primary-fixed-dim/50"
+            }`}
         >
           {leadingIcon ? (
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
