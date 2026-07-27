@@ -77,7 +77,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
               </option>
             ))}
           </select>
-          {canClear ? (
+          {canClear && !props.disabled ? (
             <button
               type="button"
               aria-label="Limpar seleção"

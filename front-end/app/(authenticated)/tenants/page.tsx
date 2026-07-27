@@ -29,7 +29,7 @@ import TenantsFilters, {
     type TenantStatusFilter,
 } from "@/components/tenants/TenantsFilters";
 import TenantsTable from "@/components/tenants/TenantsTable";
-import MetricCard from "@/components/shared/MetricCard";
+import MetricCard from "@/components/ui/MetricCard";
 import { CNPJ_MASK_REGEX, CPF_MASK_REGEX, PHONE_MASK_REGEX } from "@/lib/constants";
 import React, { startTransition, useDeferredValue, useEffect } from "react";
 import { RiAddLine, RiAdminLine, RiBuilding2Line, RiLoader4Line, RiRefreshLine, RiShieldCheckLine } from "react-icons/ri";

@@ -5,6 +5,8 @@ import { CreateUserDto } from "../dto/user/create-user.dto";
 import { UserListItemDto } from "../dto/user/list-user.dto";
 import { CPF_REGEX, EMAIL_REGEX, PHONE_REGEX } from "@/lib/constants";
 
+export type UpdateUserDto = { name: string; email: string; document?: string | null; fone?: string | null; isActive: boolean };
+
 export type ParamsFindUsers = {
   tenantId?: string;
   name?: string;
@@ -22,6 +24,10 @@ export class UsersService {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  }
+
+  async update(id: string, payload: UpdateUserDto) {
+    return authenticatedRequest<UserListItemDto>(`${this.apiUrl}/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
   }
 
   async findMultiple(params: ParamsFindUsers) {

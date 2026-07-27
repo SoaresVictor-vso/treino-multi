@@ -268,8 +268,10 @@ export class UsersService {
     if (dto.fone !== undefined) {
       person.phone = dto.fone;
     }
+    if (dto.isActive !== undefined) user.isActive = dto.isActive;
 
     await this.personRepo.save(person);
+    await this.userRepo.save(user);
 
     await this.auditLogService.logCriticalOperation({
       tenantId: user.tenantId,

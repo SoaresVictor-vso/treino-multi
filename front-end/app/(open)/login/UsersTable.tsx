@@ -1,12 +1,14 @@
 import EntityTableShell from "@/components/shared/table/EntityTableShell";
 import Button from "@/components/ui/Button";
 import { UserListItemDto } from "@/api/dto/user/list-user.dto";
-import { RiUser3Line, RiEyeLine } from "react-icons/ri";
+import { RiUser3Line, RiEyeLine, RiEditLine } from "react-icons/ri";
 import Badge, { BadgeTypes } from "../../../components/ui/Badge";
 import { mask } from "@/lib/tools";
 
 type UsersTableProps = {
   users: UserListItemDto[];
+  onView?: (user: UserListItemDto) => void;
+  onEdit?: (user: UserListItemDto) => void;
 };
 
 function EmptyState() {
@@ -29,7 +31,8 @@ function RoleLabel({ roles }: { roles: { role: string }[] }) {
   return <span className="rounded-full bg-surface-variant/20 px-3 py-1 text-xs text-primary">{roles[0]?.role || "Sem role"}</span>;
 }
 
-export default function UsersTable({ users }: UsersTableProps) {
+export default function UsersTable({ users, onView, onEdit }: UsersTableProps) {
+  const sortedUsers = [...users].sort((a, b) => Number(b.isActive) - Number(a.isActive));
   if (!users.length) {
     return <EntityTableShell title="Listagem de usuários" subtitle="Directory" emptyState={<EmptyState />}>{null}</EntityTableShell>;
   }
@@ -39,14 +42,14 @@ export default function UsersTable({ users }: UsersTableProps) {
   return (
     <EntityTableShell title="Listagem de usuários" subtitle="Directory" emptyState={null}>
       <div className="divide-y divide-outline-variant/40 md:hidden">
-        {users.map((user) => (
+        {sortedUsers.map((user) => (
           <article key={user.id} className="space-y-4 px-5 py-5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-base font-semibold text-primary">{user.person.name}</p>
                 <p className="truncate text-xs uppercase tracking-[0.16em] text-on-surface-variant">{user.person.email || "Sem e-mail"}</p>
               </div>
-              <RoleLabel roles={user.userRoles} />
+              <div className="flex flex-wrap justify-end gap-2"><Badge label={user.isActive ? "Ativo" : "Inativo"} type={user.isActive ? "primary" : "error"} /><RoleLabel roles={user.userRoles} /></div>
             </div>
             <div className="grid gap-3 text-sm text-on-surface-variant">
               <div>
@@ -70,31 +73,32 @@ export default function UsersTable({ users }: UsersTableProps) {
           <thead>
             <tr className="border-b border-outline-variant/70 bg-surface-variant/10">
               <th className="px-6 py-4 type-label-caps text-secondary-fixed-dim">Usuário</th>
-              <th className="px-6 py-4 type-label-caps text-secondary-fixed-dim">Documento</th>
               <th className="px-6 py-4 type-label-caps text-secondary-fixed-dim">Tenant</th>
-              <th className="px-6 py-4 type-label-caps text-secondary-fixed-dim">Role</th>
-              <th className="px-6 py-4 type-label-caps text-secondary-fixed-dim">Contexto</th>
+              <th className="px-6 py-4 type-label-caps text-secondary-fixed-dim">Status e perfil</th>
               <th className="px-6 py-4 text-right type-label-caps text-secondary-fixed-dim">Acoes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant/30">
-            {users.map((user) => (
+            {sortedUsers.map((user) => (
               <tr key={user.id} className="transition-colors hover:bg-surface-variant/10">
                 <td className="px-6 py-4">
                   <div className="space-y-1">
                     <p className="font-medium text-primary">{user.person.name}</p>
                     <p className="text-sm text-on-surface-variant">{user.person.email || "Sem e-mail"}</p>
+                    <p className="text-sm text-on-surface-variant">{user.person.phone || "Sem telefone"}</p>
+                    <p className="text-sm text-on-surface-variant">{mask(user.person.document, "cpf") || "Sem documento"}</p>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant text-nowrap">{mask(user.person.document, "cpf") || "Sem documento"}</td>
                 <td className="px-6 py-4 text-sm text-on-surface-variant">{user.tenant?.tradeName || user.tenant?.name || "Sem tenant"}</td>
                 <td className="px-6 py-4">
-                  <RoleBadges roles={user.userRoles} userId={user.id} />
+                  <RoleBadges roles={user.userRoles} userId={user.id} isActive={user.isActive} />
                 </td>
-                <td className="px-6 py-4 text-sm text-on-surface-variant">{user.context}</td>
                 <td className="px-6 py-4 text-right">
-                  <Button variant="ghost" size="icon" title="Visualizar">
+                  <Button variant="ghost" size="icon" title="Visualizar" onClick={() => onView?.(user)}>
                     <RiEyeLine size={18} />
+                  </Button>
+                  <Button variant="ghost" size="icon" title="Editar" onClick={() => onEdit?.(user)}>
+                    <RiEditLine size={18} />
                   </Button>
                 </td>
               </tr>
@@ -106,12 +110,10 @@ export default function UsersTable({ users }: UsersTableProps) {
   );
 }
 
-function RoleBadges({ roles, userId }: { roles: { role: string }[], userId: string }) {
-  if (!roles.length) return null;
-
-
+function RoleBadges({ roles, userId, isActive }: { roles: { role: string }[], userId: string, isActive: boolean }) {
   return (
-    <>
+    <div className="flex flex-wrap gap-2">
+      <Badge label={isActive ? "Ativo" : "Inativo"} type={isActive ? "primary" : "error"} />
       {roles.map((r) => {
         let type: BadgeTypes = "secondary";
 
@@ -126,6 +128,6 @@ function RoleBadges({ roles, userId }: { roles: { role: string }[], userId: stri
           <Badge key={r.role+userId} label={r.role} type={type} />
         )
       })}
-    </>
+    </div>
   );
 }

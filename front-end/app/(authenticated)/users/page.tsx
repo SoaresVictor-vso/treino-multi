@@ -6,7 +6,7 @@ import Switch from "@/components/ui/Switch";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { TenantService } from "@/api/services/tenant";
-import { UsersService } from "@/api/services/users";
+import { UsersService, UpdateUserDto } from "@/api/services/users";
 import { CreateUserDto, TenantFunction } from "@/api/dto/user/create-user.dto";
 import { UserListItemDto } from "@/api/dto/user/list-user.dto";
 import { TenantListItemDto } from "@/api/dto/tenant/list-tenant.dto";
@@ -16,7 +16,7 @@ import { getSessionUser } from "@/lib/auth";
 import { Role } from "@/lib/roles";
 import UsersFilters, { type UserRoleFilter, type UserSortOption } from "@/app/(open)/login/UsersFilters";
 import UsersTable from "@/app/(open)/login/UsersTable";
-import MetricCard from "@/components/shared/MetricCard";
+import MetricCard from "@/components/ui/MetricCard";
 import * as yup from "yup";
 import { CNPJ_MASK_REGEX, CPF_MASK_REGEX, CPF_REGEX, EMAIL_REGEX, PHONE_MASK_REGEX, PHONE_REGEX } from "@/lib/constants";
 
@@ -39,6 +39,18 @@ const createUserSchema = yup.object({
   }),
 });
 
+const updateUserSchema = yup.object({
+  name: yup.string().trim().required("Nome da pessoa é obrigatório").min(2, "Nome deve ter pelo menos 2 caracteres"),
+  email: yup.string().trim().required("E-mail é obrigatório").matches(EMAIL_REGEX, "Digite um e-mail válido"),
+  document: yup.string().when("documentEditable", {
+    is: true,
+    then: (schema) => schema.required("Documento é obrigatório").matches(CPF_REGEX, "Digite um CPF válido"),
+    otherwise: (schema) => schema.notRequired(),
+  }),
+  phone: yup.string().required("Telefone é obrigatório").matches(PHONE_REGEX, "Digite um telefone válido"),
+  documentEditable: yup.boolean().required(),
+});
+
 export default function UsersPage() {
   const sessionUser = getSessionUser();
   const isOrgActor = !!sessionUser?.roles?.some((role) => role.startsWith("org:"));
@@ -51,6 +63,8 @@ export default function UsersPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [viewedUser, setViewedUser] = React.useState<UserListItemDto | null>(null);
+  const [editedUser, setEditedUser] = React.useState<UserListItemDto | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const deferredSearch = useDeferredValue(search);
@@ -166,7 +180,7 @@ export default function UsersPage() {
       <div className="flex items-center justify-end">
         <Button onClick={() => setIsCreateOpen(true)}>Novo usuário</Button>
       </div>
-      <UsersTable users={users} />
+      <UsersTable users={users} onView={setViewedUser} onEdit={setEditedUser} />
       <UserModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
@@ -176,6 +190,35 @@ export default function UsersPage() {
         tenants={tenants}
         isSubmitting={isSubmitting}
         error={submitError}
+      />
+      <UserModal
+        isOpen={!!viewedUser}
+        user={viewedUser}
+        onClose={() => setViewedUser(null)}
+        onSubmit={async () => undefined}
+        isOrgActor={isOrgActor}
+        sessionTenantId={sessionUser?.tenantId ?? null}
+        tenants={tenants}
+        isSubmitting={false}
+        error={null}
+      />
+      <UserModal
+        isOpen={!!editedUser}
+        user={editedUser}
+        onClose={() => setEditedUser(null)}
+        onSubmit={async () => undefined}
+        onUpdate={async (id, payload) => {
+          const result = await usersService.update(id, payload);
+          if (result.success) {
+            setEditedUser(null);
+            const refreshed = await usersService.findMultiple({ tenantId: sessionUser?.tenantId ?? (tenantFilter || undefined), limit: 100 });
+            if (refreshed.success && refreshed.data) setUsers(refreshed.data.data);
+            else setLoadError(refreshed.error || "Não foi possível recarregar os usuários.");
+          }
+          return result;
+        }}
+        isOrgActor={isOrgActor} sessionTenantId={sessionUser?.tenantId ?? null}
+        tenants={tenants} isSubmitting={false} error={null}
       />
     </div>
   );
@@ -194,7 +237,12 @@ function UserModal(props: {
   tenants: TenantListItemDto[];
   isSubmitting: boolean;
   error: string | null;
+  user?: UserListItemDto | null;
+  onUpdate?: (id: string, payload: UpdateUserDto) => Promise<{ success: boolean; error?: string }>;
 }) {
+  const isCreateMode = !props.user;
+  const isViewMode = !!props.user;
+  const isEditMode = isViewMode && !!props.onUpdate;
   const [form, setForm] = React.useState({
     name: "",
     email: "",
@@ -210,6 +258,24 @@ function UserModal(props: {
 
   React.useEffect(() => {
     if (!props.isOpen) return;
+    if (props.user) {
+      const tenantRole = props.user.userRoles.find((item) => item.role.startsWith("tenant:"))?.role;
+      // O formulário é reinicializado quando o registro exibido muda.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setForm({
+        name: props.user.person.name,
+        email: props.user.person.email || "",
+        document: props.user.person.document || "",
+        phone: props.user.person.phone || "",
+        tenantId: props.user.tenantId || "",
+        tenantFunction: tenantRole === Role.TENANT_ADMIN ? "admin" : tenantRole === Role.TENANT_TRAINER ? "trainer" : tenantRole === Role.TENANT_CLIENT ? "client" : "",
+        password: "",
+        passwordConfirmation: "",
+        isActive: props.user.isActive,
+      });
+      setErrors({});
+      return;
+    }
     setForm({
       name: "",
       email: "",
@@ -222,7 +288,7 @@ function UserModal(props: {
       isActive: true,
     });
     setErrors({});
-  }, [props.isOpen]);
+  }, [props.isOpen, props.user]);
 
   const effectiveTenantId = props.isOrgActor ? form.tenantId || null : props.sessionTenantId;
   const context: CreateUserDto["context"] = props.isOrgActor
@@ -253,6 +319,37 @@ function UserModal(props: {
 
   async function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isEditMode && props.user && props.onUpdate) {
+      try {
+        await updateUserSchema.validate({
+          ...form,
+          documentEditable: !props.user.person.document,
+        }, { abortEarly: false });
+        setErrors({});
+      } catch (error) {
+        if (!(error instanceof yup.ValidationError)) return;
+
+        const nextErrors: Record<string, string> = {};
+        error.inner.forEach((validationError) => {
+          if (validationError.path && validationError.path !== "documentEditable" && !nextErrors[validationError.path]) {
+            nextErrors[validationError.path] = validationError.message;
+          }
+        });
+        setErrors(nextErrors);
+        return;
+      }
+
+      const result = await props.onUpdate(props.user.id, {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        document: props.user.person.document ? undefined : (form.document.trim() || null),
+        fone: form.phone.trim() || null,
+        isActive: form.isActive,
+      });
+      if (!result.success) setErrors({ form: result.error || "Não foi possível atualizar o usuário." });
+      return;
+    }
 
     try {
       await createUserSchema.validate(form, { abortEarly: false });
@@ -286,8 +383,8 @@ function UserModal(props: {
   return (
     <Modal
       isOpen={props.isOpen}
-      title="Novo usuário"
-      description="Cadastre os dados pessoais e de acesso."
+      title={isViewMode ? (isEditMode ? "Editar usuário" : "Visualizar usuário") : "Novo usuário"}
+      description={isViewMode ? "Consulte os dados cadastrais e de acesso." : "Cadastre os dados pessoais e de acesso."}
       onClose={props.onClose}
     >
       <form
@@ -301,6 +398,7 @@ function UserModal(props: {
             required
             error={errors.name}
             value={form.name}
+            disabled={isViewMode && !isEditMode}
             onChange={(event) => updateField("name", event.target.value)}
           />
           <Input
@@ -310,6 +408,7 @@ function UserModal(props: {
             required
             error={errors.email}
             value={form.email}
+            disabled={isViewMode && !isEditMode}
             onChange={(event) => updateField("email", event.target.value)}
           />
           <Input
@@ -318,6 +417,7 @@ function UserModal(props: {
             required
             error={errors.document}
             value={form.document}
+            disabled={isViewMode && !!props.user?.person.document}
             onChange={(event) => updateField("document", event.target.value.replace(/\D/g, "").slice(0, 14))}
             mask={[
               { ...CPF_MASK_REGEX, maxLength: 11 },
@@ -330,6 +430,7 @@ function UserModal(props: {
             required
             error={errors.phone}
             value={form.phone}
+            disabled={isViewMode && !isEditMode}
             onChange={(event) => updateField("phone", event.target.value.replace(/\D/g, "").slice(0, 11))}
             mask={PHONE_MASK_REGEX}
           />
@@ -340,6 +441,7 @@ function UserModal(props: {
             id="user-tenant"
             label="Tenant"
             value={form.tenantId}
+            disabled={isViewMode}
             onChange={(event) => updateField("tenantId", event.target.value)}
             placeholder="Organização"
             options={props.tenants.map((tenant) => ({
@@ -355,6 +457,7 @@ function UserModal(props: {
             id="user-function"
             label="Função"
             value={form.tenantFunction}
+            disabled={isViewMode}
             onChange={(event) => updateField("tenantFunction", event.target.value)}
             placeholder="Selecione a função"
             options={[
@@ -367,30 +470,38 @@ function UserModal(props: {
         )}
 
         <section className="grid gap-4 md:grid-cols-2">
-          <Input
-            id="user-password"
-            label="Senha"
-            type="password"
-            required
-            error={errors.password}
-            value={form.password}
-            onChange={(event) => updateField("password", event.target.value)}
-          />
-          <Input
-            id="user-password-confirmation"
-            label="Confirmação"
-            type="password"
-            required
-            error={errors.passwordConfirmation}
-            value={form.passwordConfirmation}
-            onChange={(event) => updateField("passwordConfirmation", event.target.value)}
-          />
+
+          {isCreateMode && (
+            <>
+              <Input
+                id="user-password"
+                label="Senha"
+                type="password"
+                required
+                error={errors.password}
+                value={form.password}
+                disabled={isViewMode}
+                onChange={(event) => updateField("password", event.target.value)}
+              />
+              <Input
+                id="user-password-confirmation"
+                label="Confirmação"
+                type="password"
+                required
+                error={errors.passwordConfirmation}
+                value={form.passwordConfirmation}
+                disabled={isViewMode}
+                onChange={(event) => updateField("passwordConfirmation", event.target.value)}
+              />
+            </>
+          )}
         </section>
 
         <Switch
           id="user-active"
           label="Ativo"
           checked={form.isActive}
+          disabled={!isEditMode}
           onChange={(event) => updateField("isActive", event.target.checked)}
         />
 
@@ -398,11 +509,11 @@ function UserModal(props: {
 
         <div className="flex items-center justify-end gap-3">
           <Button type="button" variant="outline" onClick={props.onClose} disabled={props.isSubmitting}>
-            Cancelar
+            {isEditMode ? "Cancelar" : "Fechar"}
           </Button>
-          <Button type="submit" disabled={!canSubmit}>
-            {props.isSubmitting ? "Salvando..." : "Criar usuário"}
-          </Button>
+          {(!isViewMode || isEditMode) && <Button type="submit" disabled={isEditMode ? !form.name.trim() || !form.email.trim() : !canSubmit}>
+            {isEditMode ? "Salvar alterações" : (props.isSubmitting ? "Salvando..." : "Criar usuário")}
+          </Button>}
         </div>
       </form>
     </Modal>
