@@ -3,6 +3,8 @@ export enum Role {
   ORG_ADMIN = "org:admin",
   ORG_SUPPORT = "org:support",
   TENANT_ADMIN = "tenant:admin",
-  STANDALONE_USER = "standalone:user",
+  // STANDALONE_USER = "standalone:user",
+  TENANT_CLIENT = "tenant:client",
+  TENANT_TRAINER = "tenant:trainer",
   ALL = "*", // Role especial para rotas públicas, que aceita qualquer usuário autenticado
 }

@@ -29,6 +29,7 @@ import TenantsFilters, {
     type TenantStatusFilter,
 } from "@/components/tenants/TenantsFilters";
 import TenantsTable from "@/components/tenants/TenantsTable";
+import MetricCard from "@/components/shared/MetricCard";
 import { CNPJ_MASK_REGEX, CPF_MASK_REGEX, PHONE_MASK_REGEX } from "@/lib/constants";
 import React, { startTransition, useDeferredValue, useEffect } from "react";
 import { RiAddLine, RiAdminLine, RiBuilding2Line, RiLoader4Line, RiRefreshLine, RiShieldCheckLine } from "react-icons/ri";
@@ -375,16 +376,6 @@ export default function TenantsPage() {
                 />
             ) : null}
         </>
-    );
-}
-
-function MetricCard(props: { label: string; value: number; description: string }) {
-    return (
-        <div className="rounded-[20px] border border-outline-variant bg-surface-container p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-            <p className="type-label-caps text-secondary-fixed-dim">{props.label}</p>
-            <p className="mt-3 font-mono text-3xl font-bold text-primary">{String(props.value).padStart(2, "0")}</p>
-            <p className="mt-2 text-sm leading-6 text-on-surface-variant">{props.description}</p>
-        </div>
     );
 }
 

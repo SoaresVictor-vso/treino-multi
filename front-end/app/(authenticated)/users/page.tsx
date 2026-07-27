@@ -7,7 +7,7 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { TenantService } from "@/api/services/tenant";
 import { UsersService } from "@/api/services/users";
-import { CreateUserDto } from "@/api/dto/user/create-user.dto";
+import { CreateUserDto, TenantFunction } from "@/api/dto/user/create-user.dto";
 import { UserListItemDto } from "@/api/dto/user/list-user.dto";
 import { TenantListItemDto } from "@/api/dto/tenant/list-tenant.dto";
 import ErrorBox from "@/components/ui/ErrorBox";
@@ -16,6 +16,7 @@ import { getSessionUser } from "@/lib/auth";
 import { Role } from "@/lib/roles";
 import UsersFilters, { type UserRoleFilter, type UserSortOption } from "@/app/(open)/login/UsersFilters";
 import UsersTable from "@/app/(open)/login/UsersTable";
+import MetricCard from "@/components/shared/MetricCard";
 import * as yup from "yup";
 import { CNPJ_MASK_REGEX, CPF_MASK_REGEX, CPF_REGEX, EMAIL_REGEX, PHONE_MASK_REGEX, PHONE_REGEX } from "@/lib/constants";
 
@@ -32,6 +33,10 @@ const createUserSchema = yup.object({
     .string()
     .required("Confirmação de senha é obrigatória")
     .oneOf([yup.ref("password")], "As senhas não conferem."),
+  tenantFunction: yup.string().when("tenantId", {
+    is: (tenantId: string) => !!tenantId,
+    then: (schema) => schema.required("Função é obrigatória"),
+  }),
 });
 
 export default function UsersPage() {
@@ -130,11 +135,10 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6 p-4">
+      <UserMetrics users={users} isOrgActor={isOrgActor} />
       {loadError && <ErrorBox message={loadError} />}
       {isLoading && <p className="text-sm text-on-surface-variant">Carregando usuários...</p>}
-      <div className="flex items-center justify-end">
-        <Button onClick={() => setIsCreateOpen(true)}>Novo usuário</Button>
-      </div>
+
       {isOrgActor && (
         <Select
           id="users-tenant"
@@ -146,6 +150,8 @@ export default function UsersPage() {
           ]}
         />
       )}
+
+
       <UsersFilters
         search={search}
         role={roleFilter}
@@ -157,6 +163,9 @@ export default function UsersPage() {
         onSortChange={setSortBy}
         onReset={handleReset}
       />
+      <div className="flex items-center justify-end">
+        <Button onClick={() => setIsCreateOpen(true)}>Novo usuário</Button>
+      </div>
       <UsersTable users={users} />
       <UserModal
         isOpen={isCreateOpen}
@@ -170,6 +179,10 @@ export default function UsersPage() {
       />
     </div>
   );
+}
+
+function countUsersWithRole(users: UserListItemDto[], role: Role) {
+  return users.filter((user) => user.userRoles.some((userRole) => userRole.role === role)).length;
 }
 
 function UserModal(props: {
@@ -188,6 +201,7 @@ function UserModal(props: {
     document: "",
     phone: "",
     tenantId: "",
+    tenantFunction: "" as TenantFunction | "",
     password: "",
     passwordConfirmation: "",
     isActive: true,
@@ -202,6 +216,7 @@ function UserModal(props: {
       document: "",
       phone: "",
       tenantId: "",
+      tenantFunction: "",
       password: "",
       passwordConfirmation: "",
       isActive: true,
@@ -213,9 +228,8 @@ function UserModal(props: {
   const context: CreateUserDto["context"] = props.isOrgActor
     ? (effectiveTenantId ? "tenant" : "organization")
     : "tenant";
-  const roles = props.isOrgActor
-    ? (effectiveTenantId ? [Role.TENANT_ADMIN] : [Role.ORG_ADMIN])
-    : [Role.TENANT_ADMIN];
+
+
 
   const canSubmit =
     form.name.trim().length >= 2 &&
@@ -224,6 +238,7 @@ function UserModal(props: {
     form.phone.trim().length > 0 &&
     form.password.length >= 8 &&
     form.password === form.passwordConfirmation &&
+    (!effectiveTenantId || !!form.tenantFunction) &&
     !props.isSubmitting;
 
   const updateField = (key: keyof typeof form, value: string | boolean) => {
@@ -264,7 +279,7 @@ function UserModal(props: {
       context,
       password: form.password,
       isActive: form.isActive,
-      roles,
+      tenantFunction: form.tenantFunction as TenantFunction || null,
     });
   }
 
@@ -320,26 +335,35 @@ function UserModal(props: {
           />
         </section>
 
-        {props.isOrgActor ? (
+        {props.isOrgActor && (
           <Select
             id="user-tenant"
             label="Tenant"
             value={form.tenantId}
             onChange={(event) => updateField("tenantId", event.target.value)}
             placeholder="Organização"
-            options={[
-              // { tradeName: "Limpar", id: '', name: '' },
-              ...props.tenants
-            ].map((tenant) => ({
+            options={props.tenants.map((tenant) => ({
               value: tenant.id,
               label: tenant.tradeName || tenant.name,
             }))}
             canClear
           />
-        ) : (
-          <div className="rounded-xl border border-outline-variant bg-surface-container-high px-4 py-3 text-sm text-on-surface-variant">
-            Tenant fixo: {props.sessionTenantId ?? "indisponível"}
-          </div>
+        )}
+
+        {effectiveTenantId && (
+          <Select
+            id="user-function"
+            label="Função"
+            value={form.tenantFunction}
+            onChange={(event) => updateField("tenantFunction", event.target.value)}
+            placeholder="Selecione a função"
+            options={[
+              { value: "admin", label: "Administrador" },
+              { value: "trainer", label: "Treinador" },
+              { value: "client", label: "Aluno" },
+            ]}
+            error={errors.tenantFunction}
+          />
         )}
 
         <section className="grid gap-4 md:grid-cols-2">
@@ -383,4 +407,33 @@ function UserModal(props: {
       </form>
     </Modal>
   );
+}
+
+function UserMetrics(props: { users: UserListItemDto[], isOrgActor: boolean }) {
+  const { users, isOrgActor } = props;
+  return (
+    <section className={`grid gap-3 sm:grid-cols-2 ${isOrgActor ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
+      {isOrgActor && (<MetricCard
+        label="Organização"
+        value={users.filter((user) => user.tenantId === null).length}
+        description="Usuários da Organização."
+      />)
+      }
+      <MetricCard
+        label="Administradores"
+        value={countUsersWithRole(users, Role.TENANT_ADMIN)}
+        description="Usuários com perfil de administrador de um Cliente."
+      />
+      <MetricCard
+        label="Treinadores"
+        value={countUsersWithRole(users, Role.TENANT_TRAINER)}
+        description="Usuários com perfil de treinador."
+      />
+      <MetricCard
+        label="Alunos"
+        value={countUsersWithRole(users, Role.TENANT_CLIENT)}
+        description="Usuários com perfil de aluno."
+      />
+    </section>
+  )
 }

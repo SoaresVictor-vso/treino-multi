@@ -19,6 +19,7 @@ import { Person } from '../persons/entities/person.entity';
 import { CreateManagedUserDto } from './dto/create-managed-user.dto';
 import { UpdateManagedUserDto } from './dto/update-managed-user.dto';
 import { FindUsersQueryDto, UserOrderBy } from './dto/find-users-query.dto';
+import { Role } from '../common/enums/role.enum';
 
 const USER_ORDERING = {
   [UserOrderBy.ID]: {
@@ -69,6 +70,16 @@ export class UsersService {
   ): Promise<User> {
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
+    if (!dto.tenantId && dto.tenantFunction)
+      throw new BadRequestException(
+        'tenantFunction só pode ser definido para usuários externos à organização.',
+      );
+
+    if (dto.tenantId && !dto.tenantFunction)
+      throw new BadRequestException(
+        'tenantFunction deve ser definido para usuários externos à organização.',
+      );
+
     return this.dataSource.transaction(async (em) => {
       await this.ensurePersonUniqueness(
         em,
@@ -97,7 +108,8 @@ export class UsersService {
         }),
       );
 
-      const roleEntities = dto.roles.map((role) =>
+      const role = this.prepareUserRoles(dto);
+      const roleEntities = [role].map((role) =>
         em.create(UserRole, { userId: user.id, role }),
       );
       await em.save(UserRole, roleEntities);
@@ -229,7 +241,7 @@ export class UsersService {
   ): Promise<User> {
     const user = await this.findOne(id);
 
-    if (tenantId && user.tenantId !== tenantId) 
+    if (tenantId && user.tenantId !== tenantId)
       throw new ForbiddenException('Acesso negado: usuário não pertence à empresa.');
 
     if (dto.email !== undefined || dto.document !== undefined) {
@@ -474,5 +486,18 @@ export class UsersService {
       ipAddress: opts.ipAddress ?? null,
       usedToken: opts.usedToken ?? null,
     });
+  }
+
+  private prepareUserRoles(dto: CreateManagedUserDto): Role {
+    if (!dto.tenantId)
+      return Role.ORG_ADMIN;
+    else if (dto.tenantFunction === 'admin')
+      return Role.TENANT_ADMIN;
+    else if (dto.tenantFunction === 'trainer')
+      return Role.TENANT_TRAINER;
+    else if (dto.tenantFunction === 'client')
+      return Role.TENANT_CLIENT;
+    else
+      throw new BadRequestException('tenantFunction inválido. Deve ser "admin", "trainer" ou "client".');
   }
 }

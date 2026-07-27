@@ -6,6 +6,9 @@ export enum Role {
   // Contexto: tenant (empresa cliente)
   TENANT_ADMIN = 'tenant:admin',
 
-  // Contexto: standalone (usuário avulso)
-  STANDALONE_USER = 'standalone:user',
+  // STANDALONE_USER = 'standalone:user',
+
+  TENANT_CLIENT = 'tenant:client',
+
+  TENANT_TRAINER = 'tenant:trainer',
 }

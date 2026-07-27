@@ -26,11 +26,23 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.LOG_READ,
   ],
 
-  [Role.STANDALONE_USER]: [
+  // [Role.STANDALONE_USER]: [
+  //   Permission.AUTH_LOGIN,
+  //   Permission.AUTH_LOGOUT,
+  //   Permission.AUTH_REFRESH_TOKEN,
+  // ],
+
+  [Role.TENANT_CLIENT]: [
     Permission.AUTH_LOGIN,
     Permission.AUTH_LOGOUT,
     Permission.AUTH_REFRESH_TOKEN,
   ],
+
+  [Role.TENANT_TRAINER]: [
+    Permission.AUTH_LOGIN,
+    Permission.AUTH_LOGOUT,
+    Permission.AUTH_REFRESH_TOKEN,
+  ]
 };
 
 /**

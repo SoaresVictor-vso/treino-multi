@@ -30,7 +30,19 @@ function tokenHasEnoughLifetime(token: string | null): boolean {
 
 function getRefreshToken(): string | null {
     if (typeof localStorage === "undefined") return null;
-    return localStorage.getItem("refreshToken");
+
+    const persistedValue = localStorage.getItem("refreshToken");
+    if (!persistedValue) return null;
+
+    // usePersistedState persists strings with JSON.stringify(), so older
+    // entries may be stored as `"token"` instead of `token`.
+    try {
+        const parsedValue: unknown = JSON.parse(persistedValue);
+        return typeof parsedValue === "string" ? parsedValue : null;
+    } catch {
+        // Keep compatibility with values stored directly in localStorage.
+        return persistedValue;
+    }
 }
 
 async function refreshAccessToken(): Promise<ApiResponse<{ accessToken: string }>> {

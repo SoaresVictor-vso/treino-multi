@@ -9,5 +9,7 @@ export type CreateUserDto = {
   context: "organization" | "tenant" | "standalone";
   password: string;
   isActive?: boolean;
-  roles: Role[];
+  tenantFunction: TenantFunction | null;
 };
+
+export type TenantFunction = "admin" | "trainer" | "client";

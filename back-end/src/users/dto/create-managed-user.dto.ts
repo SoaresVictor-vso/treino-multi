@@ -62,9 +62,18 @@ export class CreateManagedUserDto {
   @IsBoolean()
   isActive?: boolean;
 
-  @ApiProperty({ example: [Role.TENANT_ADMIN], enum: Role, isArray: true })
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsIn(Object.values(Role), { each: true })
-  roles!: Role[];
+  // @ApiProperty({ example: [Role.TENANT_ADMIN], enum: Role, isArray: true })
+  // @IsArray()
+  // @ArrayMinSize(1)
+  // @IsIn(Object.values(Role), { each: true })
+  // roles!: Role[];
+
+  @ApiPropertyOptional({ example: 'admin', enum: ['admin', 'trainer', 'client'], nullable: true })
+  @ValidateIf((_obj, value) => value !== undefined && value !== null)
+  @IsIn(['admin', 'trainer', 'client'], {
+    message: "tenantFunction deve ser 'admin', 'trainer' ou 'client'",
+  })
+  tenantFunction!: TenantFunction | null;
 }
+
+export type TenantFunction = "admin" | "trainer" | "client";
