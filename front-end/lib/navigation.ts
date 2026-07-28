@@ -42,6 +42,13 @@ const NAV_ITEMS: { [href: string]: NavItem } = {
         allowedRoles: [Role.ORG_ADMIN, Role.ORG_SUPPORT, Role.TENANT_ADMIN],
         hidden: false,
     },
+    "/workout-template": {
+        href: "/workout-template",
+        label: "Modelos de Treino",
+        icon: "RiClipboardLine",
+        allowedRoles: [Role.ORG_ADMIN, Role.ORG_SUPPORT, Role.TENANT_ADMIN, Role.TENANT_TRAINER],
+        hidden: false,
+    },
     "/teste": {
         href: "/tenants",
         label: "Tenants",
