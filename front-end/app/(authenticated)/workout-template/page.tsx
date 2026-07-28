@@ -3,25 +3,22 @@
 import { useMemo, useState, type KeyboardEvent } from "react";
 import {
   RiAddLine,
-  RiArrowRightSLine,
   RiHeartPulseLine,
   RiCheckLine,
   RiCloseLine,
-  RiSearchLine,
 } from "react-icons/ri";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Badge from "@/components/ui/Badge";
+import Modal from "@/components/ui/Modal";
+import TemplatePreview from "@/components/workout-template/TemplatePreview";
+import TemplateStats from "@/components/workout-template/TemplateStats";
+import TemplatesTable from "@/components/workout-template/TemplatesTable";
+import type { Template, TemplateModalState } from "@/components/workout-template/types";
 import { exercises, metricLabels, metricUnits } from "./mocks";
-import type { CreateWorkoutTemplateDto, Exercise } from "./types";
+import type { Activity, CreateWorkoutTemplateDto, Exercise } from "./types";
 
-type Template = {
-  id: number;
-  title: string;
-  description: string;
-  exercises: Exercise[];
-};
 type RegisterType = "p" | "v";
 type ExerciseConfig = {
   metric1: string;
@@ -29,7 +26,6 @@ type ExerciseConfig = {
   pse: string;
   metric2Type: RegisterType;
 };
-
 const initialTemplates: Template[] = [
   {
     id: 1,
@@ -37,6 +33,11 @@ const initialTemplates: Template[] = [
     description:
       "Base de força para membros inferiores com foco em controle e progressão.",
     exercises: [exercises[0], exercises[2]],
+    activities: [
+      { exercise: 1, metric_1: 10, metric_2: 60, type_1: "v", type_2: "v", pse: 7 },
+      { exercise: 1, metric_1: 8, metric_2: 70, type_1: "v", type_2: "v", pse: 8 },
+      { exercise: 3, metric_1: 8, metric_2: 80, type_1: "v", type_2: "v", pse: 8 },
+    ],
   },
   {
     id: 2,
@@ -44,12 +45,45 @@ const initialTemplates: Template[] = [
     description:
       "Circuito intervalado para elevar a capacidade cardiovascular.",
     exercises: [exercises[3]],
+    activities: [
+      { exercise: 4, metric_1: 2, metric_2: 5, type_1: "v", type_2: "v", pse: 8 },
+      { exercise: 4, metric_1: 1, metric_2: 4.5, type_1: "v", type_2: "v", pse: 9 },
+    ],
   },
 ];
+
+function getExercisesFromActivities(activities: Activity[]) {
+  return activities.reduce<Exercise[]>((items, activity) => {
+    const exercise = exercises.find((item) => item.id === activity.exercise);
+    return exercise && !items.some((item) => item.id === exercise.id)
+      ? [...items, exercise]
+      : items;
+  }, []);
+}
+
+function getConfigsFromActivities(activities: Activity[]) {
+  return activities.reduce<Record<number, ExerciseConfig[]>>((configs, activity) => {
+    const config: ExerciseConfig = {
+      metric1: activity.metric_1?.toString() ?? "",
+      metric2: activity.metric_2?.toString() ?? "",
+      pse: activity.pse?.toString() ?? "",
+      metric2Type: activity.type_2 ?? "p",
+    };
+    return {
+      ...configs,
+      [activity.exercise]: [...(configs[activity.exercise] ?? []), config],
+    };
+  }, {});
+}
 
 export default function WorkoutTemplatePage() {
   const [templates, setTemplates] = useState(initialTemplates);
   const [selected, setSelected] = useState(initialTemplates[0]);
+  const [templateModal, setTemplateModal] = useState<TemplateModalState | null>(
+    null,
+  );
+  const [actionsTemplate, setActionsTemplate] = useState<Template | null>(null);
+  const [templateToRemove, setTemplateToRemove] = useState<Template | null>(null);
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -67,19 +101,51 @@ export default function WorkoutTemplatePage() {
       id: Date.now(),
       title: workoutTemplate.name,
       description: workoutTemplate.description,
-      exercises: workoutTemplate.activities.reduce<Exercise[]>(
-        (items, activity) => {
-          const exercise = exercises.find((item) => item.id === activity.exercise);
-          return exercise && !items.some((item) => item.id === exercise.id)
-            ? [...items, exercise]
-            : items;
-        },
-        [],
-      ),
+      exercises: getExercisesFromActivities(workoutTemplate.activities),
+      activities: workoutTemplate.activities,
     };
     setTemplates((current) => [...current, saved]);
     setSelected(saved);
     setCreateOpen(false);
+  };
+  const updateTemplate = (
+    id: number,
+    workoutTemplate: CreateWorkoutTemplateDto,
+  ) => {
+    setTemplates((current) =>
+      current.map((template) =>
+        template.id === id
+          ? {
+              ...template,
+              title: workoutTemplate.name,
+              description: workoutTemplate.description,
+              exercises: getExercisesFromActivities(workoutTemplate.activities),
+              activities: workoutTemplate.activities,
+            }
+          : template,
+      ),
+    );
+    setSelected((current) =>
+      current.id === id
+        ? {
+            ...current,
+            title: workoutTemplate.name,
+            description: workoutTemplate.description,
+            exercises: getExercisesFromActivities(workoutTemplate.activities),
+            activities: workoutTemplate.activities,
+          }
+        : current,
+    );
+    setTemplateModal(null);
+  };
+  const removeTemplate = (template: Template) => {
+    setTemplates((current) => current.filter((item) => item.id !== template.id));
+    setSelected((current) =>
+      current.id === template.id
+        ? templates.find((item) => item.id !== template.id) ?? current
+        : current,
+    );
+    setTemplateToRemove(null);
   };
 
   return (
@@ -99,96 +165,40 @@ export default function WorkoutTemplatePage() {
           <RiAddLine size={20} /> Nova template
         </Button>
       </header>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label="Templates ativas" value={templates.length} />
-        <Stat
-          label="Exercícios cadastrados"
-          value={templates.reduce(
-            (total, item) => total + item.exercises.length,
-            0,
-          )}
-        />
-        <Stat label="Última atualização" value="Hoje" />
-      </div>
+      <TemplateStats
+        templateCount={templates.length}
+        exerciseCount={templates.reduce(
+          (total, item) => total + item.exercises.length,
+          0,
+        )}
+      />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="rounded-lg border border-outline-variant bg-surface-container-low p-5">
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="type-headline-md">
-              Todas as templates{" "}
-              <span className="ml-2 text-sm font-normal text-on-surface-variant">
-                {filtered.length}
-              </span>
-            </h2>
-            <label className="flex items-center gap-2 border-b border-outline bg-surface-container px-3 py-2 text-sm focus-within:border-primary-container">
-              <span className="text-on-surface-variant">
-                <RiSearchLine />
-              </span>
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar template"
-                className="w-full bg-transparent outline-none placeholder:text-on-surface-variant"
-              />
-            </label>
-          </div>
-          <div className="space-y-2">
-            {filtered.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setSelected(item)}
-                className={`flex w-full items-center justify-between gap-4 rounded border p-4 text-left transition ${selected.id === item.id ? "border-primary-fixed-dim bg-surface-container-high" : "border-transparent hover:bg-surface-container-high"}`}
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-3">
-                    <span className="truncate font-bold">{item.title}</span>
-                    <span className="shrink-0 rounded-sm bg-primary-fixed-dim/15 px-2 py-1 font-mono text-xs text-primary-fixed-dim">
-                      {item.exercises.length} exercícios
-                    </span>
-                  </div>
-                  <p className="mt-2 truncate text-sm text-on-surface-variant">
-                    {item.description}
-                  </p>
-                </div>
-                <span className="shrink-0 text-primary-fixed-dim">
-                  <RiArrowRightSLine size={24} />
-                </span>
-              </button>
-            ))}
-            {!filtered.length && (
-              <p className="py-8 text-center text-on-surface-variant">
-                Nenhuma template encontrada.
-              </p>
-            )}
-          </div>
-        </section>
-        <aside className="rounded-lg border border-outline-variant bg-surface-container-low p-5">
-          <p className="type-label-caps text-primary-fixed-dim">
-            Prévia da template
-          </p>
-          <h2 className="mt-2 text-xl font-bold">{selected.title}</h2>
-          <p className="mt-3 text-sm leading-6 text-on-surface-variant">
-            {selected.description}
-          </p>
-          <h3 className="type-label-caps mb-3 mt-6 text-on-surface-variant">
-            Sequência
-          </h3>
-          <div className="space-y-2">
-            {selected.exercises.map((exercise, index) => (
-              <div
-                key={exercise.id}
-                className="flex items-center gap-3 rounded border border-outline-variant bg-surface-container p-3"
-              >
-                <span className="font-mono text-primary-fixed-dim">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
-                <span className="text-on-surface-variant">
-                  <RiHeartPulseLine />
-                </span>
-                <span className="text-sm font-semibold">{exercise.name}</span>
-              </div>
-            ))}
-          </div>
-        </aside>
+        <TemplatesTable
+          templates={filtered}
+          selectedId={selected.id}
+          query={query}
+          actionsTemplateId={actionsTemplate?.id ?? null}
+          onQueryChange={setQuery}
+          onSelect={setSelected}
+          onToggleActions={(template) =>
+            setActionsTemplate((current) =>
+              current?.id === template.id ? null : template,
+            )
+          }
+          onEdit={(template) => {
+            setTemplateModal({ mode: "edit", template });
+            setActionsTemplate(null);
+          }}
+          onView={(template) => {
+            setTemplateModal({ mode: "view", template });
+            setActionsTemplate(null);
+          }}
+          onRemove={(template) => {
+            setTemplateToRemove(template);
+            setActionsTemplate(null);
+          }}
+        />
+        <TemplatePreview template={selected} />
       </div>
       {createOpen && (
         <CreateModal
@@ -196,15 +206,34 @@ export default function WorkoutTemplatePage() {
           onSave={saveTemplate}
         />
       )}
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg border border-outline-variant bg-surface-container-low p-4">
-      <p className="type-label-caps text-on-surface-variant">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-primary-fixed-dim">{value}</p>
+      {templateModal && (
+        <CreateModal
+          key={`${templateModal.mode}-${templateModal.template.id}`}
+          template={templateModal.template}
+          mode={templateModal.mode}
+          onClose={() => setTemplateModal(null)}
+          onSave={(workoutTemplate) =>
+            updateTemplate(templateModal.template.id, workoutTemplate)
+          }
+        />
+      )}
+      {templateToRemove && (
+        <Modal
+          isOpen
+          title="Remover template"
+          description={`Deseja remover a template ${templateToRemove.title}? Esta ação não poderá ser desfeita.`}
+          onClose={() => setTemplateToRemove(null)}
+        >
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setTemplateToRemove(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={() => removeTemplate(templateToRemove)}>
+              Remover
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -212,14 +241,21 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 function CreateModal({
   onClose,
   onSave,
+  template,
+  mode = "create",
 }: {
   onClose: () => void;
   onSave: (workoutTemplate: CreateWorkoutTemplateDto) => void;
+  template?: Template;
+  mode?: "create" | "view" | "edit";
 }) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [selected, setSelected] = useState<Exercise[]>([]);
-  const [configs, setConfigs] = useState<Record<number, ExerciseConfig[]>>({});
+  const isViewMode = mode === "view";
+  const [title, setTitle] = useState(template?.title ?? "");
+  const [description, setDescription] = useState(template?.description ?? "");
+  const [selected, setSelected] = useState<Exercise[]>(template?.exercises ?? []);
+  const [configs, setConfigs] = useState<Record<number, ExerciseConfig[]>>(
+    () => getConfigsFromActivities(template?.activities ?? []),
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const newConfig = (): ExerciseConfig => ({
     metric1: "",
@@ -330,10 +366,14 @@ function CreateModal({
         <div className="mb-6 flex justify-between border-b border-outline-variant pb-5">
           <div>
             <p className="type-label-caps text-primary-fixed-dim">
-              Nova template
+              {mode === "create" ? "Nova template" : "Template de treino"}
             </p>
             <h2 className="mt-2 text-2xl font-bold">
-              Cadastrar template de treino
+              {mode === "create"
+                ? "Cadastrar template de treino"
+                : isViewMode
+                  ? "Visualizar template de treino"
+                  : "Editar template de treino"}
             </h2>
           </div>
           <button
@@ -344,7 +384,7 @@ function CreateModal({
             <RiCloseLine size={24} />
           </button>
         </div>
-        <div className="space-y-4">
+        <fieldset disabled={isViewMode} className="space-y-4 disabled:opacity-75">
           <Input
             label="Nome"
             value={title}
@@ -360,7 +400,7 @@ function CreateModal({
             placeholder="Descreva o objetivo do treino"
             rows={3}
           />
-        </div>
+        </fieldset>
         <div className="mt-7">
           <div className="flex items-center justify-between">
             <h3 className="type-headline-md">
@@ -369,13 +409,15 @@ function CreateModal({
                 {selected.length}
               </span>
             </h3>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPickerOpen(true)}
-            >
-              <RiAddLine /> Adicionar exercício
-            </Button>
+            {!isViewMode && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPickerOpen(true)}
+              >
+                <RiAddLine /> Adicionar exercício
+              </Button>
+            )}
           </div>
           <div className="mt-3 space-y-4">
             {selected.map((item, index) => (
@@ -401,6 +443,7 @@ function CreateModal({
                         exercise={item}
                         index={configIndex}
                         config={config}
+                        disabled={isViewMode}
                         onChange={(key, value) =>
                           updateConfig(item.id, configIndex, key, value)
                         }
@@ -408,14 +451,18 @@ function CreateModal({
                     ),
                   )}
                 </div>
-                <button
-                  type="button"
-                  data-add-block
-                  onClick={() => addConfig(item.id)}
-                  className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-primary-fixed-dim hover:text-primary"
-                >
-                  <RiAddLine /> Adicionar outro bloco
-                </button>
+                {!isViewMode && (
+                  <>
+                    <button
+                      type="button"
+                      data-add-block
+                      onClick={() => addConfig(item.id)}
+                      className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-primary-fixed-dim hover:text-primary"
+                    >
+                      <RiAddLine /> Adicionar outro bloco
+                    </button>
+                  </>
+                )}
               </div>
             ))}
             {!selected.length && (
@@ -427,14 +474,13 @@ function CreateModal({
         </div>
         <div className="mt-7 flex justify-end gap-3 border-t border-outline-variant pt-5">
           <Button variant="outline" onClick={onClose}>
-            Cancelar
+            {isViewMode ? "Fechar" : "Cancelar"}
           </Button>
-          <Button
-            disabled={!title.trim()}
-            onClick={createWorkoutTemplate}
-          >
-            Criar template
-          </Button>
+          {!isViewMode && (
+            <Button disabled={!title.trim()} onClick={createWorkoutTemplate}>
+              {mode === "edit" ? "Salvar alterações" : "Criar template"}
+            </Button>
+          )}
         </div>
         {pickerOpen && (
           <ExercisePicker
@@ -452,11 +498,13 @@ function ConfigBlock({
   exercise,
   index,
   config,
+  disabled = false,
   onChange,
 }: {
   exercise: Exercise;
   index: number;
   config: ExerciseConfig;
+  disabled?: boolean;
   onChange: (key: keyof ExerciseConfig, value: string) => void;
 }) {
   const metric_1 = metricLabels[exercise?.metric_1] || exercise?.metric_1;
@@ -478,6 +526,7 @@ function ConfigBlock({
           onChange={(value) => onChange("metric1", value)}
           className="col-span-3"
           exercise={exercise}
+          disabled={disabled}
         />
         <MetricField
           label={metric_2 ?? "Métrica 2"}
@@ -488,6 +537,7 @@ function ConfigBlock({
           optional={!exercise.metric_2}
           className="col-span-3"
           exercise={exercise}
+          disabled={disabled}
         />
         <MetricField
           label="PSE"
@@ -496,6 +546,7 @@ function ConfigBlock({
           optional
           className="col-span-3"
           exercise={exercise}
+          disabled={disabled}
         />
       </div>
     </div>
@@ -511,6 +562,7 @@ function MetricField({
   onTypeChange,
   optional = false,
   exercise,
+  disabled = false,
 }: {
   label?: string;
   value: string;
@@ -520,6 +572,7 @@ function MetricField({
   optional?: boolean;
   className?: string;
   exercise: Exercise;
+  disabled?: boolean;
 }) {
   if (!label) return null;
 
@@ -542,11 +595,13 @@ function MetricField({
           max={label === "PSE" ? 10 : undefined}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
           sideComponent={hasButtonMetric2 ? "right" : "none"}
         />
         {hasButtonMetric2 && (
           <button
             type="button"
+            disabled={disabled}
             onClick={() => onTypeChange(type === "p" ? "v" : "p")}
             className="h-[30px] w-auto px-1 rounded-r-lg border border-l-0 border-outline-variant bg-surface-container-highest text-xs font-bold text-primary-fixed-dim"
             aria-label={`Alternar unidade entre porcentagem e valor, atual ${type}`}
