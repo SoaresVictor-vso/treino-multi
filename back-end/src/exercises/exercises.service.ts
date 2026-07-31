@@ -1,10 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
 import { Metric } from '../metrics/entities/metric.entity';
 import { CreateExerciseDto } from './dto/create-exercise.dto';
 import { UpdateExerciseDto } from './dto/update-exercise.dto';
 import { Exercise } from './entities/exercise.entity';
+import { ReadExercise } from './entities/read-exercise.entity';
+
+export interface ExerciseChanges {
+  exercises: ReadExercise[];
+  deletedIds: number[];
+}
 
 @Injectable()
 export class ExercisesService {
@@ -20,8 +26,32 @@ export class ExercisesService {
     return this.exerciseRepo.save(this.exerciseRepo.create(dto));
   }
 
-  findAll(): Promise<Exercise[]> {
-    return this.exerciseRepo.find({ relations: ['metric1', 'metric2'], order: { name: 'ASC' } });
+  async findAll(): Promise<ReadExercise[]> {
+    const exercises = await this.exerciseRepo.find({ order: { name: 'ASC' } });
+    return exercises.map((exercise) => this.toReadModel(exercise));
+  }
+
+  async findChangesSince(since: Date): Promise<ExerciseChanges> {
+    const [exercises, deletedExercises] = await Promise.all([
+      this.exerciseRepo.find({
+        withDeleted: true,
+        where: [
+          { createdAt: MoreThan(since), deletedAt: IsNull() },
+          { updatedAt: MoreThan(since), deletedAt: IsNull() },
+        ],
+        order: { updatedAt: 'ASC' },
+      }),
+      this.exerciseRepo.find({
+        withDeleted: true,
+        where: { deletedAt: MoreThan(since) },
+        select: { id: true },
+      }),
+    ]);
+
+    return {
+      exercises: exercises.map((exercise) => this.toReadModel(exercise)),
+      deletedIds: deletedExercises.map((exercise) => exercise.id),
+    };
   }
 
   async findOne(id: number): Promise<Exercise> {
@@ -49,5 +79,15 @@ export class ExercisesService {
     if (!(await this.metricRepo.existsBy({ id }))) {
       throw new NotFoundException(`Métrica ${id} não encontrada.`);
     }
+  }
+
+  private toReadModel(exercise: Exercise): ReadExercise {
+    return Object.assign(new ReadExercise(), {
+      id: exercise.id,
+      name: exercise.name,
+      metric1Id: exercise.metric1Id,
+      metric2Id: exercise.metric2Id,
+      visualUrl: exercise.visualUrl,
+    });
   }
 }

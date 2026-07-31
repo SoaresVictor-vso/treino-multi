@@ -6,12 +6,6 @@ export class CreateWorkoutTemplateDto {
   @IsUUID()
   tenantId!: string;
 
-  @IsUUID()
-  createdBy!: string;
-
-  @IsUUID()
-  updatedBy!: string;
-
   @IsString()
   @MaxLength(150)
   name!: string;

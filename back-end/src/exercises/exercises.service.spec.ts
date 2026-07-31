@@ -40,14 +40,46 @@ describe('ExercisesService', () => {
     await expect(service.create({ name: 'Agachamento', metric1Id: 99 })).rejects.toThrow(NotFoundException);
   });
 
-  it('lista exercício com métricas e remove logicamente o existente', async () => {
+  it('lista somente os campos públicos e remove logicamente o existente', async () => {
     const exercise = makeExercise();
     exerciseRepo.find.mockResolvedValue([exercise]);
     exerciseRepo.findOne.mockResolvedValue(exercise);
-    await expect(service.findAll()).resolves.toEqual([exercise]);
+    await expect(service.findAll()).resolves.toEqual([{
+      id: exercise.id,
+      name: exercise.name,
+      metric1Id: exercise.metric1Id,
+      metric2Id: exercise.metric2Id,
+      visualUrl: exercise.visualUrl,
+    }]);
     await service.remove(1);
-    expect(exerciseRepo.find).toHaveBeenCalledWith({ relations: ['metric1', 'metric2'], order: { name: 'ASC' } });
+    expect(exerciseRepo.find).toHaveBeenCalledWith({ order: { name: 'ASC' } });
     expect(exerciseRepo.softRemove).toHaveBeenCalledWith(exercise);
+  });
+
+  it('retorna alterações ativas e IDs removidos desde uma data', async () => {
+    const since = new Date('2026-07-31T10:00:00.000Z');
+    const exercise = makeExercise();
+    exerciseRepo.find
+      .mockResolvedValueOnce([exercise])
+      .mockResolvedValueOnce([{ id: 2 } as Exercise]);
+
+    await expect(service.findChangesSince(since)).resolves.toEqual({
+      exercises: [{
+        id: exercise.id,
+        name: exercise.name,
+        metric1Id: exercise.metric1Id,
+        metric2Id: exercise.metric2Id,
+        visualUrl: exercise.visualUrl,
+      }],
+      deletedIds: [2],
+    });
+    expect(exerciseRepo.find).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      withDeleted: true,
+    }));
+    expect(exerciseRepo.find).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      withDeleted: true,
+      select: { id: true },
+    }));
   });
 
   it('falha ao buscar exercício inexistente', async () => {
