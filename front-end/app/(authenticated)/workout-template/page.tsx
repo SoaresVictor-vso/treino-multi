@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import {
   RiAddLine,
   RiHeartPulseLine,
@@ -15,9 +15,13 @@ import Modal from "@/components/ui/Modal";
 import TemplatePreview from "@/components/workout-template/TemplatePreview";
 import TemplateStats from "@/components/workout-template/TemplateStats";
 import TemplatesTable from "@/components/workout-template/TemplatesTable";
-import type { Template, TemplateModalState } from "@/components/workout-template/types";
+import type {
+  Template,
+  TemplateModalState,
+} from "@/components/workout-template/types";
 import { exercises, metricLabels, metricUnits } from "./mocks";
 import type { Activity, CreateWorkoutTemplateDto, Exercise } from "./types";
+import { ParametersService } from "@/api/services/parametro";
 
 type RegisterType = "p" | "v";
 type ExerciseConfig = {
@@ -49,9 +53,30 @@ const initialTemplates: Template[] = [
       "Base de força para membros inferiores com foco em controle e progressão.",
     exercises: [exercises[0], exercises[2]],
     activities: [
-      { exercise: 1, metric_1: 10, metric_2: 60, type_1: "v", type_2: "v", pse: 7 },
-      { exercise: 1, metric_1: 8, metric_2: 70, type_1: "v", type_2: "v", pse: 8 },
-      { exercise: 3, metric_1: 8, metric_2: 80, type_1: "v", type_2: "v", pse: 8 },
+      {
+        exercise: 1,
+        metric_1: 10,
+        metric_2: 60,
+        type_1: "v",
+        type_2: "v",
+        pse: 7,
+      },
+      {
+        exercise: 1,
+        metric_1: 8,
+        metric_2: 70,
+        type_1: "v",
+        type_2: "v",
+        pse: 8,
+      },
+      {
+        exercise: 3,
+        metric_1: 8,
+        metric_2: 80,
+        type_1: "v",
+        type_2: "v",
+        pse: 8,
+      },
     ],
   },
   {
@@ -61,8 +86,22 @@ const initialTemplates: Template[] = [
       "Circuito intervalado para elevar a capacidade cardiovascular.",
     exercises: [exercises[3]],
     activities: [
-      { exercise: 4, metric_1: 2, metric_2: 5, type_1: "v", type_2: "v", pse: 8 },
-      { exercise: 4, metric_1: 1, metric_2: 4.5, type_1: "v", type_2: "v", pse: 9 },
+      {
+        exercise: 4,
+        metric_1: 2,
+        metric_2: 5,
+        type_1: "v",
+        type_2: "v",
+        pse: 8,
+      },
+      {
+        exercise: 4,
+        metric_1: 1,
+        metric_2: 4.5,
+        type_1: "v",
+        type_2: "v",
+        pse: 9,
+      },
     ],
   },
 ];
@@ -77,19 +116,22 @@ function getExercisesFromActivities(activities: Activity[]) {
 }
 
 function getConfigsFromActivities(activities: Activity[]) {
-  return activities.reduce<Record<number, ExerciseConfig[]>>((configs, activity) => {
-    const config: ExerciseConfig = {
-      metric1: activity.metric_1?.toString() ?? "",
-      metric2: activity.metric_2?.toString() ?? "",
-      pse: activity.pse?.toString() ?? "",
-      metric2Type: activity.type_2 ?? "p",
-      rest: activity.rest_duration ?? DEFAULT_REST_DURATION,
-    };
-    return {
-      ...configs,
-      [activity.exercise]: [...(configs[activity.exercise] ?? []), config],
-    };
-  }, {});
+  return activities.reduce<Record<number, ExerciseConfig[]>>(
+    (configs, activity) => {
+      const config: ExerciseConfig = {
+        metric1: activity.metric_1?.toString() ?? "",
+        metric2: activity.metric_2?.toString() ?? "",
+        pse: activity.pse?.toString() ?? "",
+        metric2Type: activity.type_2 ?? "p",
+        rest: activity.rest_duration ?? DEFAULT_REST_DURATION,
+      };
+      return {
+        ...configs,
+        [activity.exercise]: [...(configs[activity.exercise] ?? []), config],
+      };
+    },
+    {},
+  );
 }
 
 export default function WorkoutTemplatePage() {
@@ -99,7 +141,9 @@ export default function WorkoutTemplatePage() {
     null,
   );
   const [actionsTemplate, setActionsTemplate] = useState<Template | null>(null);
-  const [templateToRemove, setTemplateToRemove] = useState<Template | null>(null);
+  const [templateToRemove, setTemplateToRemove] = useState<Template | null>(
+    null,
+  );
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -155,14 +199,22 @@ export default function WorkoutTemplatePage() {
     setTemplateModal(null);
   };
   const removeTemplate = (template: Template) => {
-    setTemplates((current) => current.filter((item) => item.id !== template.id));
+    setTemplates((current) =>
+      current.filter((item) => item.id !== template.id),
+    );
     setSelected((current) =>
       current.id === template.id
-        ? templates.find((item) => item.id !== template.id) ?? current
+        ? (templates.find((item) => item.id !== template.id) ?? current)
         : current,
     );
     setTemplateToRemove(null);
   };
+
+  useEffect(() => {
+    new ParametersService().search("metrics").then((data) => {
+      console.log("data", data);
+    });
+  }, []);
 
   return (
     <div className="mx-auto max-w-[1440px] space-y-8 p-4 md:p-8">
@@ -268,9 +320,11 @@ function CreateModal({
   const isViewMode = mode === "view";
   const [title, setTitle] = useState(template?.title ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
-  const [selected, setSelected] = useState<Exercise[]>(template?.exercises ?? []);
-  const [configs, setConfigs] = useState<Record<number, ExerciseConfig[]>>(
-    () => getConfigsFromActivities(template?.activities ?? []),
+  const [selected, setSelected] = useState<Exercise[]>(
+    template?.exercises ?? [],
+  );
+  const [configs, setConfigs] = useState<Record<number, ExerciseConfig[]>>(() =>
+    getConfigsFromActivities(template?.activities ?? []),
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const newConfig = (): ExerciseConfig => ({
@@ -402,7 +456,10 @@ function CreateModal({
             <RiCloseLine size={24} />
           </button>
         </div>
-        <fieldset disabled={isViewMode} className="space-y-4 disabled:opacity-75">
+        <fieldset
+          disabled={isViewMode}
+          className="space-y-4 disabled:opacity-75"
+        >
           <Input
             label="Nome"
             value={title}
@@ -601,9 +658,7 @@ function MetricField({
   const hasButtonMetric2 = !!onTypeChange && metric_2;
 
   return (
-    <div
-      className="block text-[11px] font-semibold leading-none text-on-surface-variant"
-    >
+    <div className="block text-[11px] font-semibold leading-none text-on-surface-variant">
       {label}
       {optional ? " (opcional)" : ""}
       <div className="mt-1 flex h-8">
