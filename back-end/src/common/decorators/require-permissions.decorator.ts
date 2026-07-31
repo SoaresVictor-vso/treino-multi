@@ -3,6 +3,7 @@ import { Permission } from '../enums/permission.enum';
 
 /** Chave de metadata utilizada pelo PermissionsGuard */
 export const PERMISSIONS_KEY = 'permissions';
+export const SOME_PERMISSIONS_KEY = 'some-permissions';
 
 /**
  * Restringe o acesso a usuários que possuam TODAS as permissões listadas.
@@ -16,3 +17,16 @@ export const PERMISSIONS_KEY = 'permissions';
  */
 export const RequirePermissions = (...permissions: Permission[]) =>
   SetMetadata(PERMISSIONS_KEY, permissions);
+
+/**
+ * Restringe o acesso a usuários que possuam todas as permissões de pelo menos
+ * um dos grupos informados.
+ *
+ * Exemplo:
+ *   @RequireSomePermissions(
+ *     [Permission.WORKOUT_TEMPLATES_READ],
+ *     [Permission.WORKOUT_TEMPLATES_READ_TENANT, Permission.TENANT_READ],
+ *   )
+ */
+export const RequireSomePermissions = (...permissions: Permission[][]) =>
+  SetMetadata(SOME_PERMISSIONS_KEY, permissions);

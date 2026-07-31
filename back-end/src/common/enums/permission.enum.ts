@@ -30,4 +30,22 @@ export enum Permission {
   ATTENDANCE_TICKETS_READ = 'attendance:tickets:read',
   ATTENDANCE_TICKETS_CREATE = 'attendance:tickets:create',
   ATTENDANCE_TICKETS_UPDATE = 'attendance:tickets:update',
+
+  // Treinos
+  WORKOUT_TEMPLATES_READ = 'workout-templates:read',
+  WORKOUT_TEMPLATES_READ_TENANT = 'workout-templates:read-tenant',
+  WORKOUT_TEMPLATES_READ_ALL = 'workout-templates:read-all',
+  WORKOUT_TEMPLATES_CREATE = 'workout-templates:create',
+  WORKOUT_TEMPLATES_UPDATE = 'workout-templates:update',
+  WORKOUT_TEMPLATES_UPDATE_TENANT = 'workout-templates:update-tenant',
+  WORKOUT_TEMPLATES_UPDATE_ALL = 'workout-templates:update-all',
+  WORKOUT_TEMPLATES_DELETE = 'workout-templates:delete',
+  WORKOUT_TEMPLATES_DELETE_TENANT = 'workout-templates:delete-tenant',
+  WORKOUT_TEMPLATES_DELETE_ALL = 'workout-templates:delete-all',
+
+  // Exercícios
+  EXERCISES_READ = 'exercises:read',
+  EXERCISES_CREATE = 'exercises:create',
+  EXERCISES_UPDATE = 'exercises:update',
+  EXERCISES_DELETE = 'exercises:delete',
 }

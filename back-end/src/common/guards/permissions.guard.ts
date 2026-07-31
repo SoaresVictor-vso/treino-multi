@@ -9,7 +9,10 @@ import { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
 import { Permission } from '../enums/permission.enum';
 import { Role } from '../enums/role.enum';
 import { resolvePermissions } from '../enums/role-permissions.map';
-import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
+import {
+  PERMISSIONS_KEY,
+  SOME_PERMISSIONS_KEY,
+} from '../decorators/require-permissions.decorator';
 
 /**
  * PermissionsGuard — verifica se o usuário autenticado possui TODAS as
@@ -42,8 +45,18 @@ export class PermissionsGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
+    const requiredPermissionGroups = requiredPermissions
+      ? undefined
+      : this.reflector.getAllAndOverride<Permission[][]>(SOME_PERMISSIONS_KEY, [
+          context.getHandler(),
+          context.getClass(),
+        ]);
+
     // Sem restrição de permissão → acesso liberado
-    if (!requiredPermissions || requiredPermissions.length === 0) {
+    if (
+      (!requiredPermissions || requiredPermissions.length === 0) &&
+      (!requiredPermissionGroups || requiredPermissionGroups.length === 0)
+    ) {
       return true;
     }
 
@@ -56,7 +69,19 @@ export class PermissionsGuard implements CanActivate {
     // Calcula as permissões efetivas em runtime (não vêm do JWT)
     const effectivePermissions = resolvePermissions(user.roles as Role[]);
 
-    const missingPermissions = requiredPermissions.filter(
+    if (requiredPermissionGroups) {
+      const hasPermissionGroup = requiredPermissionGroups.some((group) =>
+        group.every((permission) => effectivePermissions.includes(permission)),
+      );
+
+      if (!hasPermissionGroup) {
+        throw new ForbiddenException('Acesso negado: nenhuma combinação de permissões foi atendida');
+      }
+
+      return true;
+    }
+
+    const missingPermissions = requiredPermissions!.filter(
       (p) => !effectivePermissions.includes(p),
     );
 

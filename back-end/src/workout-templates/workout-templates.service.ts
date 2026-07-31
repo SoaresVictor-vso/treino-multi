@@ -52,7 +52,7 @@ export class WorkoutTemplatesService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.templateRepo.remove(await this.findOne(id));
+    await this.templateRepo.softRemove(await this.findOne(id));
   }
 
   private async ensureExercises(activities: { exerciseId: number }[]): Promise<void> {

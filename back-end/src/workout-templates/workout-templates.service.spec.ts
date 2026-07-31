@@ -7,7 +7,10 @@ import { WorkoutTemplate } from './entities/workout-template.entity';
 import { WorkoutTemplatesService } from './workout-templates.service';
 
 const uuid = 'd2719f58-929d-4c18-b0d5-1ec3213918be';
-const makeTemplate = (): WorkoutTemplate => ({ id: uuid, tenantId: uuid, createdBy: uuid, updatedBy: uuid, name: 'Treino A', description: '', createdAt: new Date(), updatedAt: new Date(), activities: [], tenant: {} as any, creator: {} as any, updater: {} as any });
+const makeTemplate = (): WorkoutTemplate => ({
+    id: uuid, tenantId: uuid, createdBy: uuid, updatedBy: uuid, name: 'Treino A', description: '', createdAt: new Date(), updatedAt: new Date(), activities: [], tenant: {} as any, creator: {} as any, updater: {} as any,
+    deletedAt: null
+});
 
 describe('WorkoutTemplatesService', () => {
     let service: WorkoutTemplatesService;
@@ -33,7 +36,7 @@ describe('WorkoutTemplatesService', () => {
                     useValue: {
                         find: jest.fn(),
                         findOne: jest.fn(),
-                        remove: jest.fn(),
+                        softRemove: jest.fn(),
                         manager,
                     },
                 },
@@ -65,7 +68,7 @@ describe('WorkoutTemplatesService', () => {
         await expect(service.create({ tenantId: uuid, createdBy: uuid, updatedBy: uuid, name: 'Treino A', description: '', activities: [{ exerciseId: 1, type1: 'v', pse: 8 }] })).rejects.toThrow(NotFoundException);
     });
 
-    it('lista, atualiza atividades e remove template existente', async () => {
+    it('lista, atualiza atividades e remove logicamente o template existente', async () => {
         const template = makeTemplate();
         templateRepo.find.mockResolvedValue([template]);
         templateRepo.findOne.mockResolvedValue(template);
@@ -75,6 +78,6 @@ describe('WorkoutTemplatesService', () => {
         await service.update(uuid, { activities: [{ exerciseId: 1, type1: 'v', pse: 7 }] });
         expect(manager.delete).toHaveBeenCalled();
         await service.remove(uuid);
-        expect(templateRepo.remove).toHaveBeenCalledWith(template);
+        expect(templateRepo.softRemove).toHaveBeenCalledWith(template);
     });
 });

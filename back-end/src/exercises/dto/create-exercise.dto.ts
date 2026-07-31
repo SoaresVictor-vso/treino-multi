@@ -8,19 +8,19 @@ export class CreateExerciseDto {
   name!: string;
 
   @ApiProperty({ example: 1 })
-  @IsInt()
+  @IsInt({message: 'Você deve informar uma métrica primária válida'})
   @Min(1)
   metric1Id!: number;
 
   @ApiPropertyOptional({ example: 2 })
   @IsOptional()
-  @IsInt()
+  @IsInt({message: 'Você deve informar uma métrica secundária válida'})
   @Min(1)
   metric2Id?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsUrl()
+  @IsUrl(undefined, {message: 'Você deve informar uma URL válida'})
   @MaxLength(100)
   visualUrl?: string;
 }

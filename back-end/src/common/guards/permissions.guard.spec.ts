@@ -25,7 +25,10 @@ import { PermissionsGuard } from './permissions.guard';
 import { Permission } from '../enums/permission.enum';
 import { Role } from '../enums/role.enum';
 import { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
-import { PERMISSIONS_KEY } from '../decorators/require-permissions.decorator';
+import {
+  PERMISSIONS_KEY,
+  SOME_PERMISSIONS_KEY,
+} from '../decorators/require-permissions.decorator';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -145,6 +148,57 @@ describe('PermissionsGuard', () => {
 
     const context = makeContext([Role.TENANT_FINANCIAL, Role.TENANT_ATTENDANT]);
     expect(guard.canActivate(context)).toBe(true);
+  });
+
+  // ── grupos alternativos de permissões ───────────────────────────────────
+
+  it('deve exigir todas as permissões de um grupo', () => {
+    reflector.getAllAndOverride.mockImplementation((key) => {
+      if (key === SOME_PERMISSIONS_KEY) {
+        return [
+          [
+            Permission.FINANCIAL_INVOICES_READ,
+            Permission.FINANCIAL_INVOICES_CREATE,
+          ],
+        ];
+      }
+      return undefined;
+    });
+
+    expect(() => guard.canActivate(makeContext([Role.TENANT_ADMIN]))).toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('deve permitir quando qualquer grupo de permissões é atendido', () => {
+    reflector.getAllAndOverride.mockImplementation((key) => {
+      if (key === SOME_PERMISSIONS_KEY) {
+        return [
+          [Permission.USER_IMPERSONATE],
+          [Permission.FINANCIAL_INVOICES_READ],
+        ];
+      }
+      return undefined;
+    });
+
+    expect(guard.canActivate(makeContext([Role.TENANT_ADMIN]))).toBe(true);
+  });
+
+  it('deve permitir quando o segundo grupo completo é atendido', () => {
+    reflector.getAllAndOverride.mockImplementation((key) => {
+      if (key === SOME_PERMISSIONS_KEY) {
+        return [
+          [Permission.USER_IMPERSONATE],
+          [
+            Permission.FINANCIAL_INVOICES_READ,
+            Permission.FINANCIAL_REPORTS_READ,
+          ],
+        ];
+      }
+      return undefined;
+    });
+
+    expect(guard.canActivate(makeContext([Role.TENANT_ADMIN]))).toBe(true);
   });
 
   // ── cenários de rejeição ──────────────────────────────────────────────────

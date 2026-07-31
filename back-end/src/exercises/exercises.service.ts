@@ -37,7 +37,7 @@ export class ExercisesService {
   }
 
   async remove(id: number): Promise<void> {
-    await this.exerciseRepo.remove(await this.findOne(id));
+    await this.exerciseRepo.softRemove(await this.findOne(id));
   }
 
   private async ensureMetrics(metric1Id: number, metric2Id?: number | null): Promise<void> {
