@@ -25,7 +25,22 @@ type ExerciseConfig = {
   metric2: string;
   pse: string;
   metric2Type: RegisterType;
+  rest: number;
 };
+
+const DEFAULT_REST_DURATION = 90;
+
+function secondsToTime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+function timeToSeconds(time: string): number {
+  const [hours = 0, minutes = 0, seconds = 0] = time.split(":").map(Number);
+  return hours * 3600 + minutes * 60 + seconds;
+}
 const initialTemplates: Template[] = [
   {
     id: 1,
@@ -68,6 +83,7 @@ function getConfigsFromActivities(activities: Activity[]) {
       metric2: activity.metric_2?.toString() ?? "",
       pse: activity.pse?.toString() ?? "",
       metric2Type: activity.type_2 ?? "p",
+      rest: activity.rest_duration ?? DEFAULT_REST_DURATION,
     };
     return {
       ...configs,
@@ -262,6 +278,7 @@ function CreateModal({
     metric2: "",
     pse: "",
     metric2Type: "p",
+    rest: DEFAULT_REST_DURATION,
   });
   const toggle = (exercise: Exercise) =>
     setSelected((current) => {
@@ -281,7 +298,7 @@ function CreateModal({
     exerciseId: number,
     index: number,
     key: keyof ExerciseConfig,
-    value: string,
+    value: string | number,
   ) =>
     setConfigs((current) => ({
       ...current,
@@ -349,6 +366,7 @@ function CreateModal({
             : {}),
           type_1: "v",
           pse: toNumber(config.pse),
+          rest_duration: config.rest,
         })),
       ),
     });
@@ -505,7 +523,7 @@ function ConfigBlock({
   index: number;
   config: ExerciseConfig;
   disabled?: boolean;
-  onChange: (key: keyof ExerciseConfig, value: string) => void;
+  onChange: (key: keyof ExerciseConfig, value: string | number) => void;
 }) {
   const metric_1 = metricLabels[exercise?.metric_1] || exercise?.metric_1;
   const metric_2 =
@@ -516,7 +534,7 @@ function ConfigBlock({
       data-block-index={index}
       className="rounded border border-outline-variant bg-surface-container-high px-2 py-1.5"
     >
-      <div className="grid items-end gap-2 grid-cols-10">
+      <div className="grid items-end gap-2 grid-cols-[28px_1fr_1fr_1fr_1fr]">
         <div className="flex items-center justify-center my-auto">
           <Badge label={`${index + 1}`} type="primary" />
         </div>
@@ -524,7 +542,6 @@ function ConfigBlock({
           label={metric_1}
           value={config.metric1}
           onChange={(value) => onChange("metric1", value)}
-          className="col-span-3"
           exercise={exercise}
           disabled={disabled}
         />
@@ -535,7 +552,6 @@ function ConfigBlock({
           onChange={(value) => onChange("metric2", value)}
           onTypeChange={(value) => onChange("metric2Type", value)}
           optional={!exercise.metric_2}
-          className="col-span-3"
           exercise={exercise}
           disabled={disabled}
         />
@@ -544,8 +560,12 @@ function ConfigBlock({
           value={config.pse}
           onChange={(value) => onChange("pse", value)}
           optional
-          className="col-span-3"
           exercise={exercise}
+          disabled={disabled}
+        />
+        <RestDurationField
+          value={config.rest}
+          onChange={(seconds) => onChange("rest", seconds)}
           disabled={disabled}
         />
       </div>
@@ -582,7 +602,7 @@ function MetricField({
 
   return (
     <div
-      className={`block text-[11px] font-semibold leading-none text-on-surface-variant ${className ?? ""}`}
+      className="block text-[11px] font-semibold leading-none text-on-surface-variant"
     >
       {label}
       {optional ? " (opcional)" : ""}
@@ -609,6 +629,33 @@ function MetricField({
             {type === "p" ? "%" : metric_2}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+function RestDurationField({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: number;
+  onChange: (seconds: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="block text-[11px] font-semibold leading-none text-on-surface-variant">
+      Descanso
+      <div className="mt-1 flex h-8">
+        <Input
+          aria-label="Duração do descanso"
+          sizeVariant="sm"
+          type="time"
+          step={2}
+          value={secondsToTime(value)}
+          onChange={(event) => onChange(timeToSeconds(event.target.value))}
+          disabled={disabled}
+        />
       </div>
     </div>
   );

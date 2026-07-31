@@ -16,7 +16,7 @@ export type Exercise = {
   name: string;
   metric_1: Metric;
   metric_2?: Metric;
-  visual_url?: string
+  visual_url?: string;
 };
 export type Activity = {
   exercise: number;
@@ -25,6 +25,7 @@ export type Activity = {
   type_1: "v";
   type_2?: RegisterType;
   pse: number;
+  rest_duration?: number;
   note?: string;
 };
 

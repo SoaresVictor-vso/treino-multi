@@ -98,16 +98,20 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     let roundedClass;
     switch (sideComponent) {
       case "right":
-        roundedClass = "rounded-r-none " + (sizeVariant === "sm" ? 'rounded-l-md ' : 'rounded-l-xl ');
+        roundedClass =
+          "rounded-r-none " +
+          (sizeVariant === "sm" ? "rounded-l-md " : "rounded-l-xl ");
         break;
       case "left":
-        roundedClass = "rounded-l-none " + (sizeVariant === "sm" ? 'rounded-r-md ' : 'rounded-r-xl ');
+        roundedClass =
+          "rounded-l-none " +
+          (sizeVariant === "sm" ? "rounded-r-md " : "rounded-r-xl ");
         break;
       case "both":
         roundedClass = "rounded-none ";
         break;
       default:
-        roundedClass = sizeVariant === "sm" ? 'rounded-md ' : 'rounded-xl ';
+        roundedClass = sizeVariant === "sm" ? "rounded-md " : "rounded-xl ";
     }
 
     return (
@@ -127,7 +131,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           className={
             `relative border border-outline-variant bg-surface-container-high transition-colors ` +
             roundedClass +
-            (error ? "border-error/60 " : "focus-within:border-primary-fixed-dim/50 ")
+            (error
+              ? "border-error/60 "
+              : "focus-within:border-primary-fixed-dim/50 ")
           }
         >
           {leadingIcon ? (
@@ -150,7 +156,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               className
             }
             onChange={handleChange}
-            value={typeof value === "string" ? applyMask(value) : value}
+            value={
+              typeof value === "string" ? applyMask(value) : value
+            }
             defaultValue={
               typeof defaultValue === "string"
                 ? applyMask(defaultValue)
