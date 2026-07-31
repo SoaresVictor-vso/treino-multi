@@ -24,11 +24,6 @@ describe('ROLE_PERMISSIONS', () => {
     );
   });
 
-  it('STANDALONE_USER não deve ter permissões de tenant', () => {
-    const standalonePerms = ROLE_PERMISSIONS[Role.STANDALONE_USER];
-    expect(standalonePerms).not.toContain(Permission.TENANT_CREATE);
-    expect(standalonePerms).not.toContain(Permission.USER_CREATE);
-  });
 
   it('todas as permissões mapeadas são valores válidos do enum Permission', () => {
     const validPerms = new Set(Object.values(Permission));
@@ -43,11 +38,11 @@ describe('ROLE_PERMISSIONS', () => {
 describe('resolvePermissions', () => {
   it('deve retornar a união de permissões de múltiplas roles', () => {
     const perms = resolvePermissions([
-      Role.TENANT_FINANCIAL,
-      Role.TENANT_ATTENDANT,
+      Role.TENANT_ADMIN,
+      Role.TENANT_TRAINER,
     ]);
-    expect(perms).toContain(Permission.FINANCIAL_INVOICES_READ);
-    expect(perms).toContain(Permission.ATTENDANCE_TICKETS_READ);
+    expect(perms).toContain(Permission.WORKOUT_TEMPLATES_READ_TENANT);
+    expect(perms).toContain(Permission.WORKOUT_TEMPLATES_CREATE);
   });
 
   it('não deve duplicar permissões compartilhadas entre roles', () => {

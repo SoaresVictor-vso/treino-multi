@@ -11,4 +11,6 @@ export enum Role {
   TENANT_CLIENT = 'tenant:client',
 
   TENANT_TRAINER = 'tenant:trainer',
+
+  TENANT_TRAINER_MASTER = 'tenant:trainer-master',
 }

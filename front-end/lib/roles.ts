@@ -6,5 +6,6 @@ export enum Role {
   // STANDALONE_USER = "standalone:user",
   TENANT_CLIENT = "tenant:client",
   TENANT_TRAINER = "tenant:trainer",
+  TENANT_TRAINER_MASTER = "tenant:trainer-master",
   ALL = "*", // Role especial para rotas públicas, que aceita qualquer usuário autenticado
 }
