@@ -11,6 +11,10 @@ import { AuthenticationLog } from '../audit-logs/entities/authentication-log.ent
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';
 import { PasswordChangeLog } from '../audit-logs/entities/password-change-log.entity';
 import { LogContextType } from '../audit-logs/entities/log-context-type.entity';
+import { Metric } from '../metrics/entities/metric.entity';
+import { Exercise } from '../exercises/entities/exercise.entity';
+import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
+import { Activity } from '../workout-templates/entities/activity.entity';
 import { DatabaseSyncService } from './database-sync.service';
 
 @Module({
@@ -25,7 +29,7 @@ import { DatabaseSyncService } from './database-sync.service';
         username: config.get<string>('database.user'),
         password: config.get<string>('database.password'),
         database: config.get<string>('database.name'),
-        entities: [Person, Tenant, User, UserRole, RefreshToken, AuditLog, AuthenticationLog, CriticalOperationLog, PasswordChangeLog, LogContextType],
+        entities: [Person, Tenant, User, UserRole, RefreshToken, AuditLog, AuthenticationLog, CriticalOperationLog, PasswordChangeLog, LogContextType, Metric, Exercise, WorkoutTemplate, Activity],
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: true,
         synchronize: false,

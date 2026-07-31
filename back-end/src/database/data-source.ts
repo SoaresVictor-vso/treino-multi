@@ -10,6 +10,10 @@ import { AuthenticationLog } from '../audit-logs/entities/authentication-log.ent
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';
 import { PasswordChangeLog } from '../audit-logs/entities/password-change-log.entity';
 import { LogContextType } from '../audit-logs/entities/log-context-type.entity';
+import { Metric } from '../metrics/entities/metric.entity';
+import { Exercise } from '../exercises/entities/exercise.entity';
+import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
+import { Activity } from '../workout-templates/entities/activity.entity';
 
 config();
 
@@ -20,7 +24,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DATABASE_USER,
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE_NAME,
-  entities: [Person, Tenant, User, UserRole, RefreshToken, AuditLog, AuthenticationLog, CriticalOperationLog, PasswordChangeLog, LogContextType],
+  entities: [Person, Tenant, User, UserRole, RefreshToken, AuditLog, AuthenticationLog, CriticalOperationLog, PasswordChangeLog, LogContextType, Metric, Exercise, WorkoutTemplate, Activity],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,
 });

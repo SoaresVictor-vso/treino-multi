@@ -12,6 +12,9 @@ import { TenantsModule } from './tenants/tenants.module';
 import { UsersModule } from './users/users.module';
 import { RolesModule } from './roles/roles.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { MetricsModule } from './metrics/metrics.module';
+import { ExercisesModule } from './exercises/exercises.module';
+import { WorkoutTemplatesModule } from './workout-templates/workout-templates.module';
 
 @Module({
   imports: [
@@ -28,6 +31,9 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
     UsersModule,
     RolesModule,
     AuditLogsModule,
+    MetricsModule,
+    ExercisesModule,
+    WorkoutTemplatesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
