@@ -19,9 +19,9 @@ import type {
   Template,
   TemplateModalState,
 } from "@/components/workout-template/types";
+import { exercisesService } from "@/api/services/parametro/exercises";
 import { exercises, metricLabels, metricUnits } from "./mocks";
 import type { Activity, CreateWorkoutTemplateDto, Exercise } from "./types";
-import { ParametersService } from "@/api/services/parametro";
 
 type RegisterType = "p" | "v";
 type ExerciseConfig = {
@@ -211,9 +211,7 @@ export default function WorkoutTemplatePage() {
   };
 
   useEffect(() => {
-    new ParametersService().search("metrics").then((data) => {
-      console.log("data", data);
-    });
+    void exercisesService.syncCatalog();
   }, []);
 
   return (
@@ -751,6 +749,49 @@ function ExercisePicker({
   onToggle: (exercise: Exercise) => void;
   onClose: () => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [resultIds, setResultIds] = useState<number[] | null>(null);
+  const [descriptions, setDescriptions] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    let active = true;
+
+    void exercisesService
+      .search(query)
+      .then((results) => {
+        if (!active) return;
+        setResultIds(results.map((item) => Number(item.id)));
+        setDescriptions(
+          results.reduce<Record<number, string>>((acc, item) => {
+            acc[Number(item.id)] = item.description;
+            return acc;
+          }, {}),
+        );
+      })
+      .catch(() => {
+        if (!active) return;
+        setResultIds(null);
+        setDescriptions({});
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [query]);
+
+  const visibleExercises = useMemo(() => {
+    if (resultIds === null) return exercises;
+
+    if (!query.trim() && resultIds.length === 0) {
+      return exercises;
+    }
+
+    const byId = new Map(exercises.map((exercise) => [exercise.id, exercise]));
+    return resultIds
+      .map((id) => byId.get(id))
+      .filter((item): item is Exercise => Boolean(item));
+  }, [query, resultIds]);
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
       <div className="w-full max-w-xl rounded-lg border border-outline-variant bg-surface-container p-6">
@@ -769,8 +810,17 @@ function ExercisePicker({
             <RiCloseLine size={24} />
           </button>
         </div>
+        <label className="mb-4 flex items-center gap-2 border-b border-outline bg-surface-container px-3 py-2 text-sm focus-within:border-primary-container">
+          <span className="text-on-surface-variant">Buscar</span>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Nome ou descrição do exercício"
+            className="w-full bg-transparent outline-none placeholder:text-on-surface-variant"
+          />
+        </label>
         <div className="max-h-[55vh] space-y-2 overflow-y-auto">
-          {exercises.map((exercise) => {
+          {visibleExercises.map((exercise) => {
             const order =
               selected.findIndex((item) => item.id === exercise.id) + 1;
             return (
@@ -787,7 +837,14 @@ function ExercisePicker({
                     </span>
                   )}
                 </span>
-                <span className="font-semibold">{exercise.name}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">{exercise.name}</span>
+                  {descriptions[exercise.id] && (
+                    <span className="block truncate text-xs text-on-surface-variant">
+                      {descriptions[exercise.id]}
+                    </span>
+                  )}
+                </span>
                 {order > 0 && (
                   <span className="ml-auto text-primary-fixed-dim">
                     <RiCheckLine size={22} />
@@ -796,6 +853,11 @@ function ExercisePicker({
               </button>
             );
           })}
+          {visibleExercises.length === 0 && (
+            <p className="rounded border border-dashed border-outline-variant p-4 text-center text-sm text-on-surface-variant">
+              Nenhum exercício encontrado para a busca informada.
+            </p>
+          )}
         </div>
         <div className="mt-6 flex justify-end border-t border-outline-variant pt-5">
           <Button onClick={onClose}>OK</Button>

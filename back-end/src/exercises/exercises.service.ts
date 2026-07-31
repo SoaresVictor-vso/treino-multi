@@ -10,6 +10,7 @@ import { ReadExercise } from './entities/read-exercise.entity';
 export interface ExerciseChanges {
   exercises: ReadExercise[];
   deletedIds: number[];
+  syncedAt: string;
 }
 
 @Injectable()
@@ -31,7 +32,16 @@ export class ExercisesService {
     return exercises.map((exercise) => this.toReadModel(exercise));
   }
 
-  async findChangesSince(since: Date): Promise<ExerciseChanges> {
+  async findChangesSince(since: Date | null): Promise<ExerciseChanges> {
+    if (!since) {
+      const exercises = await this.exerciseRepo.find({ order: { name: 'ASC' } });
+      return {
+        exercises: exercises.map((exercise) => this.toReadModel(exercise)),
+        deletedIds: [],
+        syncedAt: new Date().toISOString(),
+      };
+    }
+
     const [exercises, deletedExercises] = await Promise.all([
       this.exerciseRepo.find({
         withDeleted: true,
@@ -51,6 +61,7 @@ export class ExercisesService {
     return {
       exercises: exercises.map((exercise) => this.toReadModel(exercise)),
       deletedIds: deletedExercises.map((exercise) => exercise.id),
+      syncedAt: new Date().toISOString(),
     };
   }
 
@@ -85,6 +96,8 @@ export class ExercisesService {
     return Object.assign(new ReadExercise(), {
       id: exercise.id,
       name: exercise.name,
+      description: exercise.description,
+      tenantId: exercise.tenantId,
       metric1Id: exercise.metric1Id,
       metric2Id: exercise.metric2Id,
       visualUrl: exercise.visualUrl,

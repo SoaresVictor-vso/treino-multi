@@ -7,7 +7,7 @@ import { Exercise } from './entities/exercise.entity';
 import { ExercisesService } from './exercises.service';
 
 const makeExercise = (overrides: Partial<Exercise> = {}): Exercise => ({
-  id: 1, name: 'Agachamento', metric1Id: 1, metric2Id: null, visualUrl: null,
+  id: 1, name: 'Agachamento', description: 'Exercício de base', tenantId: null, metric1Id: 1, metric2Id: null, visualUrl: null,
   createdAt: new Date(), updatedAt: new Date(), metric1: {} as Metric, metric2: null, ...overrides,
 });
 
@@ -47,6 +47,8 @@ describe('ExercisesService', () => {
     await expect(service.findAll()).resolves.toEqual([{
       id: exercise.id,
       name: exercise.name,
+      description: exercise.description,
+      tenantId: exercise.tenantId,
       metric1Id: exercise.metric1Id,
       metric2Id: exercise.metric2Id,
       visualUrl: exercise.visualUrl,
@@ -67,11 +69,14 @@ describe('ExercisesService', () => {
       exercises: [{
         id: exercise.id,
         name: exercise.name,
+        description: exercise.description,
+        tenantId: exercise.tenantId,
         metric1Id: exercise.metric1Id,
         metric2Id: exercise.metric2Id,
         visualUrl: exercise.visualUrl,
       }],
       deletedIds: [2],
+      syncedAt: expect.any(String),
     });
     expect(exerciseRepo.find).toHaveBeenNthCalledWith(1, expect.objectContaining({
       withDeleted: true,
@@ -80,6 +85,26 @@ describe('ExercisesService', () => {
       withDeleted: true,
       select: { id: true },
     }));
+  });
+
+  it('retorna catálogo completo quando since é nulo', async () => {
+    const exercise = makeExercise({ id: 10, name: 'Supino reto' });
+    exerciseRepo.find.mockResolvedValue([exercise]);
+
+    await expect(service.findChangesSince(null)).resolves.toEqual({
+      exercises: [{
+        id: exercise.id,
+        name: exercise.name,
+        description: exercise.description,
+        tenantId: exercise.tenantId,
+        metric1Id: exercise.metric1Id,
+        metric2Id: exercise.metric2Id,
+        visualUrl: exercise.visualUrl,
+      }],
+      deletedIds: [],
+      syncedAt: expect.any(String),
+    });
+    expect(exerciseRepo.find).toHaveBeenCalledWith({ order: { name: 'ASC' } });
   });
 
   it('falha ao buscar exercício inexistente', async () => {

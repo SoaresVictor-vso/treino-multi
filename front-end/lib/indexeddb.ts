@@ -48,6 +48,23 @@ export class IndexedDbService {
         });
     }
 
+    public async remover(parametro: string, ids: string[]): Promise<void> {
+        if (typeof window === "undefined" || !window.indexedDB || ids.length === 0) return;
+
+        const database = await this.openDatabase(parametro);
+
+        return new Promise((resolve, reject) => {
+            const transaction = database.transaction(parametro, "readwrite");
+            const store = transaction.objectStore(parametro);
+
+            ids.forEach((id) => store.delete(id));
+
+            transaction.oncomplete = () => resolve();
+            transaction.onerror = () => reject(transaction.error);
+            transaction.onabort = () => reject(transaction.error);
+        });
+    }
+
     private openDatabase(parametro: string, fields: string[] = []): Promise<IDBDatabase> {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(DATABASE_NAME);

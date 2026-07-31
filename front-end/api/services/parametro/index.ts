@@ -1,14 +1,20 @@
 export type ParameterEntity = {
     id: string;
     name: string;
+    description?: string;
 };
 
 import { CACHE_PARAMETROS, TTL_PARAMETROS } from "../../../lib/constants";
 import { IndexedDbEntity, indexedDbService } from "../../../lib/indexeddb";
+import { ExerciseParameter, exercisesService } from "./exercises";
 import { MetricsService } from "./metrics";
 
 export class ParametersService {
     public async search<T extends IndexedDbEntity>(parametro: string): Promise<T[]> {
+        if (parametro === "exercises") {
+            return exercisesService.syncCatalog().then((items) => items as unknown as T[]);
+        }
+
         const cachedResults = CACHE_PARAMETROS ? await indexedDbService.buscar(parametro) : null;
         const lastSearchKey = `last_search_${parametro}`;
         const lastSearch = typeof localStorage !== "undefined"
@@ -27,6 +33,10 @@ export class ParametersService {
         return buscado as T[];
     }
 
+    public async fullTextSearchExercises(query: string): Promise<ExerciseParameter[]> {
+        return exercisesService.search(query);
+    }
+
     private webSearch<T>(parametro: string, lastBusca: string | null = null): Promise<T[]> {
         switch (parametro) {
             case "metrics":
@@ -40,4 +50,5 @@ export class ParametersService {
 
 export * from "../../../lib/indexeddb";
 export * from "./metrics";
+export * from "./exercises";
 export * from "../../../lib/constants";

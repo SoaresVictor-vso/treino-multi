@@ -23,10 +23,13 @@ export class ExercisesController {
   }
 
   @ApiOperation({ summary: 'Lista alterações de exercícios desde uma data' })
-  @ApiQuery({ name: 'since', type: String, format: 'date-time', required: true })
+  @ApiQuery({ name: 'since', type: String, format: 'date-time', required: false, nullable: true })
   @RequirePermissions(Permission.EXERCISES_READ)
   @Get('sync')
   findChanges(@Query() { since }: FindExerciseChangesDto) {
-    return this.exercisesService.findChangesSince(new Date(since));
+    const normalizedSince = typeof since === 'string' && (since === 'null' || since.trim() === '')
+      ? null
+      : since;
+    return this.exercisesService.findChangesSince(normalizedSince ? new Date(normalizedSince) : null);
   }
 }

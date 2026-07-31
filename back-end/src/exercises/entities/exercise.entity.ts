@@ -18,6 +18,12 @@ export class Exercise {
   @Column({ type: 'varchar', length: 50 })
   name!: string;
 
+  @Column({ name: 'description', type: 'text', default: '' })
+  description!: string;
+
+  @Column({ name: 'tenant_id', type: 'uuid', nullable: true, default: null })
+  tenantId!: string | null;
+
   @Column({ name: 'metric_1_id', type: 'integer' })
   metric1Id!: number;
 

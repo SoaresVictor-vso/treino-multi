@@ -7,6 +7,12 @@ export class CreateExerciseDto {
   @MaxLength(50)
   name!: string;
 
+  @ApiPropertyOptional({ example: 'Exercício multiarticular para membros inferiores' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  description?: string;
+
   @ApiProperty({ example: 1 })
   @IsInt({message: 'Você deve informar uma métrica primária válida'})
   @Min(1)
