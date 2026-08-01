@@ -1,6 +1,6 @@
 import { authenticatedRequest } from "@/api/client";
 import { indexedDbService, type IndexedDbEntity } from "@/lib/indexeddb";
-import MiniSearch from "minisearch";
+import { createFulltextSearch, type FulltextSearch } from "@/lib/Fulltextsearch";
 
 export type ExerciseParameter = IndexedDbEntity & {
   id: string;
@@ -34,7 +34,7 @@ const EXERCISES_STORE = "exercises";
 const EXERCISES_SYNC_CURSOR_KEY = "last_sync_exercises";
 
 export class ExercisesService implements ExercisesServiceContract {
-  private readonly index = new MiniSearch<ExerciseSearchDocument>({
+  private readonly index: FulltextSearch<ExerciseSearchDocument> = createFulltextSearch({
     fields: ["name", "description"],
     storeFields: ["id", "name", "description"],
     searchOptions: {
@@ -42,7 +42,7 @@ export class ExercisesService implements ExercisesServiceContract {
       fuzzy: 0.2,
       boost: { name: 4, description: 1 },
     },
-    processTerm: (term) => this.normalize(term),
+    normalize: (term) => this.normalize(term),
   });
 
   private documents: ExerciseSearchDocument[] = [];
@@ -97,11 +97,7 @@ export class ExercisesService implements ExercisesServiceContract {
     if (!normalizedQuery) return catalog;
 
     return this.index
-      .search(this.normalize(normalizedQuery), {
-        prefix: true,
-        fuzzy: 0.2,
-        boost: { name: 4, description: 1 },
-      })
+      .search(this.normalize(normalizedQuery))
       .map((result) => ({
         id: result.id,
         name: result.name,
@@ -117,9 +113,7 @@ export class ExercisesService implements ExercisesServiceContract {
     }));
 
     this.index.removeAll();
-    if (this.documents.length > 0) {
-      this.index.addAll(this.documents);
-    }
+    if (this.documents.length > 0) this.index.addAll(this.documents);
   }
 
   private normalize(text: string): string {

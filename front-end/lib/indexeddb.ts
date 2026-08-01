@@ -79,6 +79,25 @@ export class IndexedDbService {
             };
             request.onsuccess = () => {
                 const database = request.result;
+
+                if (!database.objectStoreNames.contains(parametro)) {
+                    const nextVersion = database.version + 1;
+                    database.close();
+                    const upgradeRequest = indexedDB.open(DATABASE_NAME, nextVersion);
+
+                    upgradeRequest.onupgradeneeded = () => {
+                        this.configureObjectStore(
+                            upgradeRequest.result,
+                            parametro,
+                            fields,
+                            upgradeRequest.transaction,
+                        );
+                    };
+                    upgradeRequest.onsuccess = () => resolve(upgradeRequest.result);
+                    upgradeRequest.onerror = () => reject(upgradeRequest.error);
+                    return;
+                }
+
                 const store = database
                     .transaction(parametro, "readonly")
                     .objectStore(parametro);
