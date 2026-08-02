@@ -1,4 +1,5 @@
 import { authenticatedRequest } from '../client';
+import { Exercise } from './parametro';
 
 export type RegisterType = 'p' | 'v';
 
@@ -41,27 +42,6 @@ export interface WorkoutTemplateResponse {
 	deletedAt: string | null;
 	activities: WorkoutActivityResponse[];
 }
-
-export enum MetricFieldType {
-	INT = 'int',
-	DECIMAL = 'decimal',
-	TIME = 'time',
-}
-
-export type Metric = {
-	id: number;
-	name: string;
-	symbol: string;
-	fieldType: MetricFieldType;
-};
-
-export type Exercise = {
-	id: number;
-	name: string;
-	metric_1: Metric;
-	metric_2?: Metric;
-	visual_url?: string;
-};
 
 export type Activity = {
 	exercise: number;

@@ -5,41 +5,42 @@ import { RiCheckLine, RiCloseLine, RiHeartPulseLine } from 'react-icons/ri';
 import {
 	ParametersService,
 	type ExerciseParameter,
-	type Metrics,
 } from '@/api/services/parametro';
 import Button from '@/components/ui/Button';
-import type { Exercise, Metric } from '@/api/services/workout-templates';
+import {
+	MetricFieldType,
+	type Exercise,
+	type Metric,
+} from '@/api/services/parametro';
 
-const metricByName: Record<string, Metric> = {
-	repeticoes: 'repetition',
-	repetição: 'repetition',
-	repetition: 'repetition',
-	peso: 'weight',
-	weight: 'weight',
-	tempo: 'time',
-	time: 'time',
-	distancia: 'distance',
-	distância: 'distance',
-	distance: 'distance',
-	ritmo: 'pace',
-	pace: 'pace',
+const metricByName: Record<string, MetricFieldType> = {
+	repeticoes: MetricFieldType.INT,
+	repetição: MetricFieldType.INT,
+	repetition: MetricFieldType.INT,
+	peso: MetricFieldType.DECIMAL,
+	weight: MetricFieldType.DECIMAL,
+	tempo: MetricFieldType.TIME,
+	time: MetricFieldType.TIME,
+	distancia: MetricFieldType.DECIMAL,
+	distância: MetricFieldType.DECIMAL,
+	distance: MetricFieldType.DECIMAL,
+	ritmo: MetricFieldType.DECIMAL,
+	pace: MetricFieldType.DECIMAL,
 };
 
 function toExercise(
-	parameter: ExerciseParameter,
-	metrics: Record<string, Metrics>,
+	exercise: ExerciseParameter,
+	metrics: Record<string, Metric>,
 ): Exercise {
-	const metric = (id: number | null | undefined): Metric =>
-		metricByName[metrics[String(id)]?.name.trim().toLocaleLowerCase()] ??
-		'repetition';
+	const metric_1 = metrics[exercise.metric1Id];
+	const metric_2 = (exercise.metric2Id && metrics[exercise.metric2Id]) || null;
 	return {
-		id: Number(parameter.id),
-		name: parameter.name,
-		metric_1: metric(parameter.metric1Id),
-		...(parameter.metric2Id == null
-			? {}
-			: { metric_2: metric(parameter.metric2Id) }),
-		...(parameter.visualUrl ? { visual_url: parameter.visualUrl } : {}),
+		id: Number(exercise.id),
+		name: exercise.name,
+		description: exercise.description,
+		metric_1,
+		...(metric_2 == null ? {} : { metric_2 }),
+		...(exercise.visualUrl ? { visual_url: exercise.visualUrl } : {}),
 	};
 }
 
@@ -53,14 +54,14 @@ export default function ExercisePicker({
 	onClose: () => void;
 }) {
 	const [query, setQuery] = useState('');
-	const [catalog, setCatalog] = useState<Exercise[]>([]);
+	const [exercises, setExercises] = useState<Exercise[]>([]);
 	const [descriptions, setDescriptions] = useState<Record<number, string>>({});
 
 	useEffect(() => {
 		let active = true;
 		const parameters = new ParametersService();
 		Promise.all([
-			parameters.search<Metrics>('metrics'),
+			parameters.search<Metric & { id: string }>('metrics'),
 			parameters.search<ExerciseParameter>('exercises'),
 		])
 			.then(([metricList, exerciseList]) => {
@@ -68,14 +69,14 @@ export default function ExercisePicker({
 				const metrics = Object.fromEntries(
 					metricList.map((metric) => [String(metric.id), metric]),
 				);
-				setCatalog(exerciseList.map((exercise) => toExercise(exercise, metrics)));
+				setExercises(exerciseList.map((exercise) => toExercise(exercise, metrics)));
 				setDescriptions(
 					Object.fromEntries(
 						exerciseList.map((item) => [Number(item.id), item.description ?? '']),
 					),
 				);
 			})
-			.catch(() => active && setCatalog([]));
+			.catch(() => active && setExercises([]));
 		return () => {
 			active = false;
 		};
@@ -83,13 +84,13 @@ export default function ExercisePicker({
 
 	const visibleExercises = useMemo(() => {
 		const normalizedQuery = query.trim().toLocaleLowerCase();
-		if (!normalizedQuery) return catalog;
-		return catalog.filter((exercise) =>
+		if (!normalizedQuery) return exercises;
+		return exercises.filter((exercise) =>
 			`${exercise.name} ${descriptions[exercise.id] ?? ''}`
 				.toLocaleLowerCase()
 				.includes(normalizedQuery),
 		);
-	}, [catalog, descriptions, query]);
+	}, [exercises, descriptions, query]);
 
 	const toggle = (exercise: Exercise) => {
 		const isSelected = selected.some((item) => item.id === exercise.id);

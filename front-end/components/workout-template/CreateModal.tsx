@@ -10,10 +10,8 @@ import Button from '../ui/Button';
 import { ConfigBlock } from './ConfigBlock';
 import ExercisePicker from '../shared/ExercisePicker';
 import type { Template } from '@/api/services/workout-templates';
-import type {
-	CreateWorkoutTemplateDto,
-	Exercise,
-} from '@/api/services/workout-templates';
+import type { CreateWorkoutTemplateDto } from '@/api/services/workout-templates';
+import type { Exercise } from '@/api/services/parametro';
 
 export function CreateModal({
 	onClose,
@@ -33,7 +31,15 @@ export function CreateModal({
 		template?.exercises ?? [],
 	);
 	const [pickerOpen, setPickerOpen] = useState(false);
-	const [activities, setActivities] = useState<Record<number, Activity[]>>({});
+	const [activities, setActivities] = useState<Record<number, Activity[]>>(() =>
+		template
+			? (Object.fromEntries(
+					Object.entries(
+						Object.groupBy(template.activities, (activity) => activity.exercise),
+					),
+				) as Record<number, Activity[]>)
+			: {},
+	);
 
 	const handleSelectedChange = (next: Exercise[]) => {
 		const selectedIds = new Set(next.map((exercise) => exercise.id));

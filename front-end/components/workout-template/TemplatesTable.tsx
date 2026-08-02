@@ -4,7 +4,7 @@ import type { Template } from '@/api/services/workout-templates';
 
 type TemplatesTableProps = {
 	templates: Template[];
-	selectedId: number;
+	selectedId: number | null;
 	query: string;
 	actionsTemplateId: number | null;
 	onQueryChange: (query: string) => void;

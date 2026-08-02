@@ -4,6 +4,7 @@ import {
 	createFulltextSearch,
 	type FulltextSearch,
 } from '@/lib/Fulltextsearch';
+import { Metric } from './metrics';
 
 export type ExerciseParameter = IndexedDbEntity & {
 	id: string;
@@ -14,15 +15,17 @@ export type ExerciseParameter = IndexedDbEntity & {
 	visualUrl?: string | null;
 };
 
+export type Exercise = {
+	id: number;
+	name: string;
+	description: string;
+	metric_1: Metric;
+	metric_2?: Metric;
+	visual_url?: string;
+};
+
 type ExerciseSyncResponse = {
-	exercises: Array<{
-		id: number;
-		name: string;
-		description?: string | null;
-		metric1Id: number;
-		metric2Id?: number | null;
-		visualUrl?: string | null;
-	}>;
+	exercises: Array<ExerciseParameter>;
 	deletedIds: number[];
 	syncedAt: string;
 };

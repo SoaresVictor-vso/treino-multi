@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RiAddLine } from 'react-icons/ri';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -8,77 +8,60 @@ import TemplatePreview from '@/components/workout-template/TemplatePreview';
 import TemplateStats from '@/components/workout-template/TemplateStats';
 import TemplatesTable from '@/components/workout-template/TemplatesTable';
 import { CreateModal } from '@/components/workout-template/CreateModal';
-import { exercises as seedExercises } from './mocks';
 import type {
 	CreateWorkoutTemplateDto,
-	Exercise,
 	Template,
 	TemplateModalState,
 } from '@/api/services/workout-templates';
+import * as workoutTemplatesService from '@/api/services/workout-templates';
 
-const initialTemplates: Template[] = [
-	{
-		id: 1,
-		title: 'Força · Membros inferiores',
-		description:
-			'Base de força para membros inferiores com foco em controle e progressão.',
-		exercises: [seedExercises[0], seedExercises[2]],
-		activities: [
-			{
-				exercise: 1,
-				metric_1: 10,
-				metric_2: 60,
-				type_1: 'v',
-				type_2: 'v',
-				pse: 7,
-			},
-			{
-				exercise: 1,
-				metric_1: 8,
-				metric_2: 70,
-				type_1: 'v',
-				type_2: 'v',
-				pse: 8,
-			},
-			{
-				exercise: 3,
-				metric_1: 8,
-				metric_2: 80,
-				type_1: 'v',
-				type_2: 'v',
-				pse: 8,
-			},
-		],
-	},
-	{
-		id: 2,
-		title: 'Condicionamento · HIIT',
-		description: 'Circuito intervalado para elevar a capacidade cardiovascular.',
-		exercises: [seedExercises[3]],
-		activities: [
-			{
-				exercise: 4,
-				metric_1: 2,
-				metric_2: 5,
-				type_1: 'v',
-				type_2: 'v',
-				pse: 8,
-			},
-			{
-				exercise: 4,
-				metric_1: 1,
-				metric_2: 4.5,
-				type_1: 'v',
-				type_2: 'v',
-				pse: 9,
-			},
-		],
-	},
-];
+const toTemplate = (
+	item: workoutTemplatesService.WorkoutTemplateResponse,
+): Template => {
+	const exercises = item.activities.reduce<Template['exercises']>(
+		(result, activity) => {
+			if (
+				activity.exercise &&
+				!result.some((exercise) => exercise.id === activity.exercise?.id)
+			) {
+				result.push(activity.exercise);
+			}
+			return result;
+		},
+		[],
+	);
+	return {
+		id: Number(item.id),
+		title: item.name,
+		description: item.description,
+		exercises,
+		activities: item.activities.map(
+			({
+				exerciseId,
+				metric1,
+				metric2,
+				type1,
+				type2,
+				pse,
+				restDuration,
+				note,
+			}) => ({
+				exercise: exerciseId,
+				metric_1: metric1 ?? undefined,
+				metric_2: metric2 ?? undefined,
+				type_1: type1 === 'v' ? 'v' : 'v',
+				type_2: type2,
+				pse,
+				rest_duration: restDuration ?? undefined,
+				note: note ?? undefined,
+			}),
+		),
+	};
+};
 
 export default function WorkoutTemplatePage() {
-	const [templates, setTemplates] = useState(initialTemplates);
-	const [selected, setSelected] = useState(initialTemplates[0]);
+	const [templates, setTemplates] = useState<Template[]>([]);
+	const [selected, setSelected] = useState<Template | null>(null);
 	const [templateModal, setTemplateModal] = useState<TemplateModalState | null>(
 		null,
 	);
@@ -88,6 +71,29 @@ export default function WorkoutTemplatePage() {
 	);
 	const [query, setQuery] = useState('');
 	const [createOpen, setCreateOpen] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		workoutTemplatesService
+			.findAll()
+			.then(async (summaries) => {
+				const loaded = await Promise.all(
+					(summaries.data ?? []).map((summary) =>
+						workoutTemplatesService.findOne(summary.id),
+					),
+				);
+				const next = loaded.flatMap((response) =>
+					response.data ? [toTemplate(response.data)] : [],
+				);
+				setTemplates(next);
+				setSelected(next[0] ?? null);
+			})
+			.catch(() =>
+				setError(
+					'Não foi possível carregar as templates. Por favor, tente novamente.',
+				),
+			);
+	}, []);
 
 	const filtered = useMemo(
 		() =>
@@ -97,20 +103,14 @@ export default function WorkoutTemplatePage() {
 		[templates, query],
 	);
 
-	const [error, setError] = useState<string | null>(null);
-
 	const saveTemplate = async (workoutTemplate: CreateWorkoutTemplateDto) => {
-		console.log('DTO de criação da WorkoutTemplate:', workoutTemplate);
-
-		const data: CreateWorkoutTemplateDto = {
-			name: workoutTemplate.name,
-			description: workoutTemplate.description,
-			activities: workoutTemplate.activities,
-		};
-
 		try {
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-			// setCreateOpen(false);
+			const created = await workoutTemplatesService.create(workoutTemplate);
+			if (!created.data) throw new Error(created.error);
+			const next = toTemplate(created.data);
+			setTemplates((current) => [...current, next]);
+			setSelected(next);
+			setCreateOpen(false);
 		} catch (error) {
 			console.error(error);
 			setError(`Não foi possível salvar a template. Por favor, tente novamente.`);
@@ -119,26 +119,44 @@ export default function WorkoutTemplatePage() {
 
 	const updateTemplate = async (id: number, data: CreateWorkoutTemplateDto) => {
 		try {
-			await new Promise((resolve) => setTimeout(resolve, 1000));
-			// setCreateOpen(false);
+			const response = await workoutTemplatesService.update(String(id), data);
+			if (!response.data) throw new Error(response.error);
+			const updated = toTemplate(response.data);
+			setTemplates((current) =>
+				current.map((item) => (item.id === id ? updated : item)),
+			);
+			setSelected((current) => (current?.id === id ? updated : current));
+			setTemplateModal(null);
 		} catch (error) {
 			console.error(error);
 			setError(`Não foi possível salvar a template. Por favor, tente novamente.`);
 		}
 	};
 
-	const removeTemplate = (template: Template) => {
-		setTemplates((current) => current.filter((item) => item.id !== template.id));
-		setSelected((current) =>
-			current.id === template.id
-				? (templates.find((item) => item.id !== template.id) ?? current)
-				: current,
-		);
-		setTemplateToRemove(null);
+	const removeTemplate = async (template: Template) => {
+		try {
+			await workoutTemplatesService.remove(String(template.id));
+			setTemplates((current) => {
+				const next = current.filter((item) => item.id !== template.id);
+				setSelected((selected) =>
+					selected?.id === template.id ? (next[0] ?? null) : selected,
+				);
+				return next;
+			});
+			setTemplateToRemove(null);
+		} catch (error) {
+			console.error(error);
+			setError('Não foi possível remover a template. Por favor, tente novamente.');
+		}
 	};
 
 	return (
 		<div className="mx-auto max-w-[1440px] space-y-8 p-4 md:p-8">
+			{error && (
+				<p className="rounded border border-error bg-error-container/20 p-3 text-error">
+					{error}
+				</p>
+			)}
 			<header className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
 				<div>
 					<p className="type-label-caps text-primary-fixed-dim">
@@ -164,7 +182,7 @@ export default function WorkoutTemplatePage() {
 			<div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
 				<TemplatesTable
 					templates={filtered}
-					selectedId={selected.id}
+					selectedId={selected?.id ?? null}
 					query={query}
 					actionsTemplateId={actionsTemplate?.id ?? null}
 					onQueryChange={setQuery}
@@ -187,7 +205,7 @@ export default function WorkoutTemplatePage() {
 						setActionsTemplate(null);
 					}}
 				/>
-				<TemplatePreview template={selected} />
+				{selected && <TemplatePreview template={selected} />}
 			</div>
 			{createOpen && (
 				<CreateModal onClose={() => setCreateOpen(false)} onSave={saveTemplate} />

@@ -1,11 +1,11 @@
 'use client';
 import Badge from '@/components/ui/Badge';
+import { type Activity } from '@/api/services/workout-templates';
 import {
 	MetricFieldType,
-	type Activity,
 	type Exercise,
 	type Metric,
-} from '@/api/services/workout-templates';
+} from '@/api/services/parametro';
 
 import { MetricField } from './MetricField';
 import { RestDurationField } from './RestDurationField';
