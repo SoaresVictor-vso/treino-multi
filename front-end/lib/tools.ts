@@ -27,3 +27,15 @@ function applyMask(value: string, maskRegex: MaskRegex): string {
 	console.log(`Applying mask: ${maskRegex.replacement} to value: ${value}`);
 	return value.replace(maskRegex.regex, maskRegex.replacement);
 }
+
+export function secondsToTime(seconds: number): string {
+	const hours = Math.floor(seconds / 3600);
+	const minutes = Math.floor((seconds % 3600) / 60);
+	const secs = seconds % 60;
+	return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+export function timeToSeconds(time: string): number {
+	const [hours = 0, minutes = 0, seconds = 0] = time.split(':').map(Number);
+	return hours * 3600 + minutes * 60 + seconds;
+}

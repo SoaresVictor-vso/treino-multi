@@ -1,37 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
-import {
-	RiAddLine,
-	RiHeartPulseLine,
-	RiCheckLine,
-	RiCloseLine,
-} from 'react-icons/ri';
+import { useMemo, useState } from 'react';
+import { RiAddLine } from 'react-icons/ri';
 import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
-import Textarea from '@/components/ui/Textarea';
-import Badge from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
 import TemplatePreview from '@/components/workout-template/TemplatePreview';
 import TemplateStats from '@/components/workout-template/TemplateStats';
 import TemplatesTable from '@/components/workout-template/TemplatesTable';
 import { CreateModal } from '@/components/workout-template/CreateModal';
-import type {
-	Template,
-	TemplateModalState,
-	ExerciseConfig,
-} from '@/components/workout-template/types';
-import {
-	DEFAULT_REST_DURATION,
-	getConfigsFromActivities,
-	secondsToTime,
-	timeToSeconds,
-	type RegisterType,
-} from '@/components/workout-template/types';
-import { exercises as seedExercises, metricLabels, metricUnits } from './mocks';
-import ExercisePicker from '@/components/shared/ExercisePicker';
-import { exercisesService } from '@/api/services/parametro/exercises';
-import type { CreateWorkoutTemplateDto, Exercise, Metric } from './types';
+import { exercises as seedExercises } from './mocks';
+import type { Template, TemplateModalState } from './types';
+import type { CreateWorkoutTemplateDto, Exercise } from './types';
 
 const initialTemplates: Template[] = [
 	{
@@ -113,54 +92,37 @@ export default function WorkoutTemplatePage() {
 			),
 		[templates, query],
 	);
-	const saveTemplate = (
-		workoutTemplate: CreateWorkoutTemplateDto,
-		exercises: Exercise[],
-	) => {
+
+	const [error, setError] = useState<string | null>(null);
+
+	const saveTemplate = async (workoutTemplate: CreateWorkoutTemplateDto) => {
 		console.log('DTO de criação da WorkoutTemplate:', workoutTemplate);
 
-		const saved: Template = {
-			id: Date.now(),
-			title: workoutTemplate.name,
+		const data: CreateWorkoutTemplateDto = {
+			name: workoutTemplate.name,
 			description: workoutTemplate.description,
-			exercises,
 			activities: workoutTemplate.activities,
 		};
-		setTemplates((current) => [...current, saved]);
-		setSelected(saved);
-		setCreateOpen(false);
+
+		try {
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+			// setCreateOpen(false);
+		} catch (error) {
+			console.error(error);
+			setError(`Não foi possível salvar a template. Por favor, tente novamente.`);
+		}
 	};
-	const updateTemplate = (
-		id: number,
-		workoutTemplate: CreateWorkoutTemplateDto,
-		exercises: Exercise[],
-	) => {
-		setTemplates((current) =>
-			current.map((template) =>
-				template.id === id
-					? {
-							...template,
-							title: workoutTemplate.name,
-							description: workoutTemplate.description,
-							exercises,
-							activities: workoutTemplate.activities,
-						}
-					: template,
-			),
-		);
-		setSelected((current) =>
-			current.id === id
-				? {
-						...current,
-						title: workoutTemplate.name,
-						description: workoutTemplate.description,
-						exercises,
-						activities: workoutTemplate.activities,
-					}
-				: current,
-		);
-		setTemplateModal(null);
+
+	const updateTemplate = async (id: number, data: CreateWorkoutTemplateDto) => {
+		try {
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+			// setCreateOpen(false);
+		} catch (error) {
+			console.error(error);
+			setError(`Não foi possível salvar a template. Por favor, tente novamente.`);
+		}
 	};
+
 	const removeTemplate = (template: Template) => {
 		setTemplates((current) => current.filter((item) => item.id !== template.id));
 		setSelected((current) =>
@@ -232,8 +194,8 @@ export default function WorkoutTemplatePage() {
 					template={templateModal.template}
 					mode={templateModal.mode}
 					onClose={() => setTemplateModal(null)}
-					onSave={(workoutTemplate, exercises) =>
-						updateTemplate(templateModal.template.id, workoutTemplate, exercises)
+					onSave={(workoutTemplate) =>
+						updateTemplate(templateModal.template.id, workoutTemplate)
 					}
 				/>
 			)}

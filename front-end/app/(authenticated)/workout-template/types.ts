@@ -1,12 +1,23 @@
-export type Metric = 'repetition' | 'weight' | 'time' | 'distance' | 'pace';
+export enum MetricFieldType {
+	INT = 'int',
+	DECIMAL = 'decimal',
+	TIME = 'time',
+}
 
-export type MetricLabel = {
-	[key in Metric]: string;
+export type Metric = {
+	id: number;
+	name: string;
+	symbol: string;
+	fieldType: MetricFieldType;
 };
 
-export type MetricUnit = {
-	[key in Metric]: string;
-};
+// export type MetricLabel = {
+// 	[key in Metric]: string;
+// };
+
+// export type MetricUnit = {
+// 	[key in Metric]: string;
+// };
 /** p - percentual, v - value */
 export type RegisterType = 'p' | 'v';
 
@@ -43,3 +54,24 @@ export type CreateWorkoutTemplateDto = Pick<
 	WorkoutTemplate,
 	'name' | 'description' | 'activities'
 >;
+
+export type ExerciseConfig = {
+	metric_1: string;
+	metric_2: string;
+	pse: string;
+	metric_2_type: RegisterType;
+	rest_duration: number;
+};
+
+export type Template = {
+	id: number;
+	title: string;
+	description: string;
+	exercises: Exercise[];
+	activities: Activity[];
+};
+
+export type TemplateModalState = {
+	mode: 'view' | 'edit';
+	template: Template;
+};

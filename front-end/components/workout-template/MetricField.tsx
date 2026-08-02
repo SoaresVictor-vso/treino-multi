@@ -1,39 +1,65 @@
 'use client';
 import Input from '@/components/ui/Input';
-import type {
-	Exercise,
+import {
 	Metric,
+	MetricFieldType,
 } from '@/app/(authenticated)/workout-template/types';
-import type { RegisterType } from './types';
-import { metricUnits } from '@/app/(authenticated)/workout-template/mocks';
+import type { RegisterType } from '../../app/(authenticated)/workout-template/types';
+import { secondsToTime, timeToSeconds } from '@/lib/tools';
+
 export function MetricField({
-	className,
-	label,
-	unit,
+	metric,
 	value,
 	type,
+	allowPercent,
+	limits: { min, max } = {},
 	onChange,
 	onTypeChange,
 	optional = false,
-	exercise,
 	disabled = false,
 }: {
-	label?: string;
-	unit?: string;
-	value: string;
+	value: string | number | undefined;
+	metric: Metric;
 	type?: RegisterType;
-	onChange: (value: string) => void;
-	onTypeChange?: (value: RegisterType) => void;
+	onChange: (value: string | number) => void;
+	onTypeChange: (value: 'v' | 'p') => void;
 	optional?: boolean;
-	className?: string;
-	exercise: Exercise;
 	disabled?: boolean;
+	limits?: {
+		min?: number;
+		max?: number;
+	};
+	allowPercent?: boolean;
 }) {
-	if (!label) return null;
+	const getType = (type: MetricFieldType) => {
+		switch (type) {
+			case MetricFieldType.INT:
+			case MetricFieldType.DECIMAL:
+				return 'number';
+			case MetricFieldType.TIME:
+				return 'time';
+		}
+	};
 
-	const metric_2 =
-		(exercise?.metric_2 && metricUnits[exercise?.metric_2]) || null;
-	const hasButtonMetric2 = !!onTypeChange && metric_2;
+	const label = metric.name ?? '';
+	const unit = metric.symbol;
+
+	const handleValue = (value?: string | number) => {
+		value = value ?? '';
+		if (metric.fieldType === MetricFieldType.TIME) {
+			return secondsToTime(value as number);
+		}
+		return value;
+	};
+
+	const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+		let inputValue: string | number = event.target.value;
+
+		if (metric.fieldType === MetricFieldType.TIME) {
+			inputValue = timeToSeconds(inputValue);
+		}
+		onChange(inputValue);
+	};
 
 	return (
 		<div className="block text-[11px] font-semibold leading-none text-on-surface-variant">
@@ -44,23 +70,23 @@ export function MetricField({
 				<Input
 					aria-label={`${label}${unit ? ` (${unit})` : ''}`}
 					sizeVariant="sm"
-					type="number"
-					min={label === 'PSE' ? 1 : undefined}
-					max={label === 'PSE' ? 10 : undefined}
-					value={value}
-					onChange={(event) => onChange(event.target.value)}
+					type={getType(metric?.fieldType)}
+					min={min}
+					max={max}
+					value={handleValue(value)}
+					onChange={handleChange}
 					disabled={disabled}
-					sideComponent={hasButtonMetric2 ? 'right' : 'none'}
+					sideComponent={allowPercent ? 'right' : 'none'}
 				/>
-				{hasButtonMetric2 && (
+				{allowPercent && (
 					<button
 						type="button"
 						disabled={disabled}
 						onClick={() => onTypeChange(type === 'p' ? 'v' : 'p')}
 						className="h-[30px] w-auto px-1 rounded-r-lg border border-l-0 border-outline-variant bg-surface-container-highest text-xs font-bold text-primary-fixed-dim"
-						aria-label={`Alternar unidade entre porcentagem e valor, atual ${type}`}
+						aria-label={`Alternar unidade entre porcentagem e valor, atual ${metric.symbol}`}
 					>
-						{type === 'p' ? '%' : metric_2}
+						{type === 'p' ? '%' : metric.symbol}
 					</button>
 				)}
 			</div>

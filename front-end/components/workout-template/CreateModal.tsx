@@ -1,22 +1,20 @@
 'use client';
+
 import { useState, type KeyboardEvent } from 'react';
-import { RiAddLine, RiCloseLine, RiHeartPulseLine } from 'react-icons/ri';
-import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
-import Textarea from '@/components/ui/Textarea';
-import ExercisePicker from '@/components/shared/ExercisePicker';
-import type { Template, ExerciseConfig } from './types';
-import {
-	DEFAULT_REST_DURATION,
-	getConfigsFromActivities,
-	secondsToTime,
-	timeToSeconds,
-} from './types';
+import { RiAddLine, RiHeartPulseLine } from 'react-icons/ri';
+import type { Activity } from '@/app/(authenticated)/workout-template/types';
+import { RiCloseLine } from 'react-icons/ri';
+import Input from '../ui/Input';
+import Textarea from '../ui/Textarea';
+import Button from '../ui/Button';
+import { ConfigBlock } from './ConfigBlock';
+import ExercisePicker from '../shared/ExercisePicker';
+import type { Template } from '../../app/(authenticated)/workout-template/types';
 import type {
 	CreateWorkoutTemplateDto,
 	Exercise,
 } from '@/app/(authenticated)/workout-template/types';
-import { ConfigBlock } from './ConfigBlock';
+
 export function CreateModal({
 	onClose,
 	onSave,
@@ -24,10 +22,7 @@ export function CreateModal({
 	mode = 'create',
 }: {
 	onClose: () => void;
-	onSave: (
-		workoutTemplate: CreateWorkoutTemplateDto,
-		exercises: Exercise[],
-	) => void;
+	onSave: (workoutTemplate: CreateWorkoutTemplateDto) => void;
 	template?: Template;
 	mode?: 'create' | 'view' | 'edit';
 }) {
@@ -37,44 +32,35 @@ export function CreateModal({
 	const [selected, setSelected] = useState<Exercise[]>(
 		template?.exercises ?? [],
 	);
-	const [configs, setConfigs] = useState<Record<number, ExerciseConfig[]>>(() =>
-		getConfigsFromActivities(template?.activities ?? []),
-	);
+	const [pickerOpen, setPickerOpen] = useState(false);
+	const [activities, setActivities] = useState<Record<number, Activity[]>>({});
+
 	const handleSelectedChange = (next: Exercise[]) => {
 		const selectedIds = new Set(next.map((exercise) => exercise.id));
-		setConfigs((current) =>
+		setActivities((current) =>
 			Object.fromEntries(
 				Object.entries(current).filter(([id]) => selectedIds.has(Number(id))),
 			),
 		);
 		setSelected(next);
 	};
-	const [pickerOpen, setPickerOpen] = useState(false);
-	const newConfig = (): ExerciseConfig => ({
-		metric_1: '',
-		metric_2: '',
-		pse: '',
-		metric_2_type: 'p',
-		rest_duration: DEFAULT_REST_DURATION,
-	});
 
-	const updateConfig = (
+	const updateActivity = (
 		exerciseId: number,
 		index: number,
-		key: keyof ExerciseConfig,
+		key: keyof Activity,
 		value: string | number,
 	) =>
-		setConfigs((current) => ({
+		setActivities((current) => ({
 			...current,
-			[exerciseId]: (current[exerciseId] ?? [newConfig()]).map(
-				(item, itemIndex) =>
-					itemIndex === index ? { ...item, [key]: value } : item,
+			[exerciseId]: (current[exerciseId] ?? []).map((item, itemIndex) =>
+				itemIndex === index ? { ...item, [key]: value } : item,
 			),
 		}));
 
-	const addConfig = (exerciseId: number) => {
-		setConfigs((current) => {
-			const blocks = current[exerciseId] ?? [newConfig()];
+	const addActivity = (exerciseId: number) => {
+		setActivities((current) => {
+			const blocks = current[exerciseId] ?? [];
 			return {
 				...current,
 				[exerciseId]: [...blocks, { ...blocks[blocks.length - 1] }],
@@ -82,12 +68,13 @@ export function CreateModal({
 		});
 		requestAnimationFrame(() => {
 			const input = document.querySelector<HTMLInputElement>(
-				`[data-exercise-id="${exerciseId}"] [data-block-index="${configs[exerciseId]?.length ?? 1}"] input`,
+				`[data-exercise-id="${exerciseId}"] [data-block-index="${activities[exerciseId]?.length ?? 1}"] input`,
 			);
 			input?.focus();
 			input?.select();
 		});
 	};
+
 	const moveToNextField = (event: KeyboardEvent<HTMLDivElement>) => {
 		if (event.key !== 'Enter' || event.target instanceof HTMLTextAreaElement)
 			return;
@@ -110,34 +97,18 @@ export function CreateModal({
 		inputs[currentIndex + 1]?.focus();
 		inputs[currentIndex + 1]?.select();
 	};
-	const createWorkoutTemplate = () => {
+
+	const saveTemplate = () => {
 		const toNumber = (value: string) => {
 			const numberValue = Number(value);
 			return Number.isFinite(numberValue) ? numberValue : 0;
 		};
 
-		onSave(
-			{
-				name: title.trim(),
-				description: description.trim(),
-				activities: selected.flatMap((exercise) =>
-					(configs[exercise.id] ?? [newConfig()]).map((config) => ({
-						exercise: exercise.id,
-						metric_1: toNumber(config.metric_1),
-						...(exercise.metric_2
-							? {
-									metric_2: toNumber(config.metric_2),
-									type_2: config.metric_2_type,
-								}
-							: {}),
-						type_1: 'v',
-						pse: toNumber(config.pse),
-						rest_duration: config.rest_duration,
-					})),
-				),
-			},
-			selected,
-		);
+		onSave({
+			name: title.trim(),
+			description: description.trim(),
+			activities: Object.values(activities).flat(),
+		});
 	};
 	return (
 		<div
@@ -218,15 +189,15 @@ export function CreateModal({
 									<span className="font-semibold">{item.name}</span>
 								</div>
 								<div className="mt-3 space-y-3">
-									{(configs[item.id] ?? [newConfig()]).map((config, configIndex) => (
+									{(activities[item.id] ?? []).map((activity, configIndex) => (
 										<ConfigBlock
 											key={`${item.id}-${configIndex}`}
 											exercise={item}
+											activity={activity}
 											index={configIndex}
-											config={config}
 											disabled={isViewMode}
 											onChange={(key, value) =>
-												updateConfig(item.id, configIndex, key, value)
+												updateActivity(item.id, configIndex, key, value)
 											}
 										/>
 									))}
@@ -236,7 +207,7 @@ export function CreateModal({
 										<button
 											type="button"
 											data-add-block
-											onClick={() => addConfig(item.id)}
+											onClick={() => addActivity(item.id)}
 											className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-primary-fixed-dim hover:text-primary"
 										>
 											<RiAddLine /> Adicionar outro bloco
@@ -257,7 +228,7 @@ export function CreateModal({
 						{isViewMode ? 'Fechar' : 'Cancelar'}
 					</Button>
 					{!isViewMode && (
-						<Button disabled={!title.trim()} onClick={createWorkoutTemplate}>
+						<Button disabled={!title.trim()} onClick={saveTemplate}>
 							{mode === 'edit' ? 'Salvar alterações' : 'Criar template'}
 						</Button>
 					)}
