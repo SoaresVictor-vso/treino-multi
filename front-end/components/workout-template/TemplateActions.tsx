@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { RiArrowRightSLine } from 'react-icons/ri';
-import type { Template } from './types';
+import type { Template } from '@/api/services/workout-templates';
 
 type TemplateActionsProps = {
 	template: Template;

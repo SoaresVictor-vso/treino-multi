@@ -1,4 +1,4 @@
-import type { Exercise } from './types';
+import type { Exercise } from '@/api/services/workout-templates';
 
 export const exercises: Exercise[] = [
 	{

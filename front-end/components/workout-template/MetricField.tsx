@@ -1,10 +1,7 @@
 'use client';
 import Input from '@/components/ui/Input';
-import {
-	Metric,
-	MetricFieldType,
-} from '@/app/(authenticated)/workout-template/types';
-import type { RegisterType } from '../../app/(authenticated)/workout-template/types';
+import { Metric, MetricFieldType } from '@/api/services/workout-templates';
+import type { RegisterType } from '@/api/services/workout-templates';
 import { secondsToTime, timeToSeconds } from '@/lib/tools';
 
 export function MetricField({

@@ -9,8 +9,12 @@ import TemplateStats from '@/components/workout-template/TemplateStats';
 import TemplatesTable from '@/components/workout-template/TemplatesTable';
 import { CreateModal } from '@/components/workout-template/CreateModal';
 import { exercises as seedExercises } from './mocks';
-import type { Template, TemplateModalState } from './types';
-import type { CreateWorkoutTemplateDto, Exercise } from './types';
+import type {
+	CreateWorkoutTemplateDto,
+	Exercise,
+	Template,
+	TemplateModalState,
+} from '@/api/services/workout-templates';
 
 const initialTemplates: Template[] = [
 	{

@@ -2,18 +2,18 @@
 
 import { useState, type KeyboardEvent } from 'react';
 import { RiAddLine, RiHeartPulseLine } from 'react-icons/ri';
-import type { Activity } from '@/app/(authenticated)/workout-template/types';
+import type { Activity } from '@/api/services/workout-templates';
 import { RiCloseLine } from 'react-icons/ri';
 import Input from '../ui/Input';
 import Textarea from '../ui/Textarea';
 import Button from '../ui/Button';
 import { ConfigBlock } from './ConfigBlock';
 import ExercisePicker from '../shared/ExercisePicker';
-import type { Template } from '../../app/(authenticated)/workout-template/types';
+import type { Template } from '@/api/services/workout-templates';
 import type {
 	CreateWorkoutTemplateDto,
 	Exercise,
-} from '@/app/(authenticated)/workout-template/types';
+} from '@/api/services/workout-templates';
 
 export function CreateModal({
 	onClose,

@@ -8,10 +8,7 @@ import {
 	type Metrics,
 } from '@/api/services/parametro';
 import Button from '@/components/ui/Button';
-import type {
-	Exercise,
-	Metric,
-} from '@/app/(authenticated)/workout-template/types';
+import type { Exercise, Metric } from '@/api/services/workout-templates';
 
 const metricByName: Record<string, Metric> = {
 	repeticoes: 'repetition',

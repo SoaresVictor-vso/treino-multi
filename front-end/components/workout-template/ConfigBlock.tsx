@@ -5,7 +5,7 @@ import {
 	type Activity,
 	type Exercise,
 	type Metric,
-} from '@/app/(authenticated)/workout-template/types';
+} from '@/api/services/workout-templates';
 
 import { MetricField } from './MetricField';
 import { RestDurationField } from './RestDurationField';

@@ -1,5 +1,5 @@
 import { RiHeartPulseLine } from 'react-icons/ri';
-import type { Template } from './types';
+import type { Template } from '@/api/services/workout-templates';
 
 export default function TemplatePreview({ template }: { template: Template }) {
 	return (
