@@ -18,27 +18,42 @@ import { Activity } from '../workout-templates/entities/activity.entity';
 import { DatabaseSyncService } from './database-sync.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get<string>('database.host'),
-        port: config.get<number>('database.port'),
-        username: config.get<string>('database.user'),
-        password: config.get<string>('database.password'),
-        database: config.get<string>('database.name'),
-        entities: [Person, Tenant, User, UserRole, RefreshToken, AuditLog, AuthenticationLog, CriticalOperationLog, PasswordChangeLog, LogContextType, Metric, Exercise, WorkoutTemplate, Activity],
-        migrations: [__dirname + '/migrations/*{.ts,.js}'],
-        migrationsRun: true,
-        synchronize: false,
-        logging: config.get<string>('nodeEnv') === 'development',
-      }),
-    }),
-    TypeOrmModule.forFeature([UserRole, CriticalOperationLog]),
-  ],
-  providers: [DatabaseSyncService],
-  exports: [DatabaseSyncService],
+	imports: [
+		TypeOrmModule.forRootAsync({
+			imports: [ConfigModule],
+			inject: [ConfigService],
+			useFactory: (config: ConfigService) => ({
+				type: 'postgres',
+				host: config.get<string>('database.host'),
+				port: config.get<number>('database.port'),
+				username: config.get<string>('database.user'),
+				password: config.get<string>('database.password'),
+				database: config.get<string>('database.name'),
+				entities: [
+					Person,
+					Tenant,
+					User,
+					UserRole,
+					RefreshToken,
+					AuditLog,
+					AuthenticationLog,
+					CriticalOperationLog,
+					PasswordChangeLog,
+					LogContextType,
+					Metric,
+					Exercise,
+					WorkoutTemplate,
+					Activity,
+				],
+				migrations: [__dirname + '/migrations/*{.ts,.js}'],
+				migrationsRun: true,
+				synchronize: false,
+				logging: config.get<string>('nodeEnv') === 'development',
+			}),
+		}),
+		TypeOrmModule.forFeature([UserRole, CriticalOperationLog]),
+	],
+	providers: [DatabaseSyncService],
+	exports: [DatabaseSyncService],
 })
 export class DatabaseModule {}

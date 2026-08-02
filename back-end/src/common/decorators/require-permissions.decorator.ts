@@ -16,7 +16,7 @@ export const SOME_PERMISSIONS_KEY = 'some-permissions';
  *   createTenant() { ... }
  */
 export const RequirePermissions = (...permissions: Permission[]) =>
-  SetMetadata(PERMISSIONS_KEY, permissions);
+	SetMetadata(PERMISSIONS_KEY, permissions);
 
 /**
  * Restringe o acesso a usuários que possuam todas as permissões de pelo menos
@@ -29,4 +29,4 @@ export const RequirePermissions = (...permissions: Permission[]) =>
  *   )
  */
 export const RequireSomePermissions = (...permissions: Permission[][]) =>
-  SetMetadata(SOME_PERMISSIONS_KEY, permissions);
+	SetMetadata(SOME_PERMISSIONS_KEY, permissions);

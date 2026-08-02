@@ -8,16 +8,16 @@ import { AuditLogService } from './audit-logs.service';
 import { AuditLogsController } from './audit-logs.controller';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([
-      AuthenticationLog,
-      CriticalOperationLog,
-      PasswordChangeLog,
-      LogContextType,
-    ]),
-  ],
-  controllers: [AuditLogsController],
-  providers: [AuditLogService],
-  exports: [AuditLogService],
+	imports: [
+		TypeOrmModule.forFeature([
+			AuthenticationLog,
+			CriticalOperationLog,
+			PasswordChangeLog,
+			LogContextType,
+		]),
+	],
+	controllers: [AuditLogsController],
+	providers: [AuditLogService],
+	exports: [AuditLogService],
 })
 export class AuditLogsModule {}

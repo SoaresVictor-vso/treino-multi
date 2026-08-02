@@ -1,40 +1,40 @@
 import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
+	Column,
+	CreateDateColumn,
+	Entity,
+	JoinColumn,
+	ManyToOne,
+	PrimaryGeneratedColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('refresh_tokens')
 export class RefreshToken {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+	@PrimaryGeneratedColumn('uuid')
+	id: string;
 
-  @Column({ name: 'user_id', type: 'uuid' })
-  userId: string;
+	@Column({ name: 'user_id', type: 'uuid' })
+	userId: string;
 
-  @Column({ name: 'token_hash', type: 'varchar' })
-  tokenHash: string;
+	@Column({ name: 'token_hash', type: 'varchar' })
+	tokenHash: string;
 
-  @Column({ name: 'expires_at', type: 'timestamptz' })
-  expiresAt: Date;
+	@Column({ name: 'expires_at', type: 'timestamptz' })
+	expiresAt: Date;
 
-  @Column({ name: 'revoked_at', type: 'timestamptz', nullable: true })
-  revokedAt: Date | null;
+	@Column({ name: 'revoked_at', type: 'timestamptz', nullable: true })
+	revokedAt: Date | null;
 
-  @Column({ name: 'ip_address', type: 'varchar', nullable: true })
-  ipAddress: string | null;
+	@Column({ name: 'ip_address', type: 'varchar', nullable: true })
+	ipAddress: string | null;
 
-  @Column({ name: 'user_agent', type: 'varchar', nullable: true })
-  userAgent: string | null;
+	@Column({ name: 'user_agent', type: 'varchar', nullable: true })
+	userAgent: string | null;
 
-  @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+	@CreateDateColumn({ name: 'created_at' })
+	createdAt: Date;
 
-  @ManyToOne(() => User, (user) => user.refreshTokens, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
-  user: User;
+	@ManyToOne(() => User, (user) => user.refreshTokens, { onDelete: 'CASCADE' })
+	@JoinColumn({ name: 'user_id' })
+	user: User;
 }

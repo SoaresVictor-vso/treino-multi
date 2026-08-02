@@ -1,8 +1,8 @@
 import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
+	CanActivate,
+	ExecutionContext,
+	ForbiddenException,
+	Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
@@ -27,35 +27,35 @@ import { ROLES_KEY } from '../decorators/roles.decorator';
  */
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+	constructor(private readonly reflector: Reflector) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    // Lê as roles exigidas do handler ou do controller (herança de metadados)
-    const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+	canActivate(context: ExecutionContext): boolean {
+		// Lê as roles exigidas do handler ou do controller (herança de metadados)
+		const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
+			context.getHandler(),
+			context.getClass(),
+		]);
 
-    // Sem restrição de role → acesso liberado
-    if (!requiredRoles || requiredRoles.length === 0) {
-      return true;
-    }
+		// Sem restrição de role → acesso liberado
+		if (!requiredRoles || requiredRoles.length === 0) {
+			return true;
+		}
 
-    const { user } = context.switchToHttp().getRequest<{ user: JwtPayload }>();
+		const { user } = context.switchToHttp().getRequest<{ user: JwtPayload }>();
 
-    // JwtAuthGuard deve garantir que user existe; defensivamente checamos aqui
-    if (!user || !Array.isArray(user.roles)) {
-      throw new ForbiddenException('Acesso negado: usuário não autenticado');
-    }
+		// JwtAuthGuard deve garantir que user existe; defensivamente checamos aqui
+		if (!user || !Array.isArray(user.roles)) {
+			throw new ForbiddenException('Acesso negado: usuário não autenticado');
+		}
 
-    const hasRole = requiredRoles.some((role) => user.roles.includes(role));
+		const hasRole = requiredRoles.some((role) => user.roles.includes(role));
 
-    if (!hasRole) {
-      throw new ForbiddenException(
-        `Acesso negado: role(s) exigida(s): [${requiredRoles.join(', ')}]`,
-      );
-    }
+		if (!hasRole) {
+			throw new ForbiddenException(
+				`Acesso negado: role(s) exigida(s): [${requiredRoles.join(', ')}]`,
+			);
+		}
 
-    return true;
-  }
+		return true;
+	}
 }

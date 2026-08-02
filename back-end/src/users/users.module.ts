@@ -9,12 +9,12 @@ import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { Person } from '../persons/entities/person.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([User, UserRole, RefreshToken, Person]),
-    AuditLogsModule,
-  ],
-  controllers: [UsersController],
-  providers: [UsersService],
-  exports: [UsersService],
+	imports: [
+		TypeOrmModule.forFeature([User, UserRole, RefreshToken, Person]),
+		AuditLogsModule,
+	],
+	controllers: [UsersController],
+	providers: [UsersService],
+	exports: [UsersService],
 })
 export class UsersModule {}

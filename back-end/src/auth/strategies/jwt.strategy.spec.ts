@@ -24,95 +24,97 @@ import { Role } from '../../common/enums/role.enum';
  * Payload válido de referência reutilizado em múltiplos testes.
  */
 const VALID_PAYLOAD: JwtPayload = {
-  sub: 'user-uuid-1',
-  personId: 'person-uuid-1',
-  context: 'organization',
-  tenantId: null,
-  roles: [Role.ORG_ADMIN],
-  impersonatedBy: null,
+	sub: 'user-uuid-1',
+	personId: 'person-uuid-1',
+	context: 'organization',
+	tenantId: null,
+	roles: [Role.ORG_ADMIN],
+	impersonatedBy: null,
 };
 
 describe('JwtStrategy', () => {
-  let strategy: JwtStrategy;
+	let strategy: JwtStrategy;
 
-  beforeEach(async () => {
-    const moduleRef = await Test.createTestingModule({
-      providers: [
-        JwtStrategy,
-        {
-          provide: ConfigService,
-          /**
-           * Mockamos a ConfigService para fornecer um segredo fixo.
-           * O segredo real virá de variáveis de ambiente em produção;
-           * aqui queremos apenas instanciar a estratégia sem erros.
-           */
-          useValue: {
-            get: jest.fn((key: string) => {
-              if (key === 'JWT_SECRET') return 'test-secret';
-              return undefined;
-            }),
-          },
-        },
-      ],
-    }).compile();
+	beforeEach(async () => {
+		const moduleRef = await Test.createTestingModule({
+			providers: [
+				JwtStrategy,
+				{
+					provide: ConfigService,
+					/**
+					 * Mockamos a ConfigService para fornecer um segredo fixo.
+					 * O segredo real virá de variáveis de ambiente em produção;
+					 * aqui queremos apenas instanciar a estratégia sem erros.
+					 */
+					useValue: {
+						get: jest.fn((key: string) => {
+							if (key === 'JWT_SECRET') return 'test-secret';
+							return undefined;
+						}),
+					},
+				},
+			],
+		}).compile();
 
-    strategy = moduleRef.get(JwtStrategy);
-  });
+		strategy = moduleRef.get(JwtStrategy);
+	});
 
-  describe('validate()', () => {
-    /**
-     * Cenário feliz: o payload contém 'sub' e todos os campos exigidos.
-     * validate() deve devolver o payload intocado para que fique em request.user.
-     * Isso permite que guards e decorators acessem os dados sem DB lookup adicional.
-     */
-    it('deve retornar o payload quando o claim sub está presente', () => {
-      const result = strategy.validate(VALID_PAYLOAD);
+	describe('validate()', () => {
+		/**
+		 * Cenário feliz: o payload contém 'sub' e todos os campos exigidos.
+		 * validate() deve devolver o payload intocado para que fique em request.user.
+		 * Isso permite que guards e decorators acessem os dados sem DB lookup adicional.
+		 */
+		it('deve retornar o payload quando o claim sub está presente', () => {
+			const result = strategy.validate(VALID_PAYLOAD);
 
-      expect(result).toEqual(VALID_PAYLOAD);
-    });
+			expect(result).toEqual(VALID_PAYLOAD);
+		});
 
-    /**
-     * Payload de impersonation: impersonatedBy preenchido.
-     * O AuthController usará esse campo para identificar ações de suporte
-     * e registrá-las corretamente no audit log.
-     */
-    it('deve retornar o payload de impersonation com impersonatedBy preenchido', () => {
-      const impersonationPayload: JwtPayload = {
-        ...VALID_PAYLOAD,
-        sub: 'tenant-admin-uuid',
-        context: 'tenant',
-        tenantId: 'tenant-uuid-1',
-        roles: [Role.TENANT_ADMIN],
-        impersonatedBy: 'org-support-uuid',
-      };
+		/**
+		 * Payload de impersonation: impersonatedBy preenchido.
+		 * O AuthController usará esse campo para identificar ações de suporte
+		 * e registrá-las corretamente no audit log.
+		 */
+		it('deve retornar o payload de impersonation com impersonatedBy preenchido', () => {
+			const impersonationPayload: JwtPayload = {
+				...VALID_PAYLOAD,
+				sub: 'tenant-admin-uuid',
+				context: 'tenant',
+				tenantId: 'tenant-uuid-1',
+				roles: [Role.TENANT_ADMIN],
+				impersonatedBy: 'org-support-uuid',
+			};
 
-      const result = strategy.validate(impersonationPayload);
+			const result = strategy.validate(impersonationPayload);
 
-      expect(result.impersonatedBy).toBe('org-support-uuid');
-      expect(result.context).toBe('tenant');
-    });
+			expect(result.impersonatedBy).toBe('org-support-uuid');
+			expect(result.context).toBe('tenant');
+		});
 
-    /**
-     * Payload sem 'sub' é inválido — pode ocorrer em tokens malformados
-     * ou forjados sem o campo obrigatório.
-     * Deve lançar UnauthorizedException imediatamente.
-     */
-    it('deve lançar UnauthorizedException quando sub está ausente', () => {
-      const invalidPayload = { ...VALID_PAYLOAD, sub: '' };
+		/**
+		 * Payload sem 'sub' é inválido — pode ocorrer em tokens malformados
+		 * ou forjados sem o campo obrigatório.
+		 * Deve lançar UnauthorizedException imediatamente.
+		 */
+		it('deve lançar UnauthorizedException quando sub está ausente', () => {
+			const invalidPayload = { ...VALID_PAYLOAD, sub: '' };
 
-      expect(() => strategy.validate(invalidPayload)).toThrow(UnauthorizedException);
-    });
+			expect(() => strategy.validate(invalidPayload)).toThrow(
+				UnauthorizedException,
+			);
+		});
 
-    /**
-     * sub = undefined (campo ausente no objeto) também deve ser rejeitado.
-     */
-    it('deve lançar UnauthorizedException quando sub é undefined', () => {
-      const invalidPayload = { ...VALID_PAYLOAD } as Partial<JwtPayload>;
-      delete invalidPayload.sub;
+		/**
+		 * sub = undefined (campo ausente no objeto) também deve ser rejeitado.
+		 */
+		it('deve lançar UnauthorizedException quando sub é undefined', () => {
+			const invalidPayload = { ...VALID_PAYLOAD } as Partial<JwtPayload>;
+			delete invalidPayload.sub;
 
-      expect(() => strategy.validate(invalidPayload as JwtPayload)).toThrow(
-        UnauthorizedException,
-      );
-    });
-  });
+			expect(() => strategy.validate(invalidPayload as JwtPayload)).toThrow(
+				UnauthorizedException,
+			);
+		});
+	});
 });

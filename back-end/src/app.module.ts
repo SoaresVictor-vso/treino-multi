@@ -2,9 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import configuration, {
-  configValidationSchema,
-} from './config/configuration';
+import configuration, { configValidationSchema } from './config/configuration';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { PersonsModule } from './persons/persons.module';
@@ -17,25 +15,25 @@ import { ExercisesModule } from './exercises/exercises.module';
 import { WorkoutTemplatesModule } from './workout-templates/workout-templates.module';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      load: [configuration],
-      validationSchema: configValidationSchema,
-      validationOptions: { allowUnknown: true, abortEarly: true },
-    }),
-    DatabaseModule,
-    AuthModule,
-    PersonsModule,
-    TenantsModule,
-    UsersModule,
-    RolesModule,
-    AuditLogsModule,
-    MetricsModule,
-    ExercisesModule,
-    WorkoutTemplatesModule,
-  ],
-  controllers: [AppController],
-  providers: [AppService],
+	imports: [
+		ConfigModule.forRoot({
+			isGlobal: true,
+			load: [configuration],
+			validationSchema: configValidationSchema,
+			validationOptions: { allowUnknown: true, abortEarly: true },
+		}),
+		DatabaseModule,
+		AuthModule,
+		PersonsModule,
+		TenantsModule,
+		UsersModule,
+		RolesModule,
+		AuditLogsModule,
+		MetricsModule,
+		ExercisesModule,
+		WorkoutTemplatesModule,
+	],
+	controllers: [AppController],
+	providers: [AppService],
 })
 export class AppModule {}

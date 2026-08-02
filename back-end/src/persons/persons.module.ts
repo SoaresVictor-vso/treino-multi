@@ -6,9 +6,9 @@ import { PersonsController } from './persons.controller';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Person]), AuditLogsModule],
-  controllers: [PersonsController],
-  providers: [PersonsService],
-  exports: [PersonsService],
+	imports: [TypeOrmModule.forFeature([Person]), AuditLogsModule],
+	controllers: [PersonsController],
+	providers: [PersonsService],
+	exports: [PersonsService],
 })
 export class PersonsModule {}

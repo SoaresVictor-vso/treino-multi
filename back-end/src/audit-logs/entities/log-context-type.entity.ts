@@ -14,9 +14,9 @@ export type LogContextTypeName = 'organization' | 'tenant' | 'standalone';
  */
 @Entity('log_context_types')
 export class LogContextType {
-  @PrimaryColumn({ type: 'smallint' })
-  id: number;
+	@PrimaryColumn({ type: 'smallint' })
+	id: number;
 
-  @Column({ type: 'varchar', unique: true })
-  name: LogContextTypeName;
+	@Column({ type: 'varchar', unique: true })
+	name: LogContextTypeName;
 }

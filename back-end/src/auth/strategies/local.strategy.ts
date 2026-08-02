@@ -9,19 +9,19 @@ import { AuthService } from '../auth.service';
  */
 @Injectable()
 export class LocalStrategy extends PassportStrategy(Strategy) {
-  constructor(private readonly authService: AuthService) {
-    super({ usernameField: 'login' });
-  }
+	constructor(private readonly authService: AuthService) {
+		super({ usernameField: 'login' });
+	}
 
-  /**
-   * Chamado pelo LocalAuthGuard antes de chegar ao endpoint.
-   * Lança UnauthorizedException se as credenciais forem inválidas ou o usuário inativo.
-   */
-  async validate(login: string, password: string) {
-    const user = await this.authService.validateUser(login, password);
-    if (!user) {
-      throw new UnauthorizedException('Credenciais inválidas');
-    }
-    return user;
-  }
+	/**
+	 * Chamado pelo LocalAuthGuard antes de chegar ao endpoint.
+	 * Lança UnauthorizedException se as credenciais forem inválidas ou o usuário inativo.
+	 */
+	async validate(login: string, password: string) {
+		const user = await this.authService.validateUser(login, password);
+		if (!user) {
+			throw new UnauthorizedException('Credenciais inválidas');
+		}
+		return user;
+	}
 }

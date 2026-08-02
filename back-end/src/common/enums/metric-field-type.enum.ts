@@ -1,5 +1,5 @@
 export enum MetricFieldType {
-  INT = 'int',
-  DECIMAL = 'decimal',
-  TIME = 'time',
+	INT = 'int',
+	DECIMAL = 'decimal',
+	TIME = 'time',
 }

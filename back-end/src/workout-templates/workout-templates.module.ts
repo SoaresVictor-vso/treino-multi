@@ -7,9 +7,9 @@ import { WorkoutTemplatesController } from './workout-templates.controller';
 import { WorkoutTemplatesService } from './workout-templates.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([WorkoutTemplate, Activity, Exercise])],
-  controllers: [WorkoutTemplatesController],
-  providers: [WorkoutTemplatesService],
-  exports: [WorkoutTemplatesService],
+	imports: [TypeOrmModule.forFeature([WorkoutTemplate, Activity, Exercise])],
+	controllers: [WorkoutTemplatesController],
+	providers: [WorkoutTemplatesService],
+	exports: [WorkoutTemplatesService],
 })
 export class WorkoutTemplatesModule {}

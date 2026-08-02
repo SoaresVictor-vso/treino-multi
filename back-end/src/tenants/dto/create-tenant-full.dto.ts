@@ -5,15 +5,15 @@ import { CreateTenantAdminDto } from './create-tenant-admin.dto';
 import { CreateTenantDto } from './create-tenant.dto';
 
 export class CreateTenantFullDto {
-  @ApiProperty({ type: () => CreateTenantAdminDto })
-  @IsDefined()
-  @ValidateNested()
-  @Type(() => CreateTenantAdminDto)
-  admin!: CreateTenantAdminDto;
+	@ApiProperty({ type: () => CreateTenantAdminDto })
+	@IsDefined()
+	@ValidateNested()
+	@Type(() => CreateTenantAdminDto)
+	admin!: CreateTenantAdminDto;
 
-  @ApiProperty({ type: () => CreateTenantDto })
-  @IsDefined()
-  @ValidateNested()
-  @Type(() => CreateTenantDto)
-  tenant!: CreateTenantDto;
+	@ApiProperty({ type: () => CreateTenantDto })
+	@IsDefined()
+	@ValidateNested()
+	@Type(() => CreateTenantDto)
+	tenant!: CreateTenantDto;
 }

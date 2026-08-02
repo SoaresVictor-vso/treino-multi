@@ -1,5 +1,11 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+	ApiBearerAuth,
+	ApiOperation,
+	ApiQuery,
+	ApiResponse,
+	ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
@@ -12,24 +18,33 @@ import { ExercisesService } from './exercises.service';
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('exercises')
 export class ExercisesController {
-  constructor(private readonly exercisesService: ExercisesService) {}
+	constructor(private readonly exercisesService: ExercisesService) {}
 
-  @ApiOperation({ summary: 'Lista todos os exercícios ativos' })
-  @ApiResponse({ status: 200, description: 'Lista de exercícios não removidos' })
-  @RequirePermissions(Permission.EXERCISES_READ)
-  @Get()
-  findAll() {
-    return this.exercisesService.findAll();
-  }
+	@ApiOperation({ summary: 'Lista todos os exercícios ativos' })
+	@ApiResponse({ status: 200, description: 'Lista de exercícios não removidos' })
+	@RequirePermissions(Permission.EXERCISES_READ)
+	@Get()
+	findAll() {
+		return this.exercisesService.findAll();
+	}
 
-  @ApiOperation({ summary: 'Lista alterações de exercícios desde uma data' })
-  @ApiQuery({ name: 'since', type: String, format: 'date-time', required: false, nullable: true })
-  @RequirePermissions(Permission.EXERCISES_READ)
-  @Get('sync')
-  findChanges(@Query() { since }: FindExerciseChangesDto) {
-    const normalizedSince = typeof since === 'string' && (since === 'null' || since.trim() === '')
-      ? null
-      : since;
-    return this.exercisesService.findChangesSince(normalizedSince ? new Date(normalizedSince) : null);
-  }
+	@ApiOperation({ summary: 'Lista alterações de exercícios desde uma data' })
+	@ApiQuery({
+		name: 'since',
+		type: String,
+		format: 'date-time',
+		required: false,
+		nullable: true,
+	})
+	@RequirePermissions(Permission.EXERCISES_READ)
+	@Get('sync')
+	findChanges(@Query() { since }: FindExerciseChangesDto) {
+		const normalizedSince =
+			typeof since === 'string' && (since === 'null' || since.trim() === '')
+				? null
+				: since;
+		return this.exercisesService.findChangesSince(
+			normalizedSince ? new Date(normalizedSince) : null,
+		);
+	}
 }

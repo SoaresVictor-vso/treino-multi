@@ -1,18 +1,20 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-export default function usePersistedState<T>(key: string, initialValue: T):
-    [T, React.Dispatch<React.SetStateAction<T>>] {
-    const [state, setState] = useState(() => {
-        if (typeof window === "undefined") return initialValue;
-        const stickyValue = localStorage.getItem(key);
-        return stickyValue !== null ? JSON.parse(stickyValue) : initialValue;
-    });
+export default function usePersistedState<T>(
+	key: string,
+	initialValue: T,
+): [T, React.Dispatch<React.SetStateAction<T>>] {
+	const [state, setState] = useState(() => {
+		if (typeof window === 'undefined') return initialValue;
+		const stickyValue = localStorage.getItem(key);
+		return stickyValue !== null ? JSON.parse(stickyValue) : initialValue;
+	});
 
-    useEffect(() => {
-        localStorage.setItem(key, JSON.stringify(state));
-    }, [key, state]);
+	useEffect(() => {
+		localStorage.setItem(key, JSON.stringify(state));
+	}, [key, state]);
 
-    return [state, setState];
+	return [state, setState];
 }

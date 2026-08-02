@@ -9,12 +9,12 @@ import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Tenant, Person, User, UserRole]),
-    AuditLogsModule,
-  ],
-  controllers: [TenantsController],
-  providers: [TenantsService],
-  exports: [TenantsService],
+	imports: [
+		TypeOrmModule.forFeature([Tenant, Person, User, UserRole]),
+		AuditLogsModule,
+	],
+	controllers: [TenantsController],
+	providers: [TenantsService],
+	exports: [TenantsService],
 })
 export class TenantsModule {}

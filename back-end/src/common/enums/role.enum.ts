@@ -1,16 +1,16 @@
 export enum Role {
-  // Contexto: organização principal
-  ORG_ADMIN = 'org:admin',
-  ORG_SUPPORT = 'org:support',
+	// Contexto: organização principal
+	ORG_ADMIN = 'org:admin',
+	ORG_SUPPORT = 'org:support',
 
-  // Contexto: tenant (empresa cliente)
-  TENANT_ADMIN = 'tenant:admin',
+	// Contexto: tenant (empresa cliente)
+	TENANT_ADMIN = 'tenant:admin',
 
-  // STANDALONE_USER = 'standalone:user',
+	// STANDALONE_USER = 'standalone:user',
 
-  TENANT_CLIENT = 'tenant:client',
+	TENANT_CLIENT = 'tenant:client',
 
-  TENANT_TRAINER = 'tenant:trainer',
+	TENANT_TRAINER = 'tenant:trainer',
 
-  TENANT_TRAINER_MASTER = 'tenant:trainer-master',
+	TENANT_TRAINER_MASTER = 'tenant:trainer-master',
 }

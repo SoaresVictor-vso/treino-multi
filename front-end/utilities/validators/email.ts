@@ -1,5 +1,5 @@
-import { EMAIL_REGEX } from "@/lib/constants";
+import { EMAIL_REGEX } from '@/lib/constants';
 
 export default function validateEmail(email: string): boolean {
-    return EMAIL_REGEX.test(email);
+	return EMAIL_REGEX.test(email);
 }
