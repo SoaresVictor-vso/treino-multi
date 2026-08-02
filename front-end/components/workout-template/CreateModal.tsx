@@ -12,6 +12,19 @@ import ExercisePicker from '../shared/ExercisePicker';
 import type { Template } from '@/api/services/workout-templates';
 import type { CreateWorkoutTemplateDto } from '@/api/services/workout-templates';
 import type { Exercise } from '@/api/services/parametro';
+import TenantSelect from '../shared/TenantSelect';
+import { getSessionUser } from '@/lib/auth';
+
+const initialActivity: Activity = {
+	exerciseId: 0,
+	metric1: 0,
+	metric2: 0,
+	type1: 'v',
+	type2: 'v',
+	pse: 0,
+	restDuration: 0,
+	note: '',
+};
 
 export function CreateModal({
 	onClose,
@@ -25,7 +38,11 @@ export function CreateModal({
 	mode?: 'create' | 'view' | 'edit';
 }) {
 	const isViewMode = mode === 'view';
-	const [title, setTitle] = useState(template?.title ?? '');
+	const sessionTenantId = getSessionUser()?.tenantId ?? null;
+	const [tenantId, setTenantId] = useState(
+		template?.tenantId ?? sessionTenantId ?? '',
+	);
+	const [title, setTitle] = useState(template?.name ?? '');
 	const [description, setDescription] = useState(template?.description ?? '');
 	const [selected, setSelected] = useState<Exercise[]>(
 		template?.exercises ?? [],
@@ -35,7 +52,7 @@ export function CreateModal({
 		template
 			? (Object.fromEntries(
 					Object.entries(
-						Object.groupBy(template.activities, (activity) => activity.exercise),
+						Object.groupBy(template.activities, (activity) => activity.exerciseId),
 					),
 				) as Record<number, Activity[]>)
 			: {},
@@ -43,11 +60,18 @@ export function CreateModal({
 
 	const handleSelectedChange = (next: Exercise[]) => {
 		const selectedIds = new Set(next.map((exercise) => exercise.id));
-		setActivities((current) =>
-			Object.fromEntries(
+		setActivities((current) => {
+			const filtered = Object.fromEntries(
 				Object.entries(current).filter(([id]) => selectedIds.has(Number(id))),
-			),
-		);
+			);
+			const updated = { ...filtered };
+			next.forEach((exercise) => {
+				if (!updated[exercise.id]) {
+					updated[exercise.id] = [{ ...initialActivity, exerciseId: exercise.id }];
+				}
+			});
+			return updated;
+		});
 		setSelected(next);
 	};
 
@@ -69,7 +93,7 @@ export function CreateModal({
 			const blocks = current[exerciseId] ?? [];
 			return {
 				...current,
-				[exerciseId]: [...blocks, { ...blocks[blocks.length - 1] }],
+				[exerciseId]: [...blocks, { ...initialActivity, exerciseId }],
 			};
 		});
 		requestAnimationFrame(() => {
@@ -105,12 +129,13 @@ export function CreateModal({
 	};
 
 	const saveTemplate = () => {
-		const toNumber = (value: string) => {
-			const numberValue = Number(value);
-			return Number.isFinite(numberValue) ? numberValue : 0;
-		};
+		const hasExerciseWithoutActivity = selected.some(
+			(exercise) => !activities[exercise.id]?.length,
+		);
+		if (hasExerciseWithoutActivity || !tenantId) return;
 
 		onSave({
+			tenantId,
 			name: title.trim(),
 			description: description.trim(),
 			activities: Object.values(activities).flat(),
@@ -148,6 +173,15 @@ export function CreateModal({
 					</button>
 				</div>
 				<fieldset disabled={isViewMode} className="space-y-4 disabled:opacity-75">
+					{!sessionTenantId && (
+						<TenantSelect
+							label="Tenant"
+							value={tenantId}
+							onChange={(event) => setTenantId(event.target.value)}
+							placeholder="Selecione o tenant"
+							required
+						/>
+					)}
 					<Input
 						label="Nome"
 						value={title}
@@ -234,7 +268,14 @@ export function CreateModal({
 						{isViewMode ? 'Fechar' : 'Cancelar'}
 					</Button>
 					{!isViewMode && (
-						<Button disabled={!title.trim()} onClick={saveTemplate}>
+						<Button
+							disabled={
+								!title.trim() ||
+								!tenantId ||
+								selected.some((exercise) => !activities[exercise.id]?.length)
+							}
+							onClick={saveTemplate}
+						>
 							{mode === 'edit' ? 'Salvar alterações' : 'Criar template'}
 						</Button>
 					)}

@@ -17,76 +17,75 @@ import * as workoutTemplatesService from '@/api/services/workout-templates';
 
 const toTemplate = (
 	item: workoutTemplatesService.WorkoutTemplateResponse,
-): Template => {
-	const exercises = item.activities.reduce<Template['exercises']>(
-		(result, activity) => {
-			if (
-				activity.exercise &&
-				!result.some((exercise) => exercise.id === activity.exercise?.id)
-			) {
-				result.push(activity.exercise);
-			}
-			return result;
-		},
-		[],
-	);
-	return {
-		id: Number(item.id),
-		title: item.name,
-		description: item.description,
-		exercises,
-		activities: item.activities.map(
-			({
-				exerciseId,
-				metric1,
-				metric2,
-				type1,
-				type2,
-				pse,
-				restDuration,
-				note,
-			}) => ({
-				exercise: exerciseId,
-				metric_1: metric1 ?? undefined,
-				metric_2: metric2 ?? undefined,
-				type_1: type1 === 'v' ? 'v' : 'v',
-				type_2: type2,
-				pse,
-				rest_duration: restDuration ?? undefined,
-				note: note ?? undefined,
-			}),
-		),
-	};
-};
+): Template => ({
+	id: item.id,
+	tenantId: item.tenantId,
+	name: item.name,
+	description: item.description,
+	exercises: Array.from(
+			new Map(
+				item.activities
+					.filter((activity) => activity.exercise)
+					.map((activity) => [activity.exercise!.id, activity.exercise!]),
+			).values(),
+		).map((exercise) => ({
+			id: exercise.id,
+			name: exercise.name,
+			description: exercise.description,
+			metric_1: exercise.metric_1,
+			metric_2: exercise.metric_2,
+		})),
+	activities: item.activities.map((activity) => ({
+		exerciseId: activity.exerciseId,
+		metric1: activity.metric1 ?? undefined,
+		metric2: activity.metric2 ?? undefined,
+		type1: 'v',
+		type2: activity.type2,
+		pse: activity.pse,
+		restDuration: activity.restDuration ?? undefined,
+		note: activity.note ?? undefined,
+	})),
+});
 
 export default function WorkoutTemplatePage() {
-	const [templates, setTemplates] = useState<Template[]>([]);
-	const [selected, setSelected] = useState<Template | null>(null);
+	const [templates, setTemplates] = useState<
+		workoutTemplatesService.WorkoutTemplateSummary[]
+	>([]);
+	const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+		null,
+	);
+	const [actionsTemplateId, setActionsTemplateId] = useState<string | null>(
+		null,
+	);
 	const [templateModal, setTemplateModal] = useState<TemplateModalState | null>(
 		null,
 	);
-	const [actionsTemplate, setActionsTemplate] = useState<Template | null>(null);
-	const [templateToRemove, setTemplateToRemove] = useState<Template | null>(
-		null,
-	);
 	const [query, setQuery] = useState('');
-	const [createOpen, setCreateOpen] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		console.log('actionsTemplateId', actionsTemplateId);
+	}, [actionsTemplateId]);
+
+	useEffect(() => {
+		if (!templateModal?.templateId || templateModal.mode === 'remove') return;
+		workoutTemplatesService
+			.findOne(String(templateModal.templateId))
+			.then((response) => {
+				if (response.data)
+					setTemplateModal((current) =>
+						current ? { ...current, template: toTemplate(response.data!) } : null,
+					);
+			});
+	}, [templateModal?.templateId, templateModal?.mode]);
 
 	useEffect(() => {
 		workoutTemplatesService
 			.findAll()
 			.then(async (summaries) => {
-				const loaded = await Promise.all(
-					(summaries.data ?? []).map((summary) =>
-						workoutTemplatesService.findOne(summary.id),
-					),
-				);
-				const next = loaded.flatMap((response) =>
-					response.data ? [toTemplate(response.data)] : [],
-				);
+				const next = summaries.data ?? [];
 				setTemplates(next);
-				setSelected(next[0] ?? null);
+				setSelectedTemplateId(next[0]?.id ?? null);
 			})
 			.catch(() =>
 				setError(
@@ -98,7 +97,7 @@ export default function WorkoutTemplatePage() {
 	const filtered = useMemo(
 		() =>
 			templates.filter((item) =>
-				item.title.toLowerCase().includes(query.toLowerCase()),
+				item.name.toLowerCase().includes(query.toLowerCase()),
 			),
 		[templates, query],
 	);
@@ -107,25 +106,20 @@ export default function WorkoutTemplatePage() {
 		try {
 			const created = await workoutTemplatesService.create(workoutTemplate);
 			if (!created.data) throw new Error(created.error);
-			const next = toTemplate(created.data);
+			const next = {
+				id: created.data.id,
+				name: created.data.name,
+				description: created.data.description,
+				exercises: Array.from(
+					new Set(
+						created.data.activities.flatMap((a) =>
+							a.exercise?.name ? [a.exercise.name] : [],
+						),
+					),
+				),
+			};
 			setTemplates((current) => [...current, next]);
-			setSelected(next);
-			setCreateOpen(false);
-		} catch (error) {
-			console.error(error);
-			setError(`Não foi possível salvar a template. Por favor, tente novamente.`);
-		}
-	};
-
-	const updateTemplate = async (id: number, data: CreateWorkoutTemplateDto) => {
-		try {
-			const response = await workoutTemplatesService.update(String(id), data);
-			if (!response.data) throw new Error(response.error);
-			const updated = toTemplate(response.data);
-			setTemplates((current) =>
-				current.map((item) => (item.id === id ? updated : item)),
-			);
-			setSelected((current) => (current?.id === id ? updated : current));
+			setSelectedTemplateId(next.id);
 			setTemplateModal(null);
 		} catch (error) {
 			console.error(error);
@@ -133,17 +127,44 @@ export default function WorkoutTemplatePage() {
 		}
 	};
 
-	const removeTemplate = async (template: Template) => {
+	const updateTemplate = async (id: string, data: CreateWorkoutTemplateDto) => {
+		try {
+			const response = await workoutTemplatesService.update(String(id), data);
+			if (!response.data) throw new Error(response.error);
+			const updated = {
+				id: response.data.id,
+				name: response.data.name,
+				description: response.data.description,
+				exercises: Array.from(
+					new Set(
+						response.data.activities.flatMap((a) =>
+							a.exercise?.name ? [a.exercise.name] : [],
+						),
+					),
+				),
+			};
+			setTemplates((current) =>
+				current.map((item) => (item.id === id ? { ...item, ...updated } : item)),
+			);
+			setTemplateModal(null);
+		} catch (error) {
+			console.error(error);
+			setError(`Não foi possível salvar a template. Por favor, tente novamente.`);
+		}
+	};
+
+	const removeTemplate = async (
+		template: workoutTemplatesService.WorkoutTemplateSummary,
+	) => {
 		try {
 			await workoutTemplatesService.remove(String(template.id));
 			setTemplates((current) => {
 				const next = current.filter((item) => item.id !== template.id);
-				setSelected((selected) =>
-					selected?.id === template.id ? (next[0] ?? null) : selected,
-				);
+				if (selectedTemplateId === template.id)
+					setSelectedTemplateId(next[0]?.id ?? null);
 				return next;
 			});
-			setTemplateToRemove(null);
+			setTemplateModal(null);
 		} catch (error) {
 			console.error(error);
 			setError('Não foi possível remover a template. Por favor, tente novamente.');
@@ -168,7 +189,7 @@ export default function WorkoutTemplatePage() {
 						alunos.
 					</p>
 				</div>
-				<Button onClick={() => setCreateOpen(true)}>
+				<Button onClick={() => setTemplateModal({ mode: 'create' })}>
 					<RiAddLine size={20} /> Nova template
 				</Button>
 			</header>
@@ -182,57 +203,75 @@ export default function WorkoutTemplatePage() {
 			<div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
 				<TemplatesTable
 					templates={filtered}
-					selectedId={selected?.id ?? null}
+					selectedId={selectedTemplateId}
 					query={query}
-					actionsTemplateId={actionsTemplate?.id ?? null}
+					actionsTemplateId={actionsTemplateId}
 					onQueryChange={setQuery}
-					onSelect={setSelected}
-					onToggleActions={(template) =>
-						setActionsTemplate((current) =>
-							current?.id === template.id ? null : template,
-						)
+					onSelect={(template) => setSelectedTemplateId(template.id)}
+					onToggleActions={(template) => {
+						console.log('onToggleActions', template.id);
+						setActionsTemplateId((id) => {
+							const nextId = id === template.id ? null : template.id;
+							console.log('next actionsTemplateId', nextId);
+							return nextId;
+						});
+					}}
+					onEdit={(template) =>
+						setTemplateModal({ mode: 'edit', templateId: template.id })
 					}
-					onEdit={(template) => {
-						setTemplateModal({ mode: 'edit', template });
-						setActionsTemplate(null);
-					}}
-					onView={(template) => {
-						setTemplateModal({ mode: 'view', template });
-						setActionsTemplate(null);
-					}}
-					onRemove={(template) => {
-						setTemplateToRemove(template);
-						setActionsTemplate(null);
-					}}
+					onView={(template) =>
+						setTemplateModal({ mode: 'view', templateId: template.id })
+					}
+					onRemove={(template) =>
+						setTemplateModal({
+							mode: 'remove',
+							templateId: template.id,
+							name: template.name,
+						})
+					}
 				/>
-				{selected && <TemplatePreview template={selected} />}
+				{templates.find((template) => template.id === selectedTemplateId) && (
+					<TemplatePreview
+						template={
+							templates.find((template) => template.id === selectedTemplateId)!
+						}
+					/>
+				)}
 			</div>
-			{createOpen && (
-				<CreateModal onClose={() => setCreateOpen(false)} onSave={saveTemplate} />
+			{templateModal?.mode === 'create' && (
+				<CreateModal onClose={() => setTemplateModal(null)} onSave={saveTemplate} />
 			)}
-			{templateModal && (
+			{templateModal?.template && (
 				<CreateModal
 					key={`${templateModal.mode}-${templateModal.template.id}`}
 					template={templateModal.template}
-					mode={templateModal.mode}
+					mode={templateModal.mode === 'view' ? 'view' : 'edit'}
 					onClose={() => setTemplateModal(null)}
 					onSave={(workoutTemplate) =>
-						updateTemplate(templateModal.template.id, workoutTemplate)
+						updateTemplate(templateModal.template!.id, workoutTemplate)
 					}
 				/>
 			)}
-			{templateToRemove && (
+			{templateModal?.mode === 'remove' && (
 				<Modal
 					isOpen
 					title="Remover template"
-					description={`Deseja remover a template ${templateToRemove.title}? Esta ação não poderá ser desfeita.`}
-					onClose={() => setTemplateToRemove(null)}
+					description={`Deseja remover a template ${templateModal.name}? Esta ação não poderá ser desfeita.`}
+					onClose={() => setTemplateModal(null)}
 				>
 					<div className="flex justify-end gap-3">
-						<Button variant="outline" onClick={() => setTemplateToRemove(null)}>
+						<Button variant="outline" onClick={() => setTemplateModal(null)}>
 							Cancelar
 						</Button>
-						<Button onClick={() => removeTemplate(templateToRemove)}>Remover</Button>
+						<Button
+							onClick={() =>
+								removeTemplate(
+									templates.find((item) => item.id === templateModal.templateId)!,
+								)
+							}
+						>
+							Remover
+						</Button>
 					</div>
 				</Modal>
 			)}

@@ -52,8 +52,15 @@ export function MetricField({
 	const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
 		let inputValue: string | number = event.target.value;
 
+		if (
+			metric.fieldType === MetricFieldType.INT ||
+			metric.fieldType === MetricFieldType.DECIMAL
+		) {
+			inputValue = inputValue === '' ? '' : Number(inputValue);
+		}
+
 		if (metric.fieldType === MetricFieldType.TIME) {
-			inputValue = timeToSeconds(inputValue);
+			inputValue = timeToSeconds(String(inputValue) || '0');
 		}
 		onChange(inputValue);
 	};

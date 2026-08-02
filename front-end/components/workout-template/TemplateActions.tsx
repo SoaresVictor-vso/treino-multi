@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { RiArrowRightSLine } from 'react-icons/ri';
-import type { Template } from '@/api/services/workout-templates';
+import type { WorkoutTemplateSummary } from '@/api/services/workout-templates';
 
 type TemplateActionsProps = {
-	template: Template;
+	template: WorkoutTemplateSummary;
 	isOpen: boolean;
 	onToggle: () => void;
 	onEdit: () => void;
@@ -23,6 +23,7 @@ export default function TemplateActions({
 }: TemplateActionsProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [openAbove, setOpenAbove] = useState(false);
+	console.log('TemplateActions render', template.id, { isOpen });
 
 	useEffect(() => {
 		if (!isOpen) return;
@@ -48,12 +49,16 @@ export default function TemplateActions({
 	}, [isOpen]);
 
 	return (
-		<div ref={containerRef} className="relative shrink-0">
+		<div
+			ref={containerRef}
+			className="relative shrink-0"
+			onClick={(event) => event.stopPropagation()}
+		>
 			<button
 				type="button"
 				onClick={onToggle}
 				className="text-primary-fixed-dim transition-colors hover:text-primary"
-				aria-label={`Abrir ações de ${template.title}`}
+				aria-label={`Abrir ações de ${template.name}`}
 				aria-expanded={isOpen}
 			>
 				<RiArrowRightSLine size={24} />

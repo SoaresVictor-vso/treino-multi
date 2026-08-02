@@ -1,18 +1,18 @@
 import { RiSearchLine } from 'react-icons/ri';
 import TemplateActions from './TemplateActions';
-import type { Template } from '@/api/services/workout-templates';
+import type { WorkoutTemplateSummary } from '@/api/services/workout-templates';
 
 type TemplatesTableProps = {
-	templates: Template[];
-	selectedId: number | null;
+	templates: WorkoutTemplateSummary[];
+	selectedId: string | null;
 	query: string;
-	actionsTemplateId: number | null;
+	actionsTemplateId: string | null;
 	onQueryChange: (query: string) => void;
-	onSelect: (template: Template) => void;
-	onToggleActions: (template: Template) => void;
-	onEdit: (template: Template) => void;
-	onView: (template: Template) => void;
-	onRemove: (template: Template) => void;
+	onSelect: (template: WorkoutTemplateSummary) => void;
+	onToggleActions: (template: WorkoutTemplateSummary) => void;
+	onEdit: (template: WorkoutTemplateSummary) => void;
+	onView: (template: WorkoutTemplateSummary) => void;
+	onRemove: (template: WorkoutTemplateSummary) => void;
 };
 
 export default function TemplatesTable({
@@ -64,32 +64,38 @@ export default function TemplatesTable({
 									: 'hover:bg-surface-container-high'
 							}
 						>
-							<td className="rounded border border-transparent p-0 first:border-l last:border-r [&:only-child]:border-outline-variant">
+							<td className="cursor-pointer rounded border border-transparent p-0 first:border-l last:border-r [&:only-child]:border-outline-variant">
 								<div className="flex items-center gap-4 p-4">
-									<button
-										type="button"
-										onClick={() => onSelect(template)}
-										className="min-w-0 flex-1 text-left"
-										aria-label={`Ver prévia de ${template.title}`}
-									>
-										<div className="flex items-center gap-3">
-											<span className="truncate font-bold">{template.title}</span>
-											<span className="shrink-0 rounded-sm bg-primary-fixed-dim/15 px-2 py-1 font-mono text-xs text-primary-fixed-dim">
-												{template.activities.length} atividades
-											</span>
-										</div>
-										<p className="mt-2 truncate text-sm text-on-surface-variant">
-											{template.description}
-										</p>
-									</button>
-									<TemplateActions
-										template={template}
-										isOpen={actionsTemplateId === template.id}
-										onToggle={() => onToggleActions(template)}
-										onEdit={() => onEdit(template)}
-										onView={() => onView(template)}
-										onRemove={() => onRemove(template)}
-									/>
+									<div className="contents">
+										<button
+											type="button"
+											onClick={(event) => {
+												console.log('onClick', template.id);
+												onToggleActions(template);
+												onSelect(template);
+											}}
+											className="min-w-0 flex-1 text-left"
+											aria-label={`Ver prévia de ${template.name}`}
+										>
+											<div className="flex items-center gap-3">
+												<span className="truncate font-bold">{template.name}</span>
+												<span className="shrink-0 rounded-sm bg-primary-fixed-dim/15 px-2 py-1 font-mono text-xs text-primary-fixed-dim">
+													{template.exercises.length} exercícios
+												</span>
+											</div>
+											<p className="mt-2 truncate text-sm text-on-surface-variant">
+												{template.description}
+											</p>
+										</button>
+										<TemplateActions
+											template={template}
+											isOpen={actionsTemplateId === template.id}
+											onToggle={() => onToggleActions(template)}
+											onEdit={() => onEdit(template)}
+											onView={() => onView(template)}
+											onRemove={() => onRemove(template)}
+										/>
+									</div>
 								</div>
 							</td>
 						</tr>

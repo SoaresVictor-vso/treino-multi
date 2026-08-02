@@ -60,10 +60,11 @@ export class WorkoutTemplatesService {
 		}
 		await this.ensureExercises(dto.activities);
 		return this.dataSource.transaction(async (manager) => {
+			const { activities: _activities, ...templateDto } = dto;
 			const template = await manager.save(
 				WorkoutTemplate,
 				manager.create(WorkoutTemplate, {
-					...dto,
+					...templateDto,
 					createdBy: actor.sub,
 					updatedBy: actor.sub,
 				}),
@@ -137,7 +138,11 @@ export class WorkoutTemplatesService {
 		this.ensureAccess(template, actor, 'update');
 		if (dto.activities) await this.ensureExercises(dto.activities);
 		return this.dataSource.transaction(async (manager) => {
-			const { tenantId: _tenantId, ...updateDto } = dto;
+				const {
+					activities: _activities,
+					tenantId: _tenantId,
+					...updateDto
+				} = dto;
 			await manager.save(
 				WorkoutTemplate,
 				Object.assign(template, updateDto, { updatedBy: actor.sub }),
@@ -207,7 +212,12 @@ export class WorkoutTemplatesService {
 	): Promise<WorkoutTemplate> {
 		const template = await manager.findOne(WorkoutTemplate, {
 			where: { id },
-			relations: ['activities', 'activities.exercise'],
+			relations: [
+				'activities',
+				'activities.exercise',
+				'activities.exercise.metric1',
+				'activities.exercise.metric2',
+			],
 		});
 		if (!template)
 			throw new NotFoundException(`Template de treino ${id} não encontrado.`);

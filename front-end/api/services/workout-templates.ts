@@ -17,10 +17,7 @@ export interface WorkoutActivity {
 export interface WorkoutActivityResponse extends WorkoutActivity {
 	id: number;
 	workoutTemplateId: string;
-	exercise?: {
-		id: number;
-		name: string;
-	};
+	exercise?: Exercise;
 }
 
 export interface WorkoutTemplateSummary {
@@ -44,18 +41,18 @@ export interface WorkoutTemplateResponse {
 }
 
 export type Activity = {
-	exercise: number;
-	metric_1?: number;
-	metric_2?: number;
-	type_1: 'v';
-	type_2?: RegisterType;
+	exerciseId: number;
+	metric1?: number;
+	metric2?: number;
+	type1: 'v';
+	type2?: RegisterType;
 	pse: number;
-	rest_duration?: number;
+	restDuration?: number;
 	note?: string;
 };
 
 export type WorkoutTemplate = {
-	tenant_id: string;
+	tenantId: string;
 	created_by: string;
 	updated_by: string;
 	created_at: string;
@@ -67,22 +64,25 @@ export type WorkoutTemplate = {
 
 export type CreateWorkoutTemplateDto = Pick<
 	WorkoutTemplate,
-	'name' | 'description' | 'activities'
+	'tenantId' | 'name' | 'description' | 'activities'
 >;
 
 export type UpdateWorkoutTemplateDto = Partial<CreateWorkoutTemplateDto>;
 
 export type Template = {
-	id: number;
-	title: string;
+	id: string;
+	tenantId: string;
+	name: string;
 	description: string;
 	exercises: Exercise[];
 	activities: Activity[];
 };
 
 export type TemplateModalState = {
-	mode: 'view' | 'edit';
-	template: Template;
+	mode: 'create' | 'view' | 'edit' | 'remove';
+	template?: Template;
+	templateId?: string;
+	name?: string;
 };
 
 export function secondsToTime(seconds: number): string {

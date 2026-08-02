@@ -41,19 +41,19 @@ export function ConfigBlock({
 				</div>
 				<MetricField
 					metric={exercise.metric_1}
-					value={activity.metric_1}
-					type={activity.type_1}
-					onChange={(value) => onChange('metric_1', value)}
-					onTypeChange={(value) => onChange('type_1', value)}
+					value={activity.metric1}
+					type={activity.type1}
+					onChange={(value) => onChange('metric1', value)}
+					onTypeChange={(value) => onChange('type1', value)}
 					disabled={disabled}
 				/>
 				{exercise.metric_2 && (
 					<MetricField
 						metric={exercise.metric_2}
-						value={activity.metric_2}
-						type={activity.type_2}
-						onChange={(value) => onChange('metric_2', value)}
-						onTypeChange={(value) => onChange('type_2', value)}
+						value={activity.metric2}
+						type={activity.type2}
+						onChange={(value) => onChange('metric2', value)}
+						onTypeChange={(value) => onChange('type2', value)}
 						disabled={disabled}
 						allowPercent
 					/>
@@ -67,8 +67,8 @@ export function ConfigBlock({
 					disabled={disabled}
 				/>
 				<RestDurationField
-					value={activity.rest_duration || 0}
-					onChange={(seconds) => onChange('rest_duration', seconds)}
+					value={activity.restDuration || 0}
+					onChange={(seconds) => onChange('restDuration', seconds)}
 					disabled={disabled}
 				/>
 			</div>
