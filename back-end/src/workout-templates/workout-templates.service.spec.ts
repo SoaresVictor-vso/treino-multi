@@ -5,6 +5,7 @@ import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Exercise } from '../exercises/entities/exercise.entity';
 import { Role } from '../common/enums/role.enum';
 import { WorkoutTemplate } from './entities/workout-template.entity';
+import { Activity } from './entities/activity.entity';
 import { WorkoutTemplatesService } from './workout-templates.service';
 
 const uuid = 'd2719f58-929d-4c18-b0d5-1ec3213918be';
@@ -52,6 +53,9 @@ describe('WorkoutTemplatesService', () => {
 			orderBy: jest.fn(),
 			where: jest.fn(),
 			orWhere: jest.fn(),
+			getQuery: jest.fn(),
+			getParameters: jest.fn(),
+			setParameters: jest.fn(),
 			getRawMany: jest.fn(),
 		};
 		Object.values(queryBuilder).forEach((method) =>
@@ -146,8 +150,35 @@ describe('WorkoutTemplatesService', () => {
 			{ activities: [{ exerciseId: 1, type1: 'v', pse: 7 }] },
 			actor,
 		);
-		expect(manager.delete).toHaveBeenCalled();
+		expect(manager.save).toHaveBeenCalled();
 		await service.remove(uuid, actor);
 		expect(templateRepo.softRemove).toHaveBeenCalledWith(template);
+	});
+
+	it('atualiza activities mantidas, cria novas e remove apenas as ausentes', async () => {
+		const template = makeTemplate();
+		template.activities = [
+			{ id: 10, workoutTemplateId: uuid, exerciseId: 1 } as Activity,
+			{ id: 11, workoutTemplateId: uuid, exerciseId: 1 } as Activity,
+		];
+		exerciseRepo.countBy.mockResolvedValue(2);
+		manager.findOne.mockResolvedValue(template);
+
+		await service.update(
+			uuid,
+			{
+				activities: [
+					{ id: 10, exerciseId: 1, type1: 'v', pse: 7 },
+					{ exerciseId: 2, type1: 'v', pse: 8 },
+				],
+			},
+			actor,
+		);
+
+		expect(manager.delete).toHaveBeenCalledWith(
+			Activity,
+			expect.objectContaining({ workoutTemplateId: uuid }),
+		);
+		expect(manager.save).toHaveBeenCalledTimes(3);
 	});
 });

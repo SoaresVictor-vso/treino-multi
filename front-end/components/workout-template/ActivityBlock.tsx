@@ -1,4 +1,6 @@
 'use client';
+import { useState } from 'react';
+import { RiDeleteBinLine } from 'react-icons/ri';
 import Badge from '@/components/ui/Badge';
 import { type Activity } from '@/api/services/workout-templates';
 import {
@@ -17,27 +19,54 @@ const RpeMetric: Metric = {
 	id: -1,
 };
 
-export function ConfigBlock({
+export function ActivityBlock({
 	exercise,
 	index,
 	activity,
 	disabled = false,
 	onChange,
+	onRemove,
 }: {
 	exercise: Exercise;
 	index: number;
 	activity: Activity;
 	disabled?: boolean;
 	onChange: (key: keyof Activity, value: string | number) => void;
+	onRemove?: () => void;
 }) {
+	const [menuOpen, setMenuOpen] = useState(false);
+
 	return (
 		<div
 			data-block-index={index}
 			className="rounded border border-outline-variant bg-surface-container-high px-2 py-1.5"
 		>
 			<div className="grid items-end gap-2 grid-cols-[28px_1fr_1fr_1fr_1fr]">
-				<div className="flex items-center justify-center my-auto">
-					<Badge label={`${index + 1}`} type="primary" />
+				<div className="relative flex items-center justify-center my-auto">
+					<button
+						type="button"
+						disabled={disabled}
+						onClick={() => setMenuOpen((open) => !open)}
+						aria-label={`Abrir opções do bloco ${index + 1}`}
+						aria-expanded={menuOpen}
+						className="rounded-md disabled:cursor-default"
+					>
+						<Badge label={`${index + 1}`} type="primary" />
+					</button>
+					{menuOpen && !disabled && (
+						<div className="absolute left-0 top-full z-10 mt-1 w-32 rounded border border-outline-variant bg-surface-container p-1 shadow-xl">
+							<button
+								type="button"
+								onClick={() => {
+									setMenuOpen(false);
+									onRemove?.();
+								}}
+								className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm text-error hover:bg-error-container/20"
+							>
+								<RiDeleteBinLine /> Remover
+							</button>
+						</div>
+					)}
 				</div>
 				{exercise.metric_1 && (
 					<MetricField

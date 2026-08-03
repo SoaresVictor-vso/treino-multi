@@ -9,9 +9,10 @@ import TemplateStats from '@/components/workout-template/TemplateStats';
 import TemplatesTable from '@/components/workout-template/TemplatesTable';
 import { CreateModal } from '@/components/workout-template/CreateModal';
 import type {
-	CreateWorkoutTemplateDto,
 	Template,
 	TemplateModalState,
+	WorkoutTemplateFormDto,
+	UpdateWorkoutTemplateDto,
 } from '@/api/services/workout-templates';
 import * as workoutTemplatesService from '@/api/services/workout-templates';
 
@@ -38,6 +39,7 @@ const toTemplate = (
 		metric_2: exercise.metric2 ?? undefined,
 	})),
 	activities: item.activities.map((activity) => ({
+		id: activity.id,
 		exerciseId: activity.exerciseId,
 		metric1: Number(activity.metric1 ?? 0),
 		metric2: Number(activity.metric2 ?? 0),
@@ -104,9 +106,14 @@ export default function WorkoutTemplatePage() {
 		[templates, query],
 	);
 
-	const saveTemplate = async (workoutTemplate: CreateWorkoutTemplateDto) => {
+	const saveTemplate = async (workoutTemplate: WorkoutTemplateFormDto) => {
 		try {
-			const created = await workoutTemplatesService.create(workoutTemplate);
+			const created = await workoutTemplatesService.create({
+			...workoutTemplate,
+			activities: workoutTemplate.activities.map(({ id: _id, ...activity }) =>
+				activity,
+			),
+		});
 			if (!created.data) {
 				setError(
 					created.error ||
@@ -135,9 +142,12 @@ export default function WorkoutTemplatePage() {
 		}
 	};
 
-	const updateTemplate = async (id: string, data: CreateWorkoutTemplateDto) => {
+	const updateTemplate = async (id: string, data: WorkoutTemplateFormDto) => {
 		try {
-			const response = await workoutTemplatesService.update(String(id), data);
+			const response = await workoutTemplatesService.update(
+				String(id),
+				data satisfies UpdateWorkoutTemplateDto,
+			);
 			if (!response.data) {
 				setError(
 					response.error ||

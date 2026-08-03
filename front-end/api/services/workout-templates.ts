@@ -50,6 +50,7 @@ export interface WorkoutTemplateResponse {
 }
 
 export type Activity = {
+	id?: number;
 	exerciseId: number;
 	metric1?: number;
 	metric2?: number;
@@ -60,6 +61,8 @@ export type Activity = {
 	note?: string;
 };
 
+export type ActivityInput = Omit<Activity, 'id'>;
+
 export type WorkoutTemplate = {
 	tenantId: string;
 	created_by: string;
@@ -68,7 +71,7 @@ export type WorkoutTemplate = {
 	updated_at: string;
 	name: string;
 	description: string;
-	activities: Activity[];
+	activities: ActivityInput[];
 };
 
 export type CreateWorkoutTemplateDto = Pick<
@@ -76,7 +79,18 @@ export type CreateWorkoutTemplateDto = Pick<
 	'tenantId' | 'name' | 'description' | 'activities'
 >;
 
-export type UpdateWorkoutTemplateDto = Partial<CreateWorkoutTemplateDto>;
+export type UpdateWorkoutTemplateDto = Partial<
+	Omit<CreateWorkoutTemplateDto, 'activities'>
+> & {
+	activities?: Activity[];
+};
+
+export type WorkoutTemplateFormDto = Omit<
+	CreateWorkoutTemplateDto,
+	'activities'
+> & {
+	activities: Activity[];
+};
 
 export type Template = {
 	id: string;

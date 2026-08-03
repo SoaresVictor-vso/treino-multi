@@ -1,4 +1,5 @@
 import {
+	BadRequestException,
 	ForbiddenException,
 	Injectable,
 	NotFoundException,
@@ -140,6 +141,17 @@ export class WorkoutTemplatesService {
 		const template = await this.getOneOrFail(id, this.templateRepo.manager);
 		this.ensureAccess(template, actor, 'update');
 		if (dto.activities) await this.ensureExercises(dto.activities);
+		const existingActivities = template.activities;
+		const receivedIds = dto.activities
+			?.map((activity) => activity.id)
+			.filter((activityId): activityId is number => activityId !== undefined);
+		if (receivedIds && new Set(receivedIds).size !== receivedIds.length) {
+			throw new BadRequestException('Há activities duplicadas na atualização.');
+		}
+		const existingIds = new Set(existingActivities.map((activity) => activity.id));
+		if (receivedIds?.some((activityId) => !existingIds.has(activityId))) {
+			throw new NotFoundException('Uma ou mais activities não pertencem à template.');
+		}
 		return this.dataSource.transaction(async (manager) => {
 			const { activities: _activities, tenantId: _tenantId, ...updateDto } = dto;
 			await manager.save(
@@ -147,11 +159,34 @@ export class WorkoutTemplatesService {
 				Object.assign(template, updateDto, { updatedBy: actor.sub }),
 			);
 			if (dto.activities) {
-				await manager.delete(Activity, { workoutTemplateId: id });
-				if (dto.activities.length) {
+				const retainedIds = new Set(receivedIds);
+				const removedIds = existingActivities
+					.filter((activity) => !retainedIds.has(activity.id))
+					.map((activity) => activity.id);
+				if (removedIds.length) {
+					await manager.delete(Activity, {
+						id: In(removedIds),
+						workoutTemplateId: id,
+					});
+				}
+				const activitiesToUpdate = dto.activities.filter(
+					(activity) => activity.id !== undefined,
+				);
+				const activitiesToCreate = dto.activities.filter(
+					(activity) => activity.id === undefined,
+				);
+				if (activitiesToUpdate.length) {
 					await manager.save(
 						Activity,
-						dto.activities.map((activity) =>
+						activitiesToUpdate.map((activity) =>
+							manager.create(Activity, { ...activity, workoutTemplateId: id }),
+						),
+					);
+				}
+				if (activitiesToCreate.length) {
+					await manager.save(
+						Activity,
+						activitiesToCreate.map((activity) =>
 							manager.create(Activity, { ...activity, workoutTemplateId: id }),
 						),
 					);

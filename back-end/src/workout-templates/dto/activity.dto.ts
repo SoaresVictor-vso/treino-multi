@@ -43,3 +43,11 @@ export class ActivityDto {
 	@MaxLength(2000)
 	note?: string;
 }
+
+export class UpdateActivityDto extends ActivityDto {
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	id?: number;
+}

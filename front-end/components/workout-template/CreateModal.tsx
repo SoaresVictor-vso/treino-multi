@@ -7,10 +7,11 @@ import { RiCloseLine } from 'react-icons/ri';
 import Input from '../ui/Input';
 import Textarea from '../ui/Textarea';
 import Button from '../ui/Button';
-import { ConfigBlock } from './ConfigBlock';
+import Modal from '../ui/Modal';
+import { ActivityBlock } from './ActivityBlock';
 import ExercisePicker from '../shared/ExercisePicker';
 import type { Template } from '@/api/services/workout-templates';
-import type { CreateWorkoutTemplateDto } from '@/api/services/workout-templates';
+import type { WorkoutTemplateFormDto } from '@/api/services/workout-templates';
 import type { Exercise } from '@/api/services/parametro';
 import TenantSelect from '../shared/TenantSelect';
 import { getSessionUser } from '@/lib/auth';
@@ -33,7 +34,7 @@ export function CreateModal({
 	mode = 'create',
 }: {
 	onClose: () => void;
-	onSave: (workoutTemplate: CreateWorkoutTemplateDto) => void;
+	onSave: (workoutTemplate: WorkoutTemplateFormDto) => void;
 	template?: Template;
 	mode?: 'create' | 'view' | 'edit';
 }) {
@@ -48,6 +49,10 @@ export function CreateModal({
 		template?.exercises ?? [],
 	);
 	const [pickerOpen, setPickerOpen] = useState(false);
+	const [activityPendingRemoval, setActivityPendingRemoval] = useState<{
+		exerciseId: number;
+		index: number;
+	} | null>(null);
 	const [activities, setActivities] = useState<Record<number, Activity[]>>(() =>
 		template
 			? (Object.fromEntries(
@@ -105,6 +110,19 @@ export function CreateModal({
 		});
 	};
 
+	const removeActivity = () => {
+		if (!activityPendingRemoval) return;
+		const { exerciseId, index } = activityPendingRemoval;
+
+		setActivities((current) => ({
+			...current,
+			[exerciseId]: (current[exerciseId] ?? []).filter(
+				(_, activityIndex) => activityIndex !== index,
+			),
+		}));
+		setActivityPendingRemoval(null);
+	};
+
 	const moveToNextField = (event: KeyboardEvent<HTMLDivElement>) => {
 		if (event.key !== 'Enter' || event.target instanceof HTMLTextAreaElement)
 			return;
@@ -134,12 +152,13 @@ export function CreateModal({
 		);
 		if (hasExerciseWithoutActivity || !tenantId) return;
 
-		onSave({
+		const formData = {
 			tenantId,
 			name: title.trim(),
 			description: description.trim(),
 			activities: Object.values(activities).flat(),
-		});
+		};
+		onSave(formData);
 	};
 	return (
 		<div
@@ -230,12 +249,18 @@ export function CreateModal({
 								</div>
 								<div className="mt-3 space-y-3">
 									{(activities[item.id] ?? []).map((activity, configIndex) => (
-										<ConfigBlock
+										<ActivityBlock
 											key={`${item.id}-${configIndex}`}
 											exercise={item}
 											activity={activity}
 											index={configIndex}
 											disabled={isViewMode}
+											onRemove={() => {
+												setActivityPendingRemoval({
+													exerciseId: item.id,
+													index: configIndex,
+												});
+											}}
 											onChange={(key, value) =>
 												updateActivity(item.id, configIndex, key, value)
 											}
@@ -286,6 +311,24 @@ export function CreateModal({
 						onChange={handleSelectedChange}
 						onClose={() => setPickerOpen(false)}
 					/>
+				)}
+				{activityPendingRemoval && (
+					<Modal
+						isOpen
+						title="Remover bloco"
+						description="Deseja remover este bloco de exercício? Esta ação não poderá ser desfeita."
+						onClose={() => setActivityPendingRemoval(null)}
+					>
+						<div className="flex justify-end gap-3">
+							<Button
+								variant="outline"
+								onClick={() => setActivityPendingRemoval(null)}
+							>
+								Cancelar
+							</Button>
+							<Button onClick={removeActivity}>Remover</Button>
+						</div>
+					</Modal>
 				)}
 			</div>
 		</div>
