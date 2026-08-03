@@ -21,7 +21,7 @@ export class Person {
 
 	/**
 	 * documento de identificação da pessoa (CPF etc.).
-	 * 11 caracteres, obrigatório, único.
+	 * 11 caracteres, único quando informado.
 	 */
 	@Column({ type: 'char', length: 11, unique: true, nullable: true })
 	document?: string | null;

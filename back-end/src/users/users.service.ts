@@ -68,6 +68,12 @@ export class UsersService {
 		actorUserId: string | null,
 		ipAddress: string,
 	): Promise<User> {
+		if (dto.tenantFunction !== 'client' && !dto.document?.trim()) {
+			throw new BadRequestException(
+				'Documento deve ser definido para usuários que não são clientes de tenant.',
+			);
+		}
+
 		const passwordHash = await bcrypt.hash(dto.password, 12);
 
 		if (!dto.tenantId && dto.tenantFunction)

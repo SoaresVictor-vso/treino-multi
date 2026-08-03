@@ -37,8 +37,19 @@ const createUserSchema = yup.object({
 		.matches(EMAIL_REGEX, 'Digite um e-mail válido'),
 	document: yup
 		.string()
-		.required('Documento é obrigatório')
-		.matches(CPF_REGEX, 'Digite um CPF válido'),
+		.trim()
+		.when('tenantFunction', {
+			is: 'client',
+			then: (schema) =>
+				schema.matches(CPF_REGEX, {
+					message: 'Digite um CPF válido',
+					excludeEmptyString: true,
+				}),
+			otherwise: (schema) =>
+				schema
+					.required('Documento é obrigatório')
+					.matches(CPF_REGEX, 'Digite um CPF válido'),
+		}),
 	phone: yup
 		.string()
 		.required('Telefone é obrigatório')
@@ -159,6 +170,7 @@ export default function UserModal(props: {
 			? 'tenant'
 			: 'organization'
 		: 'tenant';
+	const isTenantClient = !!effectiveTenantId && form.tenantFunction === 'client';
 
 	const canSubmit =
 		mode === 'edit'
@@ -169,12 +181,41 @@ export default function UserModal(props: {
 				!isSubmitting
 			: form.name.trim().length >= 2 &&
 				form.email.trim().length > 0 &&
-				form.document.trim().length > 0 &&
+				(isTenantClient || form.document.trim().length > 0) &&
 				form.phone.trim().length > 0 &&
 				form.password.length >= 8 &&
 				form.password === form.passwordConfirmation &&
 				(!effectiveTenantId || !!form.tenantFunction) &&
 				!isSubmitting;
+	const submitDisabledReason = (() => {
+		if (mode === 'view' || canSubmit) return null;
+		if (isSubmitting) return 'Aguarde enquanto o usuário é salvo.';
+
+		const pendingFields: string[] = [];
+		if (form.name.trim().length < 2) pendingFields.push('nome');
+		if (!form.email.trim()) pendingFields.push('e-mail');
+		if (!form.phone.trim()) pendingFields.push('telefone');
+
+		if (
+			mode === 'edit'
+				? !props.user?.person.document && !form.document.trim()
+				: !isTenantClient && !form.document.trim()
+		) {
+			pendingFields.push('documento');
+		}
+
+		if (mode === 'create') {
+			if (effectiveTenantId && !form.tenantFunction) {
+				pendingFields.push('função');
+			}
+			if (form.password.length < 8) pendingFields.push('senha de ao menos 8 caracteres');
+			if (form.password !== form.passwordConfirmation) {
+				pendingFields.push('confirmação de senha igual à senha');
+			}
+		}
+
+		return `Para habilitar o envio, preencha: ${pendingFields.join(', ')}.`;
+	})();
 
 	const updateField = (key: keyof typeof form, value: string | boolean) => {
 		setForm((current) => ({ ...current, [key]: value }));
@@ -305,7 +346,7 @@ export default function UserModal(props: {
 					<Input
 						id="user-document"
 						label="Documento"
-						required
+						required={!isTenantClient}
 						error={errors.document}
 						value={form.document}
 						disabled={mode === 'view' || !!props.user?.person.document}
@@ -406,7 +447,17 @@ export default function UserModal(props: {
 
 				{errors.form && <ErrorBox message={errors.form} />}
 
-				<div className="flex items-center justify-end gap-3">
+				<div className="flex flex-col items-end gap-2">
+					{submitDisabledReason && (
+						<p
+							id="user-submit-disabled-reason"
+							className="text-right text-sm text-on-surface-variant"
+							aria-live="polite"
+						>
+							{submitDisabledReason}
+						</p>
+					)}
+					<div className="flex items-center justify-end gap-3">
 					<Button
 						type="button"
 						variant="outline"
@@ -416,7 +467,13 @@ export default function UserModal(props: {
 						{mode === 'edit' ? 'Cancelar' : 'Fechar'}
 					</Button>
 					{mode !== 'view' && (
-						<Button type="submit" disabled={!canSubmit}>
+						<Button
+							type="submit"
+							disabled={!canSubmit}
+							aria-describedby={
+								submitDisabledReason ? 'user-submit-disabled-reason' : undefined
+							}
+						>
 							{mode === 'edit'
 								? isSubmitting
 									? 'Salvando...'
@@ -426,6 +483,7 @@ export default function UserModal(props: {
 									: 'Criar usuário'}
 						</Button>
 					)}
+					</div>
 				</div>
 			</form>
 		</Modal>

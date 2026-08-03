@@ -30,7 +30,11 @@ export class CreateManagedUserDto {
 	email!: string;
 
 	@ApiPropertyOptional({ example: '12345678901', nullable: true })
-	@ValidateIf((_obj, value) => value !== undefined && value !== null)
+	@ValidateIf(
+		(object: { tenantFunction?: TenantFunction | null }, value: unknown) =>
+			object.tenantFunction !== 'client' ||
+			(value !== undefined && value !== null),
+	)
 	@IsString()
 	@Length(11, 11)
 	document?: string | null;
