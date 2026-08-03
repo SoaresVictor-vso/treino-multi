@@ -28,8 +28,12 @@ export function MetricField({
 	};
 	allowPercent?: boolean;
 }) {
-	const getType = (type: MetricFieldType) => {
-		switch (type) {
+	const isPercent = type === 'p';
+
+	const getType = (fieldType: MetricFieldType) => {
+		if (isPercent) return 'number';
+
+		switch (fieldType) {
 			case MetricFieldType.INT:
 			case MetricFieldType.DECIMAL:
 				return 'number';
@@ -39,11 +43,11 @@ export function MetricField({
 	};
 
 	const label = metric.name ?? '';
-	const unit = metric.symbol;
+	const unit = type === 'p' ? '%' : metric.symbol;
 
 	const handleValue = (value?: string | number) => {
 		value = value ?? '';
-		if (metric.fieldType === MetricFieldType.TIME) {
+		if (metric.fieldType === MetricFieldType.TIME && !isPercent) {
 			return secondsToTime(value as number);
 		}
 		return value;
@@ -59,8 +63,12 @@ export function MetricField({
 			inputValue = inputValue === '' ? '' : Number(inputValue);
 		}
 
-		if (metric.fieldType === MetricFieldType.TIME) {
+		if (metric.fieldType === MetricFieldType.TIME && !isPercent) {
 			inputValue = timeToSeconds(String(inputValue) || '0');
+		}
+
+		if (isPercent) {
+			inputValue = inputValue === '' ? '' : Number(inputValue);
 		}
 		onChange(inputValue);
 	};
@@ -75,6 +83,13 @@ export function MetricField({
 					aria-label={`${label}${unit ? ` (${unit})` : ''}`}
 					sizeVariant="sm"
 					type={getType(metric?.fieldType)}
+					step={
+						isPercent
+							? 'any'
+							: metric.fieldType === MetricFieldType.TIME
+								? 1
+								: undefined
+					}
 					min={min}
 					max={max}
 					value={handleValue(value)}

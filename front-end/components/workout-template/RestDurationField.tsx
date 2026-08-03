@@ -18,7 +18,7 @@ export function RestDurationField({
 					aria-label="Duração do descanso"
 					sizeVariant="sm"
 					type="time"
-					step={2}
+					step={1}
 					value={secondsToTime(value)}
 					onChange={(event) => onChange(timeToSeconds(event.target.value))}
 					disabled={disabled}

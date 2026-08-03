@@ -49,10 +49,6 @@ export function CreateModal({
 		template?.exercises ?? [],
 	);
 	const [pickerOpen, setPickerOpen] = useState(false);
-	const [activityPendingRemoval, setActivityPendingRemoval] = useState<{
-		exerciseId: number;
-		index: number;
-	} | null>(null);
 	const [activities, setActivities] = useState<Record<number, Activity[]>>(() =>
 		template
 			? (Object.fromEntries(
@@ -96,9 +92,14 @@ export function CreateModal({
 	const addActivity = (exerciseId: number) => {
 		setActivities((current) => {
 			const blocks = current[exerciseId] ?? [];
+			const newBlock: Activity = {
+				...(blocks.at(-1) ?? initialActivity),
+				exerciseId,
+			};
+			delete newBlock.id;
 			return {
 				...current,
-				[exerciseId]: [...blocks, { ...initialActivity, exerciseId }],
+				[exerciseId]: [...blocks, newBlock],
 			};
 		});
 		requestAnimationFrame(() => {
@@ -110,17 +111,13 @@ export function CreateModal({
 		});
 	};
 
-	const removeActivity = () => {
-		if (!activityPendingRemoval) return;
-		const { exerciseId, index } = activityPendingRemoval;
-
+	const removeActivity = (exerciseId: number, index: number) => {
 		setActivities((current) => ({
 			...current,
 			[exerciseId]: (current[exerciseId] ?? []).filter(
 				(_, activityIndex) => activityIndex !== index,
 			),
 		}));
-		setActivityPendingRemoval(null);
 	};
 
 	const moveToNextField = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -256,10 +253,7 @@ export function CreateModal({
 											index={configIndex}
 											disabled={isViewMode}
 											onRemove={() => {
-												setActivityPendingRemoval({
-													exerciseId: item.id,
-													index: configIndex,
-												});
+												removeActivity(item.id, configIndex);
 											}}
 											onChange={(key, value) =>
 												updateActivity(item.id, configIndex, key, value)
@@ -311,24 +305,6 @@ export function CreateModal({
 						onChange={handleSelectedChange}
 						onClose={() => setPickerOpen(false)}
 					/>
-				)}
-				{activityPendingRemoval && (
-					<Modal
-						isOpen
-						title="Remover bloco"
-						description="Deseja remover este bloco de exercício? Esta ação não poderá ser desfeita."
-						onClose={() => setActivityPendingRemoval(null)}
-					>
-						<div className="flex justify-end gap-3">
-							<Button
-								variant="outline"
-								onClick={() => setActivityPendingRemoval(null)}
-							>
-								Cancelar
-							</Button>
-							<Button onClick={removeActivity}>Remover</Button>
-						</div>
-					</Modal>
 				)}
 			</div>
 		</div>

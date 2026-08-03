@@ -109,14 +109,15 @@ export type TemplateModalState = {
 };
 
 export function secondsToTime(seconds: number): string {
-	const minutes = Math.floor(seconds / 60);
+	const hours = Math.floor(seconds / 3600);
+	const minutes = Math.floor((seconds % 3600) / 60);
 	const remainingSeconds = seconds % 60;
-	return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+	return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
 }
 
 export function timeToSeconds(value: string): number {
-	const [minutes, seconds] = value.split(':').map(Number);
-	return minutes * 60 + seconds;
+	const [hours = 0, minutes = 0, seconds = 0] = value.split(':').map(Number);
+	return hours * 3600 + minutes * 60 + seconds;
 }
 
 const API_ENDPOINT = 'workout-templates';
