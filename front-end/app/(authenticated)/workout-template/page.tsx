@@ -23,25 +23,27 @@ const toTemplate = (
 	name: item.name,
 	description: item.description,
 	exercises: Array.from(
-			new Map(
-				item.activities
-					.filter((activity) => activity.exercise)
-					.map((activity) => [activity.exercise!.id, activity.exercise!]),
-			).values(),
-		).map((exercise) => ({
-			id: exercise.id,
-			name: exercise.name,
-			description: exercise.description,
-			metric_1: exercise.metric_1,
-			metric_2: exercise.metric_2,
-		})),
+		new Map(
+			item.activities
+				.filter((activity) => activity.exercise)
+				.map((activity) => [activity.exercise!.id, activity.exercise!]),
+		).values(),
+	).map((exercise) => ({
+		id: exercise.id,
+		name: exercise.name,
+		description: exercise.description,
+		// The workout-template API serializes TypeORM relations in camelCase,
+		// while the form's Exercise type uses snake_case.
+		metric_1: exercise.metric1,
+		metric_2: exercise.metric2 ?? undefined,
+	})),
 	activities: item.activities.map((activity) => ({
 		exerciseId: activity.exerciseId,
-		metric1: activity.metric1 ?? undefined,
-		metric2: activity.metric2 ?? undefined,
+		metric1: Number(activity.metric1 ?? 0),
+		metric2: Number(activity.metric2 ?? 0),
 		type1: 'v',
 		type2: activity.type2,
-		pse: activity.pse,
+		pse: Number(activity.pse ?? 0),
 		restDuration: activity.restDuration ?? undefined,
 		note: activity.note ?? undefined,
 	})),
@@ -105,7 +107,13 @@ export default function WorkoutTemplatePage() {
 	const saveTemplate = async (workoutTemplate: CreateWorkoutTemplateDto) => {
 		try {
 			const created = await workoutTemplatesService.create(workoutTemplate);
-			if (!created.data) throw new Error(created.error);
+			if (!created.data) {
+				setError(
+					created.error ||
+						'Não foi possível salvar a template. Por favor, tente novamente.',
+				);
+				return;
+			}
 			const next = {
 				id: created.data.id,
 				name: created.data.name,
@@ -130,7 +138,13 @@ export default function WorkoutTemplatePage() {
 	const updateTemplate = async (id: string, data: CreateWorkoutTemplateDto) => {
 		try {
 			const response = await workoutTemplatesService.update(String(id), data);
-			if (!response.data) throw new Error(response.error);
+			if (!response.data) {
+				setError(
+					response.error ||
+						'Não foi possível salvar a template. Por favor, tente novamente.',
+				);
+				return;
+			}
 			const updated = {
 				id: response.data.id,
 				name: response.data.name,
@@ -157,7 +171,12 @@ export default function WorkoutTemplatePage() {
 		template: workoutTemplatesService.WorkoutTemplateSummary,
 	) => {
 		try {
-			await workoutTemplatesService.remove(String(template.id));
+			const result = await workoutTemplatesService.remove(String(template.id));
+			if (result.error) {
+				setError(result.error);
+				return;
+			}
+
 			setTemplates((current) => {
 				const next = current.filter((item) => item.id !== template.id);
 				if (selectedTemplateId === template.id)

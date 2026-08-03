@@ -1,5 +1,5 @@
 import { authenticatedRequest } from '../client';
-import { Exercise } from './parametro';
+import { type Exercise, type Metric } from './parametro';
 
 export type RegisterType = 'p' | 'v';
 
@@ -14,10 +14,19 @@ export interface WorkoutActivity {
 	note: string | null;
 }
 
+type WorkoutTemplateExercise = Omit<
+	Exercise,
+	'metric_1' | 'metric_2' | 'visual_url'
+> & {
+	metric1: Metric;
+	metric2?: Metric | null;
+	visualUrl?: string | null;
+};
+
 export interface WorkoutActivityResponse extends WorkoutActivity {
 	id: number;
 	workoutTemplateId: string;
-	exercise?: Exercise;
+	exercise?: WorkoutTemplateExercise;
 }
 
 export interface WorkoutTemplateSummary {

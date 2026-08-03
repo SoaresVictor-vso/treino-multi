@@ -39,14 +39,16 @@ export function ConfigBlock({
 				<div className="flex items-center justify-center my-auto">
 					<Badge label={`${index + 1}`} type="primary" />
 				</div>
-				<MetricField
-					metric={exercise.metric_1}
-					value={activity.metric1}
-					type={activity.type1}
-					onChange={(value) => onChange('metric1', value)}
-					onTypeChange={(value) => onChange('type1', value)}
-					disabled={disabled}
-				/>
+				{exercise.metric_1 && (
+					<MetricField
+						metric={exercise.metric_1}
+						value={activity.metric1}
+						type={activity.type1}
+						onChange={(value) => onChange('metric1', value)}
+						onTypeChange={(value) => onChange('type1', value)}
+						disabled={disabled}
+					/>
+				)}
 				{exercise.metric_2 && (
 					<MetricField
 						metric={exercise.metric_2}

@@ -23,7 +23,7 @@ export class CreateWorkoutDomain1780185600000 implements MigrationInterface {
 			`CREATE TABLE "workout_templates" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenant_id" uuid NOT NULL, "created_by" uuid NOT NULL, "updated_by" uuid NOT NULL, "name" character varying NOT NULL, "description" text NOT NULL DEFAULT '', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP, CONSTRAINT "PK_workout_templates" PRIMARY KEY ("id"))`,
 		);
 		await queryRunner.query(
-			`CREATE TABLE "activities" ("id" SERIAL NOT NULL, "workout_template_id" uuid NOT NULL, "exercise_id" integer NOT NULL, "metric_1" numeric, "metric_2" numeric, "type_1" character varying(1) NOT NULL DEFAULT 'v', "type_2" character varying(1), "pse" numeric NOT NULL, "rest_duration" integer, "note" text, CONSTRAINT "CHK_activities_type_1" CHECK ("type_1" = 'v'), CONSTRAINT "CHK_activities_type_2" CHECK ("type_2" IS NULL OR "type_2" IN ('p', 'v')), CONSTRAINT "PK_activities" PRIMARY KEY ("id"))`,
+			`CREATE TABLE "activities" ("id" SERIAL NOT NULL, "workout_template_id" uuid NOT NULL, "exercise_id" integer NOT NULL, "metric_1" numeric, "metric_2" numeric, "type_1" character varying(1) NOT NULL DEFAULT 'v', "type_2" character varying(1), "pse" numeric NOT NULL, "rest_duration" integer, "note" text, "deleted_at" TIMESTAMP, CONSTRAINT "CHK_activities_type_1" CHECK ("type_1" = 'v'), CONSTRAINT "CHK_activities_type_2" CHECK ("type_2" IS NULL OR "type_2" IN ('p', 'v')), CONSTRAINT "PK_activities" PRIMARY KEY ("id"))`,
 		);
 		await queryRunner.query(
 			`ALTER TABLE "exercises" ADD CONSTRAINT "FK_exercises_metric_1" FOREIGN KEY ("metric_1_id") REFERENCES "metrics"("id") ON DELETE RESTRICT`,

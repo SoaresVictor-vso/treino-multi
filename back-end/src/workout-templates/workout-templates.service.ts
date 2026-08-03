@@ -87,20 +87,23 @@ export class WorkoutTemplatesService {
 		Array<{ id: string; name: string; description: string; exercises: string[] }>
 	> {
 		const permissions = resolvePermissions(actor.roles as Role[]);
+		const exercisesSubquery = this.templateRepo
+			.createQueryBuilder('t')
+			.leftJoin('t.activities', 'a')
+			.leftJoin('a.exercise', 'e')
+			.select(
+				'ARRAY_AGG(DISTINCT e.name) FILTER (WHERE e.name IS NOT NULL)',
+				'exercises',
+			)
+			.where('t.id = template.id');
+
 		const query = this.templateRepo
 			.createQueryBuilder('template')
-			.leftJoin('template.activities', 'activity')
-			.leftJoin('activity.exercise', 'exercise')
 			.select('template.id', 'id')
 			.addSelect('template.name', 'name')
 			.addSelect('template.description', 'description')
-			.addSelect(
-				"COALESCE(ARRAY_AGG(exercise.name) FILTER (WHERE exercise.name IS NOT NULL), '{}')",
-				'exercises',
-			)
-			.groupBy('template.id')
-			.addGroupBy('template.name')
-			.addGroupBy('template.description')
+			.addSelect(`(${exercisesSubquery.getQuery()})`, 'exercises')
+			.setParameters(exercisesSubquery.getParameters())
 			.orderBy('template.createdAt', 'DESC');
 
 		if (!permissions.includes(Permission.WORKOUT_TEMPLATES_READ_ALL)) {
@@ -138,11 +141,7 @@ export class WorkoutTemplatesService {
 		this.ensureAccess(template, actor, 'update');
 		if (dto.activities) await this.ensureExercises(dto.activities);
 		return this.dataSource.transaction(async (manager) => {
-				const {
-					activities: _activities,
-					tenantId: _tenantId,
-					...updateDto
-				} = dto;
+			const { activities: _activities, tenantId: _tenantId, ...updateDto } = dto;
 			await manager.save(
 				WorkoutTemplate,
 				Object.assign(template, updateDto, { updatedBy: actor.sub }),
@@ -163,9 +162,13 @@ export class WorkoutTemplatesService {
 	}
 
 	async remove(id: string, actor: JwtPayload): Promise<void> {
-		const template = await this.getOneOrFail(id, this.templateRepo.manager);
-		this.ensureAccess(template, actor, 'delete');
-		await this.templateRepo.softRemove(template);
+		try {
+			const template = await this.getOneOrFail(id, this.templateRepo.manager);
+			this.ensureAccess(template, actor, 'delete');
+			await this.templateRepo.softRemove(template);
+		} catch (error) {
+			console.error(error);
+		}
 	}
 
 	private ensureAccess(
