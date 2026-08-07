@@ -13,6 +13,9 @@ import { Person } from '../persons/entities/person.entity';
 import { CreateAthleteTrainerAssociationDto } from './dto/create-athlete-trainer-association.dto';
 import { CreateAthleteTrainerAssociationsDto } from './dto/create-athlete-trainer-associations.dto';
 import { AthleteTrainerAssociation } from './entities/athlete-trainer-association.entity';
+import { WorkoutsService } from '../workouts/workouts.service';
+import { Workout } from '../workouts/entities/workout.entity';
+import { GenerateWorkoutsFromTemplateDto } from './dto/generate-workouts-from-template.dto';
 
 @Injectable()
 export class AthleteService {
@@ -20,6 +23,7 @@ export class AthleteService {
 		@InjectRepository(User) private readonly users: Repository<User>,
 		@InjectRepository(AthleteTrainerAssociation)
 		private readonly associations: Repository<AthleteTrainerAssociation>,
+		private readonly workoutsService: WorkoutsService,
 		private readonly dataSource: DataSource,
 	) {}
 
@@ -198,7 +202,9 @@ export class AthleteService {
 			athleteIds.map((id) => this.findTenantUser(id, actor.tenantId)),
 		);
 		if (athletes.some((athlete) => !this.hasRole(athlete, Role.TENANT_CLIENT))) {
-			throw new BadRequestException('Um dos usuários selecionados não é um atleta.');
+			throw new BadRequestException(
+				'Um dos usuários selecionados não é um atleta.',
+			);
 		}
 		if (athletes.some((athlete) => athlete.tenantId !== trainer.tenantId)) {
 			throw new BadRequestException(
@@ -252,6 +258,41 @@ export class AthleteService {
 		return this.associations.save(association);
 	}
 
+	async generateWorkoutsFromTemplate(
+		dto: GenerateWorkoutsFromTemplateDto,
+		actor: JwtPayload,
+	) {
+		this.ensureManager(actor);
+		if (!actor.tenantId)
+			throw new BadRequestException(
+				'É necessário selecionar um tenant para gerar treinos.',
+			);
+
+		const athleteIds = [...new Set(dto.athleteIds)];
+		const athletes = await Promise.all(
+			athleteIds.map((id) => this.findTenantUser(id, actor.tenantId)),
+		);
+		if (athletes.some((athlete) => !this.hasRole(athlete, Role.TENANT_CLIENT))) {
+			throw new BadRequestException(
+				'Um dos usuários selecionados não é um atleta.',
+			);
+		}
+
+		const workouts: Workout[] = [];
+		for (const athlete of athletes) {
+			workouts.push(
+				await this.workoutsService.generateWorkoutFromTemplate({
+					templateId: dto.templateId,
+					athleteId: athlete.id,
+					tenantId: actor.tenantId,
+					createdBy: actor.sub,
+					scheduledDate: dto.scheduledDate,
+				}),
+			);
+		}
+		return { count: workouts.length, workouts };
+	}
+
 	private async findTenantUser(
 		id: string,
 		tenantId: string | null,
@@ -285,8 +326,14 @@ export class AthleteService {
 		maximum.setUTCDate(maximum.getUTCDate() + 60);
 		const requested = new Date(`${startDate}T00:00:00.000Z`);
 
-		if (Number.isNaN(requested.getTime()) || requested < today || requested > maximum) {
-			throw new BadRequestException('A data de início deve estar entre hoje e os próximos 60 dias.');
+		if (
+			Number.isNaN(requested.getTime()) ||
+			requested < today ||
+			requested > maximum
+		) {
+			throw new BadRequestException(
+				'A data de início deve estar entre hoje e os próximos 60 dias.',
+			);
 		}
 	}
 

@@ -1,12 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../users/entities/user.entity';
+import { WorkoutsModule } from '../workouts/workouts.module';
 import { AthleteTrainerAssociation } from './entities/athlete-trainer-association.entity';
 import { AthleteController } from './athlete.controller';
 import { AthleteService } from './athlete.service';
 
 @Module({
-	imports: [TypeOrmModule.forFeature([User, AthleteTrainerAssociation])],
+	imports: [
+		TypeOrmModule.forFeature([User, AthleteTrainerAssociation]),
+		WorkoutsModule,
+	],
 	controllers: [AthleteController],
 	providers: [AthleteService],
 })

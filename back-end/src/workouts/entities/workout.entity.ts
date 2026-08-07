@@ -38,8 +38,8 @@ export class Workout {
 	@Column({ name: 'template_description', type: 'text', default: '' })
 	templateDescription!: string;
 
-	@Column({ name: 'scheduled_date', type: 'date' })
-	scheduledDate!: string;
+	@Column({ name: 'scheduled_date', type: 'date', nullable: true })
+	scheduledDate!: string | null;
 
 	@Column({ name: 'performed_at', type: 'timestamptz', nullable: true })
 	performedAt!: Date | null;

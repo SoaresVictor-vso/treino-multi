@@ -5,13 +5,13 @@ export class CreateWorkouts1785800000000 implements MigrationInterface {
 
 	public async up(queryRunner: QueryRunner): Promise<void> {
 		await queryRunner.query(
-			`CREATE TYPE "workout_status_enum" AS ENUM ('scheduled', 'in_progress', 'completed', 'skipped', 'cancelled')`,
+			`CREATE TYPE "workout_status_enum" AS ENUM ('pending', 'scheduled', 'in_progress', 'completed', 'skipped', 'cancelled')`,
 		);
 		await queryRunner.query(
 			`CREATE TYPE "execution_status_enum" AS ENUM ('pending', 'in_progress', 'completed', 'skipped')`,
 		);
 		await queryRunner.query(
-			`CREATE TABLE "workouts" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenant_id" uuid NOT NULL, "athlete_id" uuid NOT NULL, "workout_template_id" uuid, "template_name" character varying NOT NULL, "template_description" text NOT NULL DEFAULT '', "scheduled_date" date NOT NULL, "performed_at" TIMESTAMP WITH TIME ZONE, "status" "workout_status_enum" NOT NULL DEFAULT 'scheduled', "created_by" uuid NOT NULL, "updated_by" uuid NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_workouts" PRIMARY KEY ("id"))`,
+			`CREATE TABLE "workouts" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "tenant_id" uuid NOT NULL, "athlete_id" uuid NOT NULL, "workout_template_id" uuid, "template_name" character varying NOT NULL, "template_description" text NOT NULL DEFAULT '', "scheduled_date" date, "performed_at" TIMESTAMP WITH TIME ZONE, "status" "workout_status_enum" NOT NULL DEFAULT 'scheduled', "created_by" uuid NOT NULL, "updated_by" uuid NOT NULL, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_workouts" PRIMARY KEY ("id"))`,
 		);
 		await queryRunner.query(
 			`CREATE TABLE "executions" ("id" SERIAL NOT NULL, "workout_id" uuid NOT NULL, "exercise_id" integer NOT NULL, "position" integer NOT NULL, "prescribed_metric_1" numeric, "prescribed_metric_2" numeric, "prescribed_pse" numeric, "prescribed_rest_duration" integer, "performed_metric_1" numeric, "performed_metric_2" numeric, "performed_pse" numeric, "performed_rest_duration" integer, "performed_note" text, "status" "execution_status_enum" NOT NULL DEFAULT 'pending', "started_at" TIMESTAMP WITH TIME ZONE, "finished_at" TIMESTAMP WITH TIME ZONE, "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_executions" PRIMARY KEY ("id"))`,
