@@ -13,6 +13,8 @@ export type Athlete = {
 
 export type TrainerOption = { id: string; person: { name: string } };
 
+export type GenerateWorkoutsFromTemplateResponse = { count: number };
+
 export class AthleteService {
 	async findAthletes() {
 		return authenticatedRequest<Athlete[]>('athlete/athletes', {
@@ -38,6 +40,20 @@ export class AthleteService {
 			method: 'POST',
 			body: JSON.stringify({ athleteIds, trainerId, startDate }),
 		});
+	}
+
+	async generateWorkoutsFromTemplate(
+		athleteIds: string[],
+		templateId: string,
+		scheduledDate?: string,
+	) {
+		return authenticatedRequest<GenerateWorkoutsFromTemplateResponse>(
+			'athlete/workouts/from-template',
+			{
+				method: 'POST',
+				body: JSON.stringify({ athleteIds, templateId, scheduledDate }),
+			},
+		);
 	}
 
 	async endAssociation(id: string, endDate?: string) {

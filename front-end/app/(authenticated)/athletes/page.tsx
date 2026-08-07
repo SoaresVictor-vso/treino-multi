@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	RiAddLine,
+	RiCalendarScheduleLine,
 	RiLinkUnlinkM,
 	RiSearchLine,
 	RiUserLine,
@@ -13,6 +14,10 @@ import Badge from '@/components/ui/Badge';
 import ErrorBox from '@/components/ui/ErrorBox';
 import MetricCard from '@/components/ui/MetricCard';
 import { Athlete, AthleteService, TrainerOption } from '@/api/services/athlete';
+import {
+	findAll as findWorkoutTemplates,
+	type WorkoutTemplateSummary,
+} from '@/api/services/workout-templates';
 import { getSessionUser } from '@/lib/auth';
 import { Role } from '@/lib/roles';
 
@@ -34,11 +39,18 @@ export default function AthletesPage() {
 	const [error, setError] = useState<string | null>(null);
 	const [selectedAthleteIds, setSelectedAthleteIds] = useState<string[]>([]);
 	const [associationPanelOpen, setAssociationPanelOpen] = useState(false);
+	const [workoutPanelOpen, setWorkoutPanelOpen] = useState(false);
 	const [trainerId, setTrainerId] = useState('');
+	const [workoutTemplates, setWorkoutTemplates] = useState<WorkoutTemplateSummary[]>(
+		[],
+	);
+	const [workoutTemplateId, setWorkoutTemplateId] = useState('');
+	const [workoutScheduledDate, setWorkoutScheduledDate] = useState('');
 	const [startDate, setStartDate] = useState(
 		new Date().toISOString().slice(0, 10),
 	);
 	const [savingAssociation, setSavingAssociation] = useState(false);
+	const [savingWorkout, setSavingWorkout] = useState(false);
 	const minimumStartDate = new Date().toISOString().slice(0, 10);
 	const maximumStartDate = addDays(minimumStartDate, 60);
 	const [endingAssociationId, setEndingAssociationId] = useState<string | null>(
@@ -90,7 +102,20 @@ export default function AthletesPage() {
 			return;
 		}
 		setTrainers(result.data);
+		setWorkoutPanelOpen(false);
 		setAssociationPanelOpen(true);
+	};
+
+	const openWorkoutAssignment = async () => {
+		if (selectedAthleteIds.length === 0) return;
+		const result = await findWorkoutTemplates();
+		if (!result.success || !result.data) {
+			setError(result.error || 'Não foi possível carregar as templates de treino.');
+			return;
+		}
+		setWorkoutTemplates(result.data);
+		setAssociationPanelOpen(false);
+		setWorkoutPanelOpen(true);
 	};
 
 	const saveAssociation = async () => {
@@ -135,6 +160,29 @@ export default function AthletesPage() {
 			}
 		}
 		setSavingAssociation(false);
+	};
+
+	const saveWorkoutAssignment = async () => {
+		if (!workoutTemplateId) {
+			setError('Selecione uma template de treino.');
+			return;
+		}
+		setSavingWorkout(true);
+		setError(null);
+		const result = await service.generateWorkoutsFromTemplate(
+			selectedAthleteIds,
+			workoutTemplateId,
+			workoutScheduledDate || undefined,
+		);
+		if (!result.success) {
+			setError(result.error || 'Não foi possível associar o treino aos atletas.');
+		} else {
+			setSelectedAthleteIds([]);
+			setWorkoutPanelOpen(false);
+			setWorkoutTemplateId('');
+			setWorkoutScheduledDate('');
+		}
+		setSavingWorkout(false);
 	};
 
 	const endAssociation = async (athlete: Athlete) => {
@@ -219,9 +267,9 @@ export default function AthletesPage() {
 					className="w-full bg-transparent px-3 py-3 text-primary outline-none"
 				/>
 			</div>
-			{canManage &&
-				selectedAthleteIds.length > 0 &&
-				((associationPanelOpen && (
+			{canManage && selectedAthleteIds.length > 0 && (
+				<div className="space-y-3">
+					{associationPanelOpen && (
 					<div className="flex flex-col gap-4 rounded-2xl border border-primary-fixed-dim/30 bg-surface-container p-4 md:flex-row md:items-end">
 						<div className="flex-1">
 							<p className="mb-2 text-sm font-semibold text-primary">
@@ -274,12 +322,70 @@ export default function AthletesPage() {
 							Cancelar
 						</Button>
 					</div>
-				)) || (
-					<Button onClick={() => void openAssociation()}>
+					)}
+					{workoutPanelOpen && (
+						<div className="flex flex-col gap-4 rounded-2xl border border-primary-fixed-dim/30 bg-surface-container p-4 md:flex-row md:items-end">
+							<div className="flex-1">
+								<p className="mb-2 text-sm font-semibold text-primary">
+									Associar treino a {selectedAthleteIds.length} atleta
+									{selectedAthleteIds.length === 1 ? '' : 's'}
+								</p>
+								<p className="text-xs text-on-surface-variant">
+									Sem agendamento, os treinos serão criados como pendentes.
+								</p>
+							</div>
+							<div className="min-w-56">
+								<Select
+									label="Template de treino"
+									placeholder="Selecione uma template"
+									value={workoutTemplateId}
+									onChange={(event) => setWorkoutTemplateId(event.target.value)}
+									options={workoutTemplates.map((template) => ({
+										value: template.id,
+										label: template.name,
+									}))}
+								/>
+							</div>
+							<div>
+								<label
+									htmlFor="workout-scheduled-date"
+									className="mb-1 block text-xs text-on-surface-variant"
+								>
+									Data de agendamento (opcional)
+								</label>
+								<input
+									id="workout-scheduled-date"
+									type="date"
+									value={workoutScheduledDate}
+									onChange={(event) => setWorkoutScheduledDate(event.target.value)}
+									className="rounded-xl border border-outline-variant bg-surface-container-high px-3 py-3 text-primary outline-none focus:border-primary-fixed-dim/50"
+								/>
+							</div>
+							<Button
+								onClick={() => void saveWorkoutAssignment()}
+								disabled={savingWorkout}
+							>
+								{savingWorkout ? 'Associando...' : 'Associar treino'}
+							</Button>
+							<Button variant="ghost" onClick={() => setWorkoutPanelOpen(false)}>
+								Cancelar
+							</Button>
+						</div>
+					)}
+					{!associationPanelOpen && !workoutPanelOpen && (
+						<div className="flex flex-wrap gap-3">
+							<Button onClick={() => void openAssociation()}>
 						<RiAddLine size={20} /> Gerenciar treinador ({selectedAthleteIds.length})
 						{selectedAthleteIds.length === 1 ? '' : 's'}
 					</Button>
-				))}
+							<Button onClick={() => void openWorkoutAssignment()} variant="outline">
+								<RiCalendarScheduleLine size={20} /> Associar treino ({selectedAthleteIds.length})
+								{selectedAthleteIds.length === 1 ? '' : 's'}
+							</Button>
+						</div>
+					)}
+				</div>
+			)}
 
 			<div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container">
 				<div
