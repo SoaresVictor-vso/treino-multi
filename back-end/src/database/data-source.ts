@@ -15,6 +15,9 @@ import { Exercise } from '../exercises/entities/exercise.entity';
 import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
 import { Activity } from '../workout-templates/entities/activity.entity';
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
+import { Workout } from '../workouts/entities/workout.entity';
+import { Execution } from '../workouts/entities/execution.entity';
+import { WorkoutExerciseNote } from '../workouts/entities/workout-exercise-note.entity';
 
 config();
 
@@ -41,6 +44,9 @@ export const AppDataSource = new DataSource({
 		WorkoutTemplate,
 		Activity,
 		AthleteTrainerAssociation,
+		Workout,
+		Execution,
+		WorkoutExerciseNote,
 	],
 	migrations: [__dirname + '/migrations/*{.ts,.js}'],
 	synchronize: false,

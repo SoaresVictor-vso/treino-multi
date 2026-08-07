@@ -14,6 +14,7 @@ import { MetricsModule } from './metrics/metrics.module';
 import { ExercisesModule } from './exercises/exercises.module';
 import { WorkoutTemplatesModule } from './workout-templates/workout-templates.module';
 import { AthleteModule } from './athlete/athlete.module';
+import { WorkoutsModule } from './workouts/workouts.module';
 
 @Module({
 	imports: [
@@ -34,6 +35,7 @@ import { AthleteModule } from './athlete/athlete.module';
 		ExercisesModule,
 		WorkoutTemplatesModule,
 		AthleteModule,
+		WorkoutsModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],
