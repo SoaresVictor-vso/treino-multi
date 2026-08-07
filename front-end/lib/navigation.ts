@@ -55,6 +55,18 @@ const NAV_ITEMS: { [href: string]: NavItem } = {
 		],
 		hidden: false,
 	},
+	'/athletes': {
+		href: '/athletes',
+		label: 'Acompanhamento',
+		icon: 'RiHeartPulseLine',
+		allowedRoles: [
+			Role.ORG_ADMIN,
+			Role.TENANT_ADMIN,
+			Role.TENANT_TRAINER,
+			Role.TENANT_TRAINER_MASTER,
+		],
+		hidden: false,
+	},
 	'/teste': {
 		href: '/tenants',
 		label: 'Tenants',

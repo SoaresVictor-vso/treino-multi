@@ -13,6 +13,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { ExercisesModule } from './exercises/exercises.module';
 import { WorkoutTemplatesModule } from './workout-templates/workout-templates.module';
+import { AthleteModule } from './athlete/athlete.module';
 
 @Module({
 	imports: [
@@ -32,6 +33,7 @@ import { WorkoutTemplatesModule } from './workout-templates/workout-templates.mo
 		MetricsModule,
 		ExercisesModule,
 		WorkoutTemplatesModule,
+		AthleteModule,
 	],
 	controllers: [AppController],
 	providers: [AppService],

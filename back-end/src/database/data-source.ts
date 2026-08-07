@@ -14,6 +14,7 @@ import { Metric } from '../metrics/entities/metric.entity';
 import { Exercise } from '../exercises/entities/exercise.entity';
 import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
 import { Activity } from '../workout-templates/entities/activity.entity';
+import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
 
 config();
 
@@ -39,6 +40,7 @@ export const AppDataSource = new DataSource({
 		Exercise,
 		WorkoutTemplate,
 		Activity,
+		AthleteTrainerAssociation,
 	],
 	migrations: [__dirname + '/migrations/*{.ts,.js}'],
 	synchronize: false,

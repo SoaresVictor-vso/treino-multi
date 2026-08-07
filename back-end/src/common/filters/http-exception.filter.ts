@@ -24,6 +24,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
 		let message: string | string[] = 'Não foi possível realizar a operação';
 
+		if (status >= 500) {
+			console.error(
+				`${request.method} ${request.originalUrl}`,
+				exception instanceof Error ? exception.stack : String(exception),
+			);
+		}
+
 		if (status !== HttpStatus.INTERNAL_SERVER_ERROR) {
 			if (typeof exceptionResponse === 'string') {
 				message = exceptionResponse;

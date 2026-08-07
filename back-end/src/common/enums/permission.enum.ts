@@ -48,4 +48,8 @@ export enum Permission {
 	EXERCISES_CREATE = 'exercises:create',
 	EXERCISES_UPDATE = 'exercises:update',
 	EXERCISES_DELETE = 'exercises:delete',
+
+	// Acompanhamento de atletas
+	ATHLETE_READ = 'athlete-follow-up:read',
+	ATHLETE_MANAGE = 'athlete-follow-up:manage',
 }
