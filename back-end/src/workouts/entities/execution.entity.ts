@@ -1,5 +1,6 @@
 import {
 	Column,
+	Check,
 	CreateDateColumn,
 	Entity,
 	Index,
@@ -11,6 +12,7 @@ import {
 } from 'typeorm';
 import { ExecutionStatus } from '../../common/enums/execution-status.enum';
 import { Exercise } from '../../exercises/entities/exercise.entity';
+import type { RegisterType } from '../../workout-templates/entities/activity.entity';
 import { Workout } from './workout.entity';
 
 const numericTransformer: ValueTransformer = {
@@ -21,6 +23,8 @@ const numericTransformer: ValueTransformer = {
 /** Série prescrita pela template ou criada durante o workout. */
 @Entity('executions')
 @Index(['workoutId', 'position'], { unique: true })
+@Check(`"metric1_type" = 'v'`)
+@Check(`"metric2_type" IS NULL OR "metric2_type" IN ('p', 'v')`)
 export class Execution {
 	@PrimaryGeneratedColumn()
 	id!: number;
@@ -49,6 +53,12 @@ export class Execution {
 		transformer: numericTransformer,
 	})
 	prescribedMetric2!: number | null;
+
+	@Column({ name: 'metric1_type', type: 'varchar', length: 1, default: 'v' })
+	metric1Type!: 'v';
+
+	@Column({ name: 'metric2_type', type: 'varchar', length: 1, nullable: true })
+	metric2Type!: RegisterType | null;
 
 	@Column({
 		name: 'prescribed_pse',

@@ -47,6 +47,8 @@ describe('WorkoutsService', () => {
 					exerciseId: 1,
 					metric1: 3,
 					metric2: 12,
+					type1: 'v',
+					type2: 'p',
 					pse: 7,
 					restDuration: 60,
 					note: 'Controle a cadência',
@@ -72,6 +74,8 @@ describe('WorkoutsService', () => {
 			expect.arrayContaining([
 				expect.objectContaining({
 					position: 1,
+					metric1Type: 'v',
+					metric2Type: 'p',
 					status: ExecutionStatus.PENDING,
 				}),
 			]),

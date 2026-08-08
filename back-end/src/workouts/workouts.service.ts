@@ -67,6 +67,8 @@ export class WorkoutsService {
 			position: index + 1,
 			prescribedMetric1: activity.metric1,
 			prescribedMetric2: activity.metric2,
+			metric1Type: activity.type1,
+			metric2Type: activity.type2,
 			prescribedPse: activity.pse,
 			prescribedRestDuration: activity.restDuration,
 			performedMetric1: null,
