@@ -15,6 +15,8 @@ import { ExercisesModule } from './exercises/exercises.module';
 import { WorkoutTemplatesModule } from './workout-templates/workout-templates.module';
 import { AthleteModule } from './athlete/athlete.module';
 import { WorkoutsModule } from './workouts/workouts.module';
+import { ExerciseGroupsModule } from './exercise-groups/exercise-groups.module';
+import { PersonalRecordsModule } from './personal-records/personal-records.module';
 
 @Module({
 	imports: [
@@ -33,6 +35,8 @@ import { WorkoutsModule } from './workouts/workouts.module';
 		AuditLogsModule,
 		MetricsModule,
 		ExercisesModule,
+		ExerciseGroupsModule,
+		PersonalRecordsModule,
 		WorkoutTemplatesModule,
 		AthleteModule,
 		WorkoutsModule,

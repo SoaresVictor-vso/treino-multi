@@ -49,6 +49,13 @@ export class WorkoutsService {
 						this.createExecution(manager, workout.id, activity, index),
 					),
 				);
+				const notes = this.createExerciseNotes(
+					manager,
+					workout.id,
+					template.activities,
+					input.createdBy,
+				);
+				if (notes.length) await manager.save(WorkoutExerciseNote, notes);
 			}
 
 			return workout;

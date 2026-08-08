@@ -148,9 +148,13 @@ export class WorkoutTemplatesService {
 		if (receivedIds && new Set(receivedIds).size !== receivedIds.length) {
 			throw new BadRequestException('Há activities duplicadas na atualização.');
 		}
-		const existingIds = new Set(existingActivities.map((activity) => activity.id));
+		const existingIds = new Set(
+			existingActivities.map((activity) => activity.id),
+		);
 		if (receivedIds?.some((activityId) => !existingIds.has(activityId))) {
-			throw new NotFoundException('Uma ou mais activities não pertencem à template.');
+			throw new NotFoundException(
+				'Uma ou mais activities não pertencem à template.',
+			);
 		}
 		return this.dataSource.transaction(async (manager) => {
 			const { activities: _activities, tenantId: _tenantId, ...updateDto } = dto;

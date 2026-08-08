@@ -18,6 +18,9 @@ import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-a
 import { Workout } from '../workouts/entities/workout.entity';
 import { Execution } from '../workouts/entities/execution.entity';
 import { WorkoutExerciseNote } from '../workouts/entities/workout-exercise-note.entity';
+import { ExerciseGroup } from '../exercise-groups/entities/exercise-group.entity';
+import { ExerciseGroupExercise } from '../exercise-groups/entities/exercise-group-exercise.entity';
+import { PersonalRecord } from '../personal-records/entities/personal-record.entity';
 
 config();
 
@@ -47,6 +50,9 @@ export const AppDataSource = new DataSource({
 		Workout,
 		Execution,
 		WorkoutExerciseNote,
+		ExerciseGroup,
+		ExerciseGroupExercise,
+		PersonalRecord,
 	],
 	migrations: [__dirname + '/migrations/*{.ts,.js}'],
 	synchronize: false,
