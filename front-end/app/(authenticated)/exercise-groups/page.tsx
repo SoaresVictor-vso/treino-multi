@@ -45,6 +45,7 @@ export default function ExerciseGroupsPage() {
 	const [error, setError] = useState<string | null>(null);
 	const sessionUser = getSessionUser();
 	const isOrgActor = !!sessionUser?.roles.some((role) => [Role.ORG_ADMIN, Role.ORG_SUPPORT].includes(role));
+	const listsAllTenants = !sessionUser?.tenantId;
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -70,6 +71,10 @@ export default function ExerciseGroupsPage() {
 		const normalized = query.trim().toLocaleLowerCase();
 		return normalized ? groups.filter((group) => group.name.toLocaleLowerCase().includes(normalized)) : groups;
 	}, [groups, query]);
+	const tenantNameById = useMemo(
+		() => new Map(tenants.map((tenant) => [tenant.id, tenant.tradeName || tenant.name])),
+		[tenants],
+	);
 	const openEdit = async (group: ExerciseGroup) => {
 		setFormError(null);
 		const result = await exerciseGroupsService.findExercises(group.id);
@@ -133,7 +138,7 @@ export default function ExerciseGroupsPage() {
 		<div className="flex max-w-xl items-center rounded-xl border border-outline-variant bg-surface-container-high px-3"><RiSearchLine className="text-on-surface-variant" size={20} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar grupo" className="w-full bg-transparent px-3 py-3 text-primary outline-none" /></div>
 		<div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container">
 			<div className="hidden grid-cols-[minmax(200px,1fr)_180px_180px_150px] gap-4 border-b border-outline-variant px-5 py-4 text-xs font-semibold uppercase tracking-wider text-on-surface-variant md:grid"><span>Grupo</span><span>Métrica principal</span><span>Métrica secundária</span><span>Ações</span></div>
-			{loading ? <p className="p-6 text-sm text-on-surface-variant">Carregando grupos...</p> : visibleGroups.length === 0 ? <p className="p-6 text-sm text-on-surface-variant">Nenhum grupo encontrado.</p> : visibleGroups.map((group) => <div key={group.id} className="grid gap-3 border-b border-outline-variant/70 px-5 py-4 last:border-b-0 md:grid-cols-[minmax(200px,1fr)_180px_180px_150px] md:items-center md:gap-4"><p className="font-semibold text-primary">{group.name}</p><span className="text-sm text-on-surface-variant">{group.metric1.name} ({group.metric1.symbol})</span><span className="text-sm text-on-surface-variant">{group.metric2 ? `${group.metric2.name} (${group.metric2.symbol})` : '—'}</span><div className="flex gap-1"><Button size="icon" variant="ghost" aria-label={`Editar ${group.name}`} onClick={() => void openEdit(group)}><RiEditLine size={18} /></Button><Button size="icon" variant="ghost" aria-label={`Remover ${group.name}`} onClick={() => void remove(group)}><RiDeleteBinLine size={18} /></Button></div></div>)}
+			{loading ? <p className="p-6 text-sm text-on-surface-variant">Carregando grupos...</p> : visibleGroups.length === 0 ? <p className="p-6 text-sm text-on-surface-variant">Nenhum grupo encontrado.</p> : visibleGroups.map((group) => <div key={group.id} className="grid gap-3 border-b border-outline-variant/70 px-5 py-4 last:border-b-0 md:grid-cols-[minmax(200px,1fr)_180px_180px_150px] md:items-center md:gap-4"><div><p className="font-semibold text-primary">{group.name}</p>{listsAllTenants && <p className="mt-1 text-xs text-on-surface-variant">{tenantNameById.get(group.tenantId) || 'Tenant não identificado'}</p>}</div><span className="text-sm text-on-surface-variant">{group.metric1.name} ({group.metric1.symbol})</span><span className="text-sm text-on-surface-variant">{group.metric2 ? `${group.metric2.name} (${group.metric2.symbol})` : '—'}</span><div className="flex gap-1"><Button size="icon" variant="ghost" aria-label={`Editar ${group.name}`} onClick={() => void openEdit(group)}><RiEditLine size={18} /></Button><Button size="icon" variant="ghost" aria-label={`Remover ${group.name}`} onClick={() => void remove(group)}><RiDeleteBinLine size={18} /></Button></div></div>)}
 		</div>
 		<Modal isOpen={!!form} title={form?.id ? 'Editar grupo de exercícios' : 'Novo grupo de exercícios'} description="Todos os exercícios do grupo precisam possuir as mesmas métricas." onClose={() => setForm(null)}>
 			{form && <div className="space-y-5">{formError && <ErrorBox message={formError} />}<Input label="Nome do grupo" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />

@@ -61,11 +61,20 @@ export class ExerciseGroupsService {
 	}
 
 	async findAll(actor: JwtPayload) {
-		return this.groups.find({
-			where: actor.tenantId ? { tenantId: actor.tenantId } : {},
-			relations: ['metric1', 'metric2'],
-			order: { name: 'ASC' },
-		});
+		const query = this.groups
+			.createQueryBuilder('group')
+			.innerJoin(
+				'group.tenant',
+				'tenant',
+				'tenant.is_active = true AND tenant.deleted_at IS NULL',
+			)
+			.leftJoinAndSelect('group.metric1', 'metric1')
+			.leftJoinAndSelect('group.metric2', 'metric2')
+			.orderBy('group.name', 'ASC');
+		if (actor.tenantId) {
+			query.andWhere('group.tenantId = :tenantId', { tenantId: actor.tenantId });
+		}
+		return query.getMany();
 	}
 
 	async findOne(id: number, actor: JwtPayload) {

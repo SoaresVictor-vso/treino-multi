@@ -1,4 +1,6 @@
 import {
+	BeforeInsert,
+	BeforeUpdate,
 	Column,
 	CreateDateColumn,
 	DeleteDateColumn,
@@ -12,6 +14,12 @@ import { Metric } from '../../metrics/entities/metric.entity';
 
 @Entity('exercises')
 export class Exercise {
+	@BeforeInsert()
+	@BeforeUpdate()
+	normalizeName(): void {
+		this.name = this.name.toLocaleUpperCase('pt-BR');
+	}
+
 	@PrimaryGeneratedColumn()
 	id!: number;
 
