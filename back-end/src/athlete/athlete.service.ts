@@ -18,6 +18,7 @@ import { Workout } from '../workouts/entities/workout.entity';
 import { GenerateWorkoutsFromTemplateDto } from './dto/generate-workouts-from-template.dto';
 import { UsersService } from '../users/users.service';
 import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
+import { WorkoutStatus } from '../common/enums/workout-status.enum';
 
 @Injectable()
 export class AthleteService {
@@ -111,6 +112,38 @@ export class AthleteService {
 					}
 				: null,
 		}));
+	}
+
+	async findMyWorkouts(actor: JwtPayload) {
+		if (!actor.roles.includes(Role.TENANT_CLIENT))
+			throw new ForbiddenException('Esta consulta é exclusiva para atletas.');
+
+		const workouts = await this.dataSource
+			.getRepository(Workout)
+			.createQueryBuilder('workout')
+			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
+			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
+			.andWhere('workout.status IN (:...statuses)', {
+				statuses: [WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED],
+			})
+			.orderBy('workout.scheduledDate', 'ASC', 'NULLS FIRST')
+			.addOrderBy('workout.createdAt', 'DESC')
+			.select([
+				'workout.id AS id',
+				'workout.template_name AS "templateName"',
+				'workout.template_description AS "templateDescription"',
+				'workout.scheduled_date AS "scheduledDate"',
+				'workout.status AS status',
+			])
+			.getRawMany<{
+				id: string;
+				templateName: string;
+				templateDescription: string;
+				scheduledDate: string | null;
+				status: WorkoutStatus;
+			}>();
+
+		return workouts;
 	}
 
 	async findTrainers(actor: JwtPayload) {

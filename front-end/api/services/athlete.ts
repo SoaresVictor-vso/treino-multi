@@ -16,7 +16,21 @@ export type TrainerOption = { id: string; person: { name: string } };
 
 export type GenerateWorkoutsFromTemplateResponse = { count: number };
 
+export type MyWorkout = {
+	id: string;
+	templateName: string;
+	templateDescription: string;
+	scheduledDate: string | null;
+	status: 'pending' | 'scheduled';
+};
+
 export class AthleteService {
+	async findMyWorkouts() {
+		return authenticatedRequest<MyWorkout[]>('athlete/workouts/me', {
+			method: 'GET',
+		});
+	}
+
 	async findAthletes() {
 		return authenticatedRequest<Athlete[]>('athlete/athletes', {
 			method: 'GET',

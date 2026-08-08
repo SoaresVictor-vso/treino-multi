@@ -37,6 +37,14 @@ export class AthleteController {
 		return this.service.findAthletes(actor);
 	}
 
+	@Get('workouts/me')
+	@ApiOperation({
+		summary: 'Lista os treinos pendentes ou agendados do atleta autenticado',
+	})
+	findMyWorkouts(@CurrentUser() actor: JwtPayload) {
+		return this.service.findMyWorkouts(actor);
+	}
+
 	@Get('trainers')
 	@ApiOperation({ summary: 'Lista treinadores disponíveis para associação' })
 	@RequirePermissions(Permission.ATHLETE_MANAGE)

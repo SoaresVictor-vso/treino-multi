@@ -1,14 +1,14 @@
-import Select from '@/components/ui/Select';
+import ClientWorkouts from '@/components/home/ClientWorkouts';
+import { getServerSessionUser } from '@/lib/auth.server';
+import { Role } from '@/lib/roles';
 
-const TENTANT_SELECT_TYPES = [
-	{ value: 'cnpj', label: 'CNPJ' },
-	{ value: 'name', label: 'Nome' },
-];
+export default async function Home() {
+	const user = await getServerSessionUser();
+	const showClientWorkouts = user?.roles.includes(Role.TENANT_CLIENT) ?? false;
 
-export default function Home() {
+	if (!showClientWorkouts) return null;
+
 	return (
-		<div className="p-4">
-			<Select options={TENTANT_SELECT_TYPES} />
-		</div>
+		<ClientWorkouts />
 	);
 }
