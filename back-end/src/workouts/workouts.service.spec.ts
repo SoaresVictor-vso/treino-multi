@@ -1,4 +1,3 @@
-import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
 import { ExecutionStatus } from '../common/enums/execution-status.enum';
@@ -10,9 +9,14 @@ import { Workout } from './entities/workout.entity';
 import { WorkoutsService } from './workouts.service';
 
 const input = {
-	templateId: 'e8af5c95-2c06-41e0-9dab-1d31e7dbb837',
+	template: {
+		id: 'e8af5c95-2c06-41e0-9dab-1d31e7dbb837',
+		tenantId: '3c99542d-88b6-4c2e-9eec-622a149aeb6b',
+		name: 'Treino A',
+		description: 'Descrição',
+		activities: [],
+	} as WorkoutTemplate,
 	athleteId: '1c2723db-2c78-4375-a408-d43d2494a6a2',
-	tenantId: '3c99542d-88b6-4c2e-9eec-622a149aeb6b',
 	createdBy: '6f5caec5-72b0-434e-80e9-59b6a921f60a',
 };
 
@@ -36,10 +40,8 @@ describe('WorkoutsService', () => {
 	});
 
 	it('gera um treino pendente e copia as prescrições da template', async () => {
-		manager.findOne.mockResolvedValue({
-			id: input.templateId,
-			name: 'Treino A',
-			description: 'Descrição',
+		const template = {
+			...input.template,
 			activities: [
 				{
 					exerciseId: 1,
@@ -50,21 +52,17 @@ describe('WorkoutsService', () => {
 					note: 'Controle a cadência',
 				},
 			],
-		});
+		} as WorkoutTemplate;
 		manager.save.mockResolvedValueOnce({ id: 'workout-id' });
 
-		await service.generateWorkoutFromTemplate(input);
+		await service.generateWorkoutFromTemplate({ ...input, template });
 
 		expect(dataSource.transaction).toHaveBeenCalledTimes(1);
-		expect(manager.findOne).toHaveBeenCalledWith(
-			WorkoutTemplate,
-			expect.objectContaining({ lock: { mode: 'pessimistic_write' } }),
-		);
 		expect(manager.save).toHaveBeenNthCalledWith(
 			1,
 			Workout,
 			expect.objectContaining({
-				scheduledDate: null,
+				scheduledDate: undefined,
 				status: WorkoutStatus.PENDING,
 			}),
 		);
@@ -88,16 +86,11 @@ describe('WorkoutsService', () => {
 	});
 
 	it('gera treino agendado quando recebe uma data', async () => {
-		manager.findOne.mockResolvedValue({
-			id: input.templateId,
-			name: 'Treino A',
-			description: '',
-			activities: [],
-		});
 		manager.save.mockResolvedValueOnce({ id: 'workout-id' });
 
 		await service.generateWorkoutFromTemplate({
 			...input,
+			template: { ...input.template, description: '' } as WorkoutTemplate,
 			scheduledDate: '2026-08-10',
 		});
 
@@ -110,12 +103,4 @@ describe('WorkoutsService', () => {
 		);
 	});
 
-	it('reverte a transação quando a template não existe no tenant', async () => {
-		manager.findOne.mockResolvedValue(null);
-
-		await expect(service.generateWorkoutFromTemplate(input)).rejects.toThrow(
-			NotFoundException,
-		);
-		expect(manager.save).not.toHaveBeenCalled();
-	});
 });

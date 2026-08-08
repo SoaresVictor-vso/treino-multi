@@ -67,6 +67,9 @@ export class CreateWorkouts1785800000000 implements MigrationInterface {
 	}
 
 	public async down(queryRunner: QueryRunner): Promise<void> {
+		await queryRunner.query(
+			`ALTER TABLE IF EXISTS "workout_activities" DROP CONSTRAINT IF EXISTS "FK_workout_activities_workout"`,
+		);
 		await queryRunner.query(`DROP TABLE "workout_exercise_notes"`);
 		await queryRunner.query(`DROP TABLE "executions"`);
 		await queryRunner.query(`DROP TABLE "workouts"`);

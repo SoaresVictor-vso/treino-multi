@@ -46,7 +46,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 				message =
 					exception instanceof Error ? exception.message : 'Erro na requisição';
 			}
-		}
+		} else console.error(exception);
 
 		response.status(status).json({
 			statusCode: status,

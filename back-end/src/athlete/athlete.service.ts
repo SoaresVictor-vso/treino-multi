@@ -16,6 +16,8 @@ import { AthleteTrainerAssociation } from './entities/athlete-trainer-associatio
 import { WorkoutsService } from '../workouts/workouts.service';
 import { Workout } from '../workouts/entities/workout.entity';
 import { GenerateWorkoutsFromTemplateDto } from './dto/generate-workouts-from-template.dto';
+import { UsersService } from '../users/users.service';
+import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
 
 @Injectable()
 export class AthleteService {
@@ -23,7 +25,10 @@ export class AthleteService {
 		@InjectRepository(User) private readonly users: Repository<User>,
 		@InjectRepository(AthleteTrainerAssociation)
 		private readonly associations: Repository<AthleteTrainerAssociation>,
+		@InjectRepository(WorkoutTemplate)
+		private readonly templates: Repository<WorkoutTemplate>,
 		private readonly workoutsService: WorkoutsService,
+		private readonly usersService: UsersService,
 		private readonly dataSource: DataSource,
 	) {}
 
@@ -106,7 +111,6 @@ export class AthleteService {
 	}
 
 	async findTrainers(actor: JwtPayload) {
-		this.ensureManager(actor);
 		const qb = this.users
 			.createQueryBuilder('trainer')
 			.innerJoin('trainer.person', 'person')
@@ -137,12 +141,11 @@ export class AthleteService {
 		dto: CreateAthleteTrainerAssociationDto,
 		actor: JwtPayload,
 	) {
-		this.ensureManager(actor);
 		this.ensureValidStartDate(dto.startDate);
-		const [athlete, trainer] = await Promise.all([
-			this.findTenantUser(dto.athleteId, actor.tenantId),
-			this.findTenantUser(dto.trainerId, actor.tenantId),
-		]);
+		const [athlete, trainer] = await this.usersService.findTenantUser(
+			[dto.athleteId, dto.trainerId],
+			actor.tenantId,
+		);
 		if (!this.hasRole(athlete, Role.TENANT_CLIENT))
 			throw new BadRequestException('O usuário selecionado não é um atleta.');
 		if (
@@ -187,10 +190,12 @@ export class AthleteService {
 		dto: CreateAthleteTrainerAssociationsDto,
 		actor: JwtPayload,
 	) {
-		this.ensureManager(actor);
 		this.ensureValidStartDate(dto.startDate);
 		const athleteIds = [...new Set(dto.athleteIds)];
-		const trainer = await this.findTenantUser(dto.trainerId, actor.tenantId);
+		const [trainer, ...athletes] = await this.usersService.findTenantUser(
+			[dto.trainerId, ...athleteIds],
+			actor.tenantId,
+		);
 		if (
 			!this.hasRole(trainer, Role.TENANT_TRAINER) &&
 			!this.hasRole(trainer, Role.TENANT_TRAINER_MASTER)
@@ -198,9 +203,6 @@ export class AthleteService {
 			throw new BadRequestException('O usuário selecionado não é um treinador.');
 		}
 
-		const athletes = await Promise.all(
-			athleteIds.map((id) => this.findTenantUser(id, actor.tenantId)),
-		);
 		if (athletes.some((athlete) => !this.hasRole(athlete, Role.TENANT_CLIENT))) {
 			throw new BadRequestException(
 				'Um dos usuários selecionados não é um atleta.',
@@ -244,7 +246,6 @@ export class AthleteService {
 		endDate: string | undefined,
 		actor: JwtPayload,
 	) {
-		this.ensureManager(actor);
 		const association = await this.associations.findOne({
 			where: { id, endDate: IsNull() },
 			relations: ['athlete'],
@@ -262,61 +263,38 @@ export class AthleteService {
 		dto: GenerateWorkoutsFromTemplateDto,
 		actor: JwtPayload,
 	) {
-		this.ensureManager(actor);
-		if (!actor.tenantId)
-			throw new BadRequestException(
-				'É necessário selecionar um tenant para gerar treinos.',
-			);
-
 		const athleteIds = [...new Set(dto.athleteIds)];
-		const athletes = await Promise.all(
-			athleteIds.map((id) => this.findTenantUser(id, actor.tenantId)),
-		);
+		const [athletes, template] = await Promise.all([
+			this.usersService.findTenantUser(athleteIds, actor.tenantId),
+			this.templates.findOne({
+				where: {
+					id: dto.templateId,
+					...(actor.tenantId && { tenantId: actor.tenantId }),
+				},
+				relations: ['activities'],
+			}),
+		]);
 		if (athletes.some((athlete) => !this.hasRole(athlete, Role.TENANT_CLIENT))) {
 			throw new BadRequestException(
 				'Um dos usuários selecionados não é um atleta.',
 			);
 		}
 
+		if (!template)
+			throw new NotFoundException('Template de treino não encontrado.');
+
 		const workouts: Workout[] = [];
 		for (const athlete of athletes) {
 			workouts.push(
 				await this.workoutsService.generateWorkoutFromTemplate({
-					templateId: dto.templateId,
+					template,
 					athleteId: athlete.id,
-					tenantId: actor.tenantId,
 					createdBy: actor.sub,
 					scheduledDate: dto.scheduledDate,
 				}),
 			);
 		}
 		return { count: workouts.length, workouts };
-	}
-
-	private async findTenantUser(
-		id: string,
-		tenantId: string | null,
-	): Promise<User> {
-		const user = await this.users.findOne({
-			where: { id },
-			relations: ['userRoles'],
-		});
-		if (!user) throw new NotFoundException('Usuário não encontrado.');
-		if (tenantId && user.tenantId !== tenantId)
-			throw new ForbiddenException('Usuário não pertence ao seu tenant.');
-		return user;
-	}
-
-	private ensureManager(actor: JwtPayload) {
-		if (
-			!actor.roles.includes(Role.ORG_ADMIN) &&
-			!actor.roles.includes(Role.TENANT_ADMIN) &&
-			!actor.roles.includes(Role.TENANT_TRAINER_MASTER)
-		) {
-			throw new ForbiddenException(
-				'Somente administradores e treinador master podem gerenciar vínculos.',
-			);
-		}
 	}
 
 	private ensureValidStartDate(startDate: string) {

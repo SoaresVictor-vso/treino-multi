@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { ExecutionStatus } from '../common/enums/execution-status.enum';
 import { WorkoutStatus } from '../common/enums/workout-status.enum';
@@ -9,9 +9,8 @@ import { WorkoutExerciseNote } from './entities/workout-exercise-note.entity';
 import { Workout } from './entities/workout.entity';
 
 export interface GenerateWorkoutFromTemplateInput {
-	templateId: string;
+	template: WorkoutTemplate;
 	athleteId: string;
-	tenantId: string;
 	createdBy: string;
 	scheduledDate?: string;
 }
@@ -24,19 +23,13 @@ export class WorkoutsService {
 		input: GenerateWorkoutFromTemplateInput,
 	): Promise<Workout> {
 		return this.dataSource.transaction(async (manager) => {
-			const template = await manager.findOne(WorkoutTemplate, {
-				where: { id: input.templateId, tenantId: input.tenantId },
-				relations: ['activities'],
-				lock: { mode: 'pessimistic_write' },
-			});
-			if (!template)
-				throw new NotFoundException('Template de treino não encontrado.');
+			const { template } = input;
 
 			const scheduledDate = input.scheduledDate ?? undefined;
 			const workout = await manager.save(
 				Workout,
 				manager.create(Workout, {
-					tenantId: input.tenantId,
+					tenantId: template.tenantId,
 					athleteId: input.athleteId,
 					workoutTemplateId: template.id,
 					templateName: template.name,
@@ -57,14 +50,6 @@ export class WorkoutsService {
 					),
 				);
 			}
-
-			const notes = this.createExerciseNotes(
-				manager,
-				workout.id,
-				template.activities,
-				input.createdBy,
-			);
-			if (notes.length) await manager.save(WorkoutExerciseNote, notes);
 
 			return workout;
 		});

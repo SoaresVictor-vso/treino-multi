@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
-import { DataSource, EntityManager, Not, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
@@ -150,6 +150,26 @@ export class UsersService {
 		});
 		if (!user) throw new NotFoundException(`User ${id} não encontrado.`);
 		return user;
+	}
+
+	async findTenantUser(ids: string[], tenantId: string | null): Promise<User[]> {
+		const uniqueIds = [...new Set(ids)];
+		const users = await this.userRepo.find({
+			where: { id: In(uniqueIds) },
+			relations: ['userRoles'],
+		});
+		if (users.length !== uniqueIds.length)
+			throw new NotFoundException('Usuário não encontrado.');
+
+		if (tenantId !== null) {
+			const outOfTenant = users.find((user) => user.tenantId !== tenantId);
+			if (outOfTenant)
+				throw new ForbiddenException(
+					`Usuário ${outOfTenant.id} não pertence à equipe.`,
+				);
+		}
+		const usersById = new Map(users.map((user) => [user.id, user]));
+		return uniqueIds.map((id) => usersById.get(id)!);
 	}
 
 	async findManagedUsers(dto: FindUsersQueryDto): Promise<{
