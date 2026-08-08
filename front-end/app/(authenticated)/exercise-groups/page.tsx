@@ -5,6 +5,7 @@ import { RiAddLine, RiDeleteBinLine, RiEditLine, RiSearchLine } from 'react-icon
 import { exerciseGroupsService, type ExerciseGroup } from '@/api/services/exercise-groups';
 import { exercisesService, type ExerciseParameter } from '@/api/services/parametro/exercises';
 import { metricsService, type Metric } from '@/api/services/parametro/metrics';
+import type { Exercise } from '@/api/services/parametro';
 import { TenantService } from '@/api/services/tenant';
 import type { TenantListItemDto } from '@/api/dto/tenant/list-tenant.dto';
 import { getSessionUser } from '@/lib/auth';
@@ -14,20 +15,20 @@ import ErrorBox from '@/components/ui/ErrorBox';
 import Input from '@/components/ui/Input';
 import MetricCard from '@/components/ui/MetricCard';
 import Modal from '@/components/ui/Modal';
+import ExercisePicker from '@/components/shared/ExercisePicker';
 import Select from '@/components/ui/Select';
 
 type GroupForm = {
 	id?: number;
 	name: string;
 	tenantId: string;
-	metric1Id: string;
-	metric2Id: string;
-	exerciseIds: number[];
+	selectedExercises: Exercise[];
 	originalExerciseIds: number[];
+	lockedMetrics?: { metric1Id: number; metric2Id: number | null };
 };
 
 const emptyForm = (): GroupForm => ({
-	name: '', tenantId: '', metric1Id: '', metric2Id: '', exerciseIds: [], originalExerciseIds: [],
+	name: '', tenantId: '', selectedExercises: [], originalExerciseIds: [],
 });
 
 export default function ExerciseGroupsPage() {
@@ -37,6 +38,8 @@ export default function ExerciseGroupsPage() {
 	const [tenants, setTenants] = useState<TenantListItemDto[]>([]);
 	const [query, setQuery] = useState('');
 	const [form, setForm] = useState<GroupForm | null>(null);
+	const [pickerOpen, setPickerOpen] = useState(false);
+	const [formError, setFormError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -67,33 +70,43 @@ export default function ExerciseGroupsPage() {
 		const normalized = query.trim().toLocaleLowerCase();
 		return normalized ? groups.filter((group) => group.name.toLocaleLowerCase().includes(normalized)) : groups;
 	}, [groups, query]);
-	const selectableExercises = useMemo(() => form ? exercises.filter((exercise) =>
-		(!isOrgActor || !exercise.tenantId || exercise.tenantId === form.tenantId) &&
-		exercise.metric1Id === Number(form.metric1Id) && (exercise.metric2Id ?? null) === (form.metric2Id ? Number(form.metric2Id) : null),
-	) : [], [exercises, form, isOrgActor]);
-
 	const openEdit = async (group: ExerciseGroup) => {
+		setFormError(null);
 		const result = await exerciseGroupsService.findExercises(group.id);
 		if (!result.success || !result.data) { setError(result.error || 'Não foi possível carregar os exercícios do grupo.'); return; }
 		const ids = result.data.map((item) => item.exerciseId);
-		setForm({ id: group.id, name: group.name, tenantId: group.tenantId, metric1Id: String(group.metric1Id), metric2Id: group.metric2Id ? String(group.metric2Id) : '', exerciseIds: ids, originalExerciseIds: ids });
+		const metricById = new Map(metrics.map((metric) => [metric.id, metric]));
+		const exerciseById = new Map(exercises.map((exercise) => [Number(exercise.id), exercise]));
+		const selectedExercises = ids.flatMap((id) => {
+			const exercise = exerciseById.get(id);
+			const metric1 = exercise && metricById.get(exercise.metric1Id);
+			if (!exercise || !metric1) return [];
+			const metric2 = exercise.metric2Id ? metricById.get(exercise.metric2Id) : undefined;
+			return [{ id, name: exercise.name, description: exercise.description, metric_1: metric1, ...(metric2 ? { metric_2: metric2 } : {}), ...(exercise.visualUrl ? { visual_url: exercise.visualUrl } : {}) }];
+		});
+		setForm({ id: group.id, name: group.name, tenantId: group.tenantId, selectedExercises, originalExerciseIds: ids, lockedMetrics: { metric1Id: group.metric1Id, metric2Id: group.metric2Id } });
 	};
 
 	const save = async () => {
-		if (!form || !form.name.trim() || !form.metric1Id || form.exerciseIds.length === 0 || (isOrgActor && !form.tenantId)) {
-			setError('Informe nome, tenant, métricas e ao menos um exercício.'); return;
+		if (!form || !form.name.trim() || form.selectedExercises.length === 0 || (isOrgActor && !form.tenantId)) {
+			setFormError('Informe nome, tenant e ao menos um exercício.'); return;
 		}
-		setSaving(true); setError(null);
-		const metric1Id = Number(form.metric1Id);
-		const metric2Id = form.metric2Id ? Number(form.metric2Id) : null;
+		setSaving(true); setFormError(null);
+		const exerciseIds = form.selectedExercises.map((exercise) => exercise.id);
 		const result = form.id
 			? await exerciseGroupsService.update(form.id, {
-				name: form.name.trim(), metric1Id, metric2Id,
-				exerciseIdsToAdd: form.exerciseIds.filter((id) => !form.originalExerciseIds.includes(id)),
-				exerciseIdsToRemove: form.originalExerciseIds.filter((id) => !form.exerciseIds.includes(id)),
+				name: form.name.trim(),
+				exerciseIdsToAdd: exerciseIds.filter((id) => !form.originalExerciseIds.includes(id)),
+				exerciseIdsToRemove: form.originalExerciseIds.filter((id) => !exerciseIds.includes(id)),
 			})
-			: await exerciseGroupsService.create({ name: form.name.trim(), ...(isOrgActor ? { tenantId: form.tenantId } : {}), metric1Id, metric2Id, exerciseIds: form.exerciseIds });
-		if (!result.success) setError(result.error || 'Não foi possível salvar o grupo.');
+			: await exerciseGroupsService.create({
+				name: form.name.trim(),
+				...(isOrgActor ? { tenantId: form.tenantId } : {}),
+				metric1Id: form.selectedExercises[0].metric_1.id,
+				metric2Id: form.selectedExercises[0].metric_2?.id ?? null,
+				exerciseIds,
+			});
+		if (!result.success) setFormError(result.error || 'Não foi possível salvar o grupo.');
 		else { setForm(null); await load(); }
 		setSaving(false);
 	};
@@ -104,13 +117,16 @@ export default function ExerciseGroupsPage() {
 		if (!result.success) setError(result.error || 'Não foi possível remover o grupo.'); else await load();
 	};
 
-	const changeMetric = (key: 'metric1Id' | 'metric2Id', value: string) => setForm((current) => current ? { ...current, [key]: value, exerciseIds: [] } : current);
-	const toggleExercise = (id: number) => setForm((current) => current ? { ...current, exerciseIds: current.exerciseIds.includes(id) ? current.exerciseIds.filter((item) => item !== id) : [...current.exerciseIds, id] } : current);
+	const selectedMetrics = form?.selectedExercises[0];
+	const displayedMetrics = selectedMetrics ?? (form?.lockedMetrics ? {
+		metric_1: metrics.find((metric) => metric.id === form.lockedMetrics?.metric1Id),
+		metric_2: form.lockedMetrics.metric2Id == null ? undefined : metrics.find((metric) => metric.id === form.lockedMetrics?.metric2Id),
+	} : null);
 
 	return <div className="mx-auto max-w-[1440px] space-y-7 p-4 md:p-8">
 		<header className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
 			<div><p className="type-label-caps text-secondary-fixed-dim">Catálogo de exercícios</p><h1 className="mt-2 text-3xl font-bold tracking-tight text-primary">Grupos de exercícios</h1><p className="mt-2 text-on-surface-variant">Agrupe exercícios com as mesmas métricas para registrar e acompanhar referências.</p></div>
-			<Button onClick={() => setForm(emptyForm())}><RiAddLine size={20} /> Novo grupo</Button>
+			<Button onClick={() => { setFormError(null); setForm(emptyForm()); }}><RiAddLine size={20} /> Novo grupo</Button>
 		</header>
 		<section className="grid gap-3 sm:grid-cols-3"><MetricCard label="Grupos" value={groups.length} description="Grupos disponíveis no tenant." /><MetricCard label="Métricas" value={new Set(groups.map((group) => `${group.metric1Id}-${group.metric2Id ?? ''}`)).size} description="Combinações em uso." /><MetricCard label="Exercícios" value={exercises.length} description="Exercícios disponíveis no catálogo." /></section>
 		{error && <ErrorBox message={error} />}
@@ -120,12 +136,12 @@ export default function ExerciseGroupsPage() {
 			{loading ? <p className="p-6 text-sm text-on-surface-variant">Carregando grupos...</p> : visibleGroups.length === 0 ? <p className="p-6 text-sm text-on-surface-variant">Nenhum grupo encontrado.</p> : visibleGroups.map((group) => <div key={group.id} className="grid gap-3 border-b border-outline-variant/70 px-5 py-4 last:border-b-0 md:grid-cols-[minmax(200px,1fr)_180px_180px_150px] md:items-center md:gap-4"><p className="font-semibold text-primary">{group.name}</p><span className="text-sm text-on-surface-variant">{group.metric1.name} ({group.metric1.symbol})</span><span className="text-sm text-on-surface-variant">{group.metric2 ? `${group.metric2.name} (${group.metric2.symbol})` : '—'}</span><div className="flex gap-1"><Button size="icon" variant="ghost" aria-label={`Editar ${group.name}`} onClick={() => void openEdit(group)}><RiEditLine size={18} /></Button><Button size="icon" variant="ghost" aria-label={`Remover ${group.name}`} onClick={() => void remove(group)}><RiDeleteBinLine size={18} /></Button></div></div>)}
 		</div>
 		<Modal isOpen={!!form} title={form?.id ? 'Editar grupo de exercícios' : 'Novo grupo de exercícios'} description="Todos os exercícios do grupo precisam possuir as mesmas métricas." onClose={() => setForm(null)}>
-			{form && <div className="space-y-5"><Input label="Nome do grupo" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-				{isOrgActor && <Select label="Tenant" value={form.tenantId} onChange={(event) => setForm({ ...form, tenantId: event.target.value })} placeholder="Selecione o tenant" options={tenants.map((tenant) => ({ value: tenant.id, label: tenant.tradeName || tenant.name }))} />}
-				<div className="grid gap-4 md:grid-cols-2"><Select label="Métrica principal" value={form.metric1Id} onChange={(event) => changeMetric('metric1Id', event.target.value)} placeholder="Selecione a métrica" options={metrics.map((metric) => ({ value: String(metric.id), label: `${metric.name} (${metric.symbol})` }))} /><Select label="Métrica secundária" value={form.metric2Id} onChange={(event) => changeMetric('metric2Id', event.target.value)} placeholder="Nenhuma" canClear options={metrics.filter((metric) => String(metric.id) !== form.metric1Id).map((metric) => ({ value: String(metric.id), label: `${metric.name} (${metric.symbol})` }))} /></div>
-				<div><div className="mb-2 flex items-center justify-between"><p className="text-sm font-semibold text-primary">Exercícios ({form.exerciseIds.length})</p><p className="text-xs text-on-surface-variant">Filtrados pelas métricas escolhidas</p></div><div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-outline-variant p-2">{!form.metric1Id ? <p className="p-3 text-sm text-on-surface-variant">Escolha as métricas para listar os exercícios compatíveis.</p> : selectableExercises.length === 0 ? <p className="p-3 text-sm text-on-surface-variant">Nenhum exercício compatível encontrado.</p> : selectableExercises.map((exercise) => <label key={exercise.id} className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-surface-variant"><input type="checkbox" checked={form.exerciseIds.includes(Number(exercise.id))} onChange={() => toggleExercise(Number(exercise.id))} className="h-4 w-4 accent-primary-container" /><span><span className="block text-sm font-medium text-primary">{exercise.name}</span>{exercise.description && <span className="block text-xs text-on-surface-variant">{exercise.description}</span>}</span></label>)}</div></div>
+			{form && <div className="space-y-5">{formError && <ErrorBox message={formError} />}<Input label="Nome do grupo" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+				{isOrgActor && <Select label="Tenant" value={form.tenantId} onChange={(event) => setForm({ ...form, tenantId: event.target.value, selectedExercises: [] })} placeholder="Selecione o tenant" options={tenants.map((tenant) => ({ value: tenant.id, label: tenant.tradeName || tenant.name }))} />}
+				<div className="rounded-xl border border-outline-variant p-4"><div className="flex items-center justify-between gap-4"><div><p className="text-sm font-semibold text-primary">Exercícios ({form.selectedExercises.length})</p><p className="mt-1 text-xs text-on-surface-variant">{form.id ? 'As métricas do grupo não podem ser alteradas.' : 'O primeiro exercício define as métricas do grupo.'}</p></div><Button type="button" variant="outline" onClick={() => setPickerOpen(true)}>Selecionar exercícios</Button></div>{displayedMetrics?.metric_1 && <p className="mt-3 text-sm text-on-surface-variant">Métricas: {displayedMetrics.metric_1.name} ({displayedMetrics.metric_1.symbol}){displayedMetrics.metric_2 ? ` · ${displayedMetrics.metric_2.name} (${displayedMetrics.metric_2.symbol})` : ''}</p>}</div>
 				<div className="flex justify-end gap-3 border-t border-outline-variant pt-5"><Button variant="ghost" onClick={() => setForm(null)}>Cancelar</Button><Button onClick={() => void save()} disabled={saving}>{saving ? 'Salvando...' : 'Salvar grupo'}</Button></div>
 			</div>}
 		</Modal>
+		{form && pickerOpen && <ExercisePicker selected={form.selectedExercises} onChange={(selectedExercises) => setForm((current) => current ? { ...current, selectedExercises } : current)} onClose={() => setPickerOpen(false)} matchMetricsOfFirstSelection requiredMetrics={form.lockedMetrics} filterExercise={(exercise) => !isOrgActor || !form.tenantId || exercises.some((item) => Number(item.id) === exercise.id && (!item.tenantId || item.tenantId === form.tenantId))} />}
 	</div>;
 }

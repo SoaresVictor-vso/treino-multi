@@ -23,6 +23,12 @@ export type SaveExerciseGroupDto = {
 	exerciseIds: number[];
 };
 
+export type UpdateExerciseGroupDto = {
+	name?: string;
+	exerciseIdsToAdd: number[];
+	exerciseIdsToRemove: number[];
+};
+
 export const exerciseGroupsService = {
 	findAll: () => authenticatedRequest<ExerciseGroup[]>('exercise-groups'),
 	findExercises: (id: number) =>
@@ -32,7 +38,7 @@ export const exerciseGroupsService = {
 			method: 'POST',
 			body: JSON.stringify(dto),
 		}),
-	update: (id: number, dto: Omit<SaveExerciseGroupDto, 'tenantId' | 'exerciseIds'> & { exerciseIdsToAdd: number[]; exerciseIdsToRemove: number[] }) =>
+	update: (id: number, dto: UpdateExerciseGroupDto) =>
 		authenticatedRequest<ExerciseGroup>(`exercise-groups/${id}`, {
 			method: 'PATCH',
 			body: JSON.stringify(dto),

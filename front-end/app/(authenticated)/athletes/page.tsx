@@ -25,6 +25,7 @@ import Input from '@/components/ui/Input';
 import { personalRecordsService, type PersonalRecord } from '@/api/services/personal-records';
 import { exerciseGroupsService, type ExerciseGroup } from '@/api/services/exercise-groups';
 import { exercisesService, type ExerciseParameter } from '@/api/services/parametro/exercises';
+import { metricsService, type Metric } from '@/api/services/parametro/metrics';
 
 const service = new AthleteService();
 const NO_TRAINER_VALUE = '__none__';
@@ -63,6 +64,7 @@ export default function AthletesPage() {
 	const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
 	const [exerciseGroups, setExerciseGroups] = useState<ExerciseGroup[]>([]);
 	const [recordExercises, setRecordExercises] = useState<ExerciseParameter[]>([]);
+	const [recordMetrics, setRecordMetrics] = useState<Metric[]>([]);
 	const [recordReferenceType, setRecordReferenceType] = useState<'group' | 'exercise'>('group');
 	const [recordReferenceId, setRecordReferenceId] = useState('');
 	const [recordValue, setRecordValue] = useState('');
@@ -204,10 +206,11 @@ export default function AthletesPage() {
 
 	const openPersonalRecord = async (athlete: Athlete) => {
 		setError(null);
-		const [recordsResult, groupsResult, exercisesResult] = await Promise.all([
+		const [recordsResult, groupsResult, exercisesResult, metricList] = await Promise.all([
 			personalRecordsService.findByAthlete(athlete.id),
 			exerciseGroupsService.findAll(),
 			exercisesService.syncCatalog(),
+			metricsService.search(),
 		]);
 		if (!recordsResult.success || !groupsResult.success) {
 			setError(recordsResult.error || groupsResult.error || 'Não foi possível carregar os dados de RP.');
@@ -216,6 +219,7 @@ export default function AthletesPage() {
 		setPersonalRecords(recordsResult.data ?? []);
 		setExerciseGroups((groupsResult.data ?? []).filter((group) => group.tenantId === athlete.tenantId));
 		setRecordExercises(exercisesResult.filter((exercise) => !exercise.tenantId || exercise.tenantId === athlete.tenantId));
+		setRecordMetrics(metricList);
 		setRecordReferenceType('group');
 		setRecordReferenceId('');
 		setRecordValue('');
@@ -245,6 +249,14 @@ export default function AthletesPage() {
 	const allVisibleSelected =
 		visibleAthletes.length > 0 &&
 		visibleAthletes.every((athlete) => selectedAthleteIds.includes(athlete.id));
+	const recordMetricSymbol = useMemo(() => {
+		if (!recordReferenceId) return '';
+		if (recordReferenceType === 'group') {
+			return exerciseGroups.find((group) => group.id === Number(recordReferenceId))?.metric2?.symbol ?? '';
+		}
+		const metric2Id = recordExercises.find((exercise) => Number(exercise.id) === Number(recordReferenceId))?.metric2Id;
+		return recordMetrics.find((metric) => metric.id === metric2Id)?.symbol ?? '';
+	}, [exerciseGroups, recordExercises, recordMetrics, recordReferenceId, recordReferenceType]);
 	const toggleAthlete = (id: string) => {
 		setSelectedAthleteIds((current) =>
 			current.includes(id)
@@ -529,7 +541,7 @@ export default function AthletesPage() {
 					<div className="grid gap-4 md:grid-cols-2">
 						<Select label="Tipo de referência" value={recordReferenceType} onChange={(event) => { setRecordReferenceType(event.target.value as 'group' | 'exercise'); setRecordReferenceId(''); }} options={[{ value: 'group', label: 'Grupo de exercícios' }, { value: 'exercise', label: 'Exercício individual' }]} />
 						<Select label={recordReferenceType === 'group' ? 'Grupo de exercícios' : 'Exercício'} value={recordReferenceId} onChange={(event) => setRecordReferenceId(event.target.value)} placeholder="Selecione" options={(recordReferenceType === 'group' ? exerciseGroups.map((group) => ({ value: String(group.id), label: group.name })) : recordExercises.map((exercise) => ({ value: String(exercise.id), label: exercise.name })))} />
-						<Input label="Valor do 1RM" type="number" min="0.001" step="0.001" value={recordValue} onChange={(event) => setRecordValue(event.target.value)} required />
+						<Input label={`Valor do 1RM${recordMetricSymbol ? ` (${recordMetricSymbol})` : ''}`} type="number" min="0.001" step="0.001" value={recordValue} onChange={(event) => setRecordValue(event.target.value)} required />
 						<Input label="Data da medição" type="date" value={recordMeasuredAt} onChange={(event) => setRecordMeasuredAt(event.target.value)} required />
 					</div>
 					<div className="rounded-xl border border-outline-variant bg-surface-container-high p-4"><p className="mb-3 text-sm font-semibold text-primary">Registros anteriores</p>{personalRecords.length === 0 ? <p className="text-sm text-on-surface-variant">Nenhum RP registrado para este atleta.</p> : <div className="space-y-2">{personalRecords.slice(0, 5).map((record) => <div key={record.id} className="flex justify-between gap-4 text-sm"><span className="text-primary">{record.exerciseGroup?.name || record.exercise?.name}</span><span className="text-on-surface-variant">{record.value} · {formatDate(record.measuredAt)}</span></div>)}</div>}</div>

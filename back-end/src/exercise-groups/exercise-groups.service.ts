@@ -92,9 +92,6 @@ export class ExerciseGroupsService {
 			this.findManagedOne(id, actor),
 			dto.exerciseIdsToAdd ? this.findExercisesByIds(dto.exerciseIdsToAdd) : [],
 		]);
-		const metric1Id = dto.metric1Id ?? group.metric1Id;
-		const metric2Id =
-			dto.metric2Id === undefined ? group.metric2Id : dto.metric2Id;
 		const currentExercises = group.activeExercises ?? [];
 
 		const exerciseIdsToRemove = new Set(dto.exerciseIdsToRemove ?? []);
@@ -121,11 +118,13 @@ export class ExerciseGroupsService {
 			...exercisesToAdd,
 		];
 		this.ensureExercisesBelongToTenant(exercises, group.tenantId);
-		this.ensureGroupExercisesMatchMetrics(exercises, metric1Id, metric2Id);
+		this.ensureGroupExercisesMatchMetrics(
+			exercises,
+			group.metric1Id,
+			group.metric2Id,
+		);
 		Object.assign(group, {
 			...(dto.name !== undefined && { name: dto.name.trim() }),
-			...(dto.metric1Id !== undefined && { metric1Id: dto.metric1Id }),
-			...(dto.metric2Id !== undefined && { metric2Id: dto.metric2Id }),
 			updatedBy: actor.sub,
 		});
 		return this.groups.manager.transaction(async (manager) => {

@@ -48,10 +48,18 @@ export default function ExercisePicker({
 	selected,
 	onChange,
 	onClose,
+	matchMetricsOfFirstSelection = false,
+	requiredMetrics,
+	filterExercise,
 }: {
 	selected: Exercise[];
 	onChange: (selected: Exercise[]) => void;
 	onClose: () => void;
+	/** Limits later selections to the metric combination of the first exercise. */
+	matchMetricsOfFirstSelection?: boolean;
+	/** Keeps every selection within a pre-existing group's metric combination. */
+	requiredMetrics?: { metric1Id: number; metric2Id: number | null };
+	filterExercise?: (exercise: Exercise) => boolean;
 }) {
 	const [query, setQuery] = useState('');
 	const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -84,13 +92,21 @@ export default function ExercisePicker({
 
 	const visibleExercises = useMemo(() => {
 		const normalizedQuery = query.trim().toLocaleLowerCase();
-		if (!normalizedQuery) return exercises;
-		return exercises.filter((exercise) =>
-			`${exercise.name} ${descriptions[exercise.id] ?? ''}`
+		const firstSelected = selected[0];
+		return exercises.filter((exercise) => {
+			const matchesQuery = !normalizedQuery || `${exercise.name} ${descriptions[exercise.id] ?? ''}`
 				.toLocaleLowerCase()
-				.includes(normalizedQuery),
-		);
-	}, [exercises, descriptions, query]);
+				.includes(normalizedQuery);
+			const metricReference = requiredMetrics ?? (matchMetricsOfFirstSelection && firstSelected
+				? { metric1Id: firstSelected.metric_1.id, metric2Id: firstSelected.metric_2?.id ?? null }
+				: null);
+			const matchesMetrics = !metricReference || (
+				exercise.metric_1.id === metricReference.metric1Id &&
+				(exercise.metric_2?.id ?? null) === metricReference.metric2Id
+			);
+			return matchesQuery && matchesMetrics && (!filterExercise || filterExercise(exercise));
+		});
+	}, [exercises, descriptions, filterExercise, matchMetricsOfFirstSelection, query, requiredMetrics, selected]);
 
 	const toggle = (exercise: Exercise) => {
 		const isSelected = selected.some((item) => item.id === exercise.id);
