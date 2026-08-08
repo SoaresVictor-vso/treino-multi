@@ -66,6 +66,13 @@ const NAV_ITEMS: { [href: string]: NavItem } = {
 			Role.TENANT_TRAINER_MASTER,
 		],
 		hidden: false,
+		},
+	'/exercise-groups': {
+		href: '/exercise-groups',
+		label: 'Grupos de exercícios',
+		icon: 'RiNodeTree',
+		allowedRoles: [Role.ORG_ADMIN, Role.ORG_SUPPORT, Role.TENANT_ADMIN],
+		hidden: false,
 	},
 	'/teste': {
 		href: '/tenants',

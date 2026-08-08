@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	RiAddLine,
 	RiCalendarScheduleLine,
-	RiLinkUnlinkM,
+	RiMedalLine,
 	RiSearchLine,
 	RiUserLine,
 } from 'react-icons/ri';
@@ -20,6 +20,11 @@ import {
 } from '@/api/services/workout-templates';
 import { getSessionUser } from '@/lib/auth';
 import { Role } from '@/lib/roles';
+import Modal from '@/components/ui/Modal';
+import Input from '@/components/ui/Input';
+import { personalRecordsService, type PersonalRecord } from '@/api/services/personal-records';
+import { exerciseGroupsService, type ExerciseGroup } from '@/api/services/exercise-groups';
+import { exercisesService, type ExerciseParameter } from '@/api/services/parametro/exercises';
 
 const service = new AthleteService();
 const NO_TRAINER_VALUE = '__none__';
@@ -32,6 +37,7 @@ function addDays(date: string, days: number) {
 
 export default function AthletesPage() {
 	const [canManage, setCanManage] = useState(false);
+	const [canRegisterPersonalRecord, setCanRegisterPersonalRecord] = useState(false);
 	const [athletes, setAthletes] = useState<Athlete[]>([]);
 	const [trainers, setTrainers] = useState<TrainerOption[]>([]);
 	const [search, setSearch] = useState('');
@@ -53,9 +59,15 @@ export default function AthletesPage() {
 	const [savingWorkout, setSavingWorkout] = useState(false);
 	const minimumStartDate = new Date().toISOString().slice(0, 10);
 	const maximumStartDate = addDays(minimumStartDate, 60);
-	const [endingAssociationId, setEndingAssociationId] = useState<string | null>(
-		null,
-	);
+	const [personalRecordAthlete, setPersonalRecordAthlete] = useState<Athlete | null>(null);
+	const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
+	const [exerciseGroups, setExerciseGroups] = useState<ExerciseGroup[]>([]);
+	const [recordExercises, setRecordExercises] = useState<ExerciseParameter[]>([]);
+	const [recordReferenceType, setRecordReferenceType] = useState<'group' | 'exercise'>('group');
+	const [recordReferenceId, setRecordReferenceId] = useState('');
+	const [recordValue, setRecordValue] = useState('');
+	const [recordMeasuredAt, setRecordMeasuredAt] = useState(new Date().toISOString().slice(0, 10));
+	const [savingPersonalRecord, setSavingPersonalRecord] = useState(false);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -80,6 +92,11 @@ export default function AthletesPage() {
 					[Role.ORG_ADMIN, Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER].includes(
 						role,
 					),
+				),
+			);
+			setCanRegisterPersonalRecord(
+				!!sessionUser?.roles.some((role) =>
+					[Role.ORG_ADMIN, Role.ORG_SUPPORT, Role.TENANT_ADMIN].includes(role),
 				),
 			);
 		});
@@ -185,20 +202,44 @@ export default function AthletesPage() {
 		setSavingWorkout(false);
 	};
 
-	const endAssociation = async (athlete: Athlete) => {
-		const association = athlete.activeAssociation;
-		if (
-			!association ||
-			!window.confirm(`Desassociar ${athlete.person.name} do treinador atual?`)
-		)
-			return;
-		setEndingAssociationId(association.id);
+	const openPersonalRecord = async (athlete: Athlete) => {
 		setError(null);
-		const result = await service.endAssociation(association.id);
-		if (!result.success)
-			setError(result.error || 'Não foi possível desassociar o atleta.');
-		else await load();
-		setEndingAssociationId(null);
+		const [recordsResult, groupsResult, exercisesResult] = await Promise.all([
+			personalRecordsService.findByAthlete(athlete.id),
+			exerciseGroupsService.findAll(),
+			exercisesService.syncCatalog(),
+		]);
+		if (!recordsResult.success || !groupsResult.success) {
+			setError(recordsResult.error || groupsResult.error || 'Não foi possível carregar os dados de RP.');
+			return;
+		}
+		setPersonalRecords(recordsResult.data ?? []);
+		setExerciseGroups((groupsResult.data ?? []).filter((group) => group.tenantId === athlete.tenantId));
+		setRecordExercises(exercisesResult.filter((exercise) => !exercise.tenantId || exercise.tenantId === athlete.tenantId));
+		setRecordReferenceType('group');
+		setRecordReferenceId('');
+		setRecordValue('');
+		setRecordMeasuredAt(new Date().toISOString().slice(0, 10));
+		setPersonalRecordAthlete(athlete);
+	};
+
+	const savePersonalRecord = async () => {
+		if (!personalRecordAthlete || !recordReferenceId || !recordValue || Number(recordValue) <= 0 || !recordMeasuredAt) {
+			setError('Informe uma referência, um valor maior que zero e a data da medição.');
+			return;
+		}
+		setSavingPersonalRecord(true);
+		const result = await personalRecordsService.create({
+			athleteId: personalRecordAthlete.id,
+			...(recordReferenceType === 'group' ? { exerciseGroupId: Number(recordReferenceId) } : { exerciseId: Number(recordReferenceId) }),
+			value: Number(recordValue), measuredAt: recordMeasuredAt,
+		});
+		if (!result.success) setError(result.error || 'Não foi possível registrar o RP.');
+		else {
+			setPersonalRecords((current) => result.data ? [result.data, ...current] : current);
+			setRecordReferenceId(''); setRecordValue('');
+		}
+		setSavingPersonalRecord(false);
 	};
 
 	const allVisibleSelected =
@@ -463,17 +504,13 @@ export default function AthletesPage() {
 							</div>
 							{canManage && (
 								<div>
-									{athlete.activeAssociation && (
+									{canRegisterPersonalRecord && (
 										<Button
 											variant="ghost"
 											size="sm"
-											onClick={() => void endAssociation(athlete)}
-											disabled={endingAssociationId === athlete.activeAssociation.id}
+											onClick={() => void openPersonalRecord(athlete)}
 										>
-											<RiLinkUnlinkM size={17} />
-											{endingAssociationId === athlete.activeAssociation.id
-												? 'Desassociando...'
-												: 'Desassociar'}
+											<RiMedalLine size={17} /> Registrar RP
 										</Button>
 									)}
 								</div>
@@ -482,6 +519,23 @@ export default function AthletesPage() {
 					))
 				)}
 			</div>
+			<Modal
+				isOpen={!!personalRecordAthlete}
+				title={`Registrar RP${personalRecordAthlete ? ` — ${personalRecordAthlete.person.name}` : ''}`}
+				description="Registre um 1RM de referência por grupo de exercícios ou exercício individual."
+				onClose={() => setPersonalRecordAthlete(null)}
+			>
+				<div className="space-y-5">
+					<div className="grid gap-4 md:grid-cols-2">
+						<Select label="Tipo de referência" value={recordReferenceType} onChange={(event) => { setRecordReferenceType(event.target.value as 'group' | 'exercise'); setRecordReferenceId(''); }} options={[{ value: 'group', label: 'Grupo de exercícios' }, { value: 'exercise', label: 'Exercício individual' }]} />
+						<Select label={recordReferenceType === 'group' ? 'Grupo de exercícios' : 'Exercício'} value={recordReferenceId} onChange={(event) => setRecordReferenceId(event.target.value)} placeholder="Selecione" options={(recordReferenceType === 'group' ? exerciseGroups.map((group) => ({ value: String(group.id), label: group.name })) : recordExercises.map((exercise) => ({ value: String(exercise.id), label: exercise.name })))} />
+						<Input label="Valor do 1RM" type="number" min="0.001" step="0.001" value={recordValue} onChange={(event) => setRecordValue(event.target.value)} required />
+						<Input label="Data da medição" type="date" value={recordMeasuredAt} onChange={(event) => setRecordMeasuredAt(event.target.value)} required />
+					</div>
+					<div className="rounded-xl border border-outline-variant bg-surface-container-high p-4"><p className="mb-3 text-sm font-semibold text-primary">Registros anteriores</p>{personalRecords.length === 0 ? <p className="text-sm text-on-surface-variant">Nenhum RP registrado para este atleta.</p> : <div className="space-y-2">{personalRecords.slice(0, 5).map((record) => <div key={record.id} className="flex justify-between gap-4 text-sm"><span className="text-primary">{record.exerciseGroup?.name || record.exercise?.name}</span><span className="text-on-surface-variant">{record.value} · {formatDate(record.measuredAt)}</span></div>)}</div>}</div>
+					<div className="flex justify-end gap-3 border-t border-outline-variant pt-5"><Button variant="ghost" onClick={() => setPersonalRecordAthlete(null)}>Fechar</Button><Button onClick={() => void savePersonalRecord()} disabled={savingPersonalRecord}>{savingPersonalRecord ? 'Registrando...' : 'Registrar RP'}</Button></div>
+				</div>
+			</Modal>
 		</div>
 	);
 }

@@ -12,6 +12,7 @@ export type ExerciseParameter = IndexedDbEntity & {
 	description: string;
 	metric1Id: number;
 	metric2Id?: number | null;
+	tenantId?: string | null;
 	visualUrl?: string | null;
 };
 
@@ -102,6 +103,7 @@ export class ExercisesService implements ExercisesServiceContract {
 			description: exercise.description ?? '',
 			metric1Id: exercise.metric1Id,
 			metric2Id: exercise.metric2Id ?? null,
+			tenantId: exercise.tenantId ?? null,
 			visualUrl: exercise.visualUrl ?? null,
 		}));
 

@@ -71,6 +71,7 @@ export class AthleteService {
 		const rows = await qb
 			.select([
 				'athlete.id AS athlete_id',
+				'athlete.tenant_id AS athlete_tenant_id',
 				'athlete.is_active AS athlete_is_active',
 				'person.name AS person_name',
 				'person.email AS person_email',
@@ -82,6 +83,7 @@ export class AthleteService {
 			])
 			.getRawMany<{
 				athlete_id: string;
+				athlete_tenant_id: string;
 				athlete_is_active: boolean;
 				person_name: string;
 				person_email: string | null;
@@ -94,6 +96,7 @@ export class AthleteService {
 
 		return rows.map((row) => ({
 			id: row.athlete_id,
+			tenantId: row.athlete_tenant_id,
 			isActive: row.athlete_is_active,
 			person: {
 				name: row.person_name,

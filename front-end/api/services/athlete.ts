@@ -2,6 +2,7 @@ import { authenticatedRequest } from '../client';
 
 export type Athlete = {
 	id: string;
+	tenantId: string;
 	isActive: boolean;
 	person: { name: string; email: string | null; phone: string | null };
 	activeAssociation?: {
