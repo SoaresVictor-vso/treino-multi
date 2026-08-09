@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AthleteService, type MyWorkout } from '@/api/services/athlete';
+import { workoutsService, type MyWorkout } from '@/api/services/workouts';
 import ErrorBox from '@/components/ui/ErrorBox';
-
-const athleteService = new AthleteService();
 
 function formatScheduledDate(date: string | null) {
 	if (!date) return 'Disponível para realizar';
@@ -23,7 +21,7 @@ export default function ClientWorkouts() {
 	useEffect(() => {
 		let isMounted = true;
 
-		void athleteService.findMyWorkouts().then((response) => {
+		void workoutsService.findMine().then((response) => {
 			if (!isMounted) return;
 			if (response.error) setError(response.error);
 			else setWorkouts(response.data ?? []);

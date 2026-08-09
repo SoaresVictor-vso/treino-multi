@@ -14,23 +14,7 @@ export type Athlete = {
 
 export type TrainerOption = { id: string; person: { name: string } };
 
-export type GenerateWorkoutsFromTemplateResponse = { count: number };
-
-export type MyWorkout = {
-	id: string;
-	templateName: string;
-	templateDescription: string;
-	scheduledDate: string | null;
-	status: 'pending' | 'scheduled';
-};
-
 export class AthleteService {
-	async findMyWorkouts() {
-		return authenticatedRequest<MyWorkout[]>('athlete/workouts/me', {
-			method: 'GET',
-		});
-	}
-
 	async findAthletes() {
 		return authenticatedRequest<Athlete[]>('athlete/athletes', {
 			method: 'GET',
@@ -55,20 +39,6 @@ export class AthleteService {
 			method: 'POST',
 			body: JSON.stringify({ athleteIds, trainerId, startDate }),
 		});
-	}
-
-	async generateWorkoutsFromTemplate(
-		athleteIds: string[],
-		templateId: string,
-		scheduledDate?: string,
-	) {
-		return authenticatedRequest<GenerateWorkoutsFromTemplateResponse>(
-			'athlete/workouts/from-template',
-			{
-				method: 'POST',
-				body: JSON.stringify({ athleteIds, templateId, scheduledDate }),
-			},
-		);
 	}
 
 	async endAssociation(id: string, endDate?: string) {

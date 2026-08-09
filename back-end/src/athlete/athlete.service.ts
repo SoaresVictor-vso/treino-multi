@@ -13,12 +13,7 @@ import { Person } from '../persons/entities/person.entity';
 import { CreateAthleteTrainerAssociationDto } from './dto/create-athlete-trainer-association.dto';
 import { CreateAthleteTrainerAssociationsDto } from './dto/create-athlete-trainer-associations.dto';
 import { AthleteTrainerAssociation } from './entities/athlete-trainer-association.entity';
-import { WorkoutsService } from '../workouts/workouts.service';
-import { Workout } from '../workouts/entities/workout.entity';
-import { GenerateWorkoutsFromTemplateDto } from './dto/generate-workouts-from-template.dto';
 import { UsersService } from '../users/users.service';
-import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
-import { WorkoutStatus } from '../common/enums/workout-status.enum';
 
 @Injectable()
 export class AthleteService {
@@ -26,9 +21,6 @@ export class AthleteService {
 		@InjectRepository(User) private readonly users: Repository<User>,
 		@InjectRepository(AthleteTrainerAssociation)
 		private readonly associations: Repository<AthleteTrainerAssociation>,
-		@InjectRepository(WorkoutTemplate)
-		private readonly templates: Repository<WorkoutTemplate>,
-		private readonly workoutsService: WorkoutsService,
 		private readonly usersService: UsersService,
 		private readonly dataSource: DataSource,
 	) {}
@@ -112,38 +104,6 @@ export class AthleteService {
 					}
 				: null,
 		}));
-	}
-
-	async findMyWorkouts(actor: JwtPayload) {
-		if (!actor.roles.includes(Role.TENANT_CLIENT))
-			throw new ForbiddenException('Esta consulta é exclusiva para atletas.');
-
-		const workouts = await this.dataSource
-			.getRepository(Workout)
-			.createQueryBuilder('workout')
-			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
-			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
-			.andWhere('workout.status IN (:...statuses)', {
-				statuses: [WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED],
-			})
-			.orderBy('workout.scheduledDate', 'ASC', 'NULLS FIRST')
-			.addOrderBy('workout.createdAt', 'DESC')
-			.select([
-				'workout.id AS id',
-				'workout.template_name AS "templateName"',
-				'workout.template_description AS "templateDescription"',
-				'workout.scheduled_date AS "scheduledDate"',
-				'workout.status AS status',
-			])
-			.getRawMany<{
-				id: string;
-				templateName: string;
-				templateDescription: string;
-				scheduledDate: string | null;
-				status: WorkoutStatus;
-			}>();
-
-		return workouts;
 	}
 
 	async findTrainers(actor: JwtPayload) {
@@ -293,44 +253,6 @@ export class AthleteService {
 		association.endDate = endDate ?? new Date().toISOString().slice(0, 10);
 		association.endedByUserId = actor.sub;
 		return this.associations.save(association);
-	}
-
-	async generateWorkoutsFromTemplate(
-		dto: GenerateWorkoutsFromTemplateDto,
-		actor: JwtPayload,
-	) {
-		const athleteIds = [...new Set(dto.athleteIds)];
-		const [athletes, template] = await Promise.all([
-			this.usersService.findTenantUser(athleteIds, actor.tenantId),
-			this.templates.findOne({
-				where: {
-					id: dto.templateId,
-					...(actor.tenantId && { tenantId: actor.tenantId }),
-				},
-				relations: ['activities'],
-			}),
-		]);
-		if (athletes.some((athlete) => !this.hasRole(athlete, Role.TENANT_CLIENT))) {
-			throw new BadRequestException(
-				'Um dos usuários selecionados não é um atleta.',
-			);
-		}
-
-		if (!template)
-			throw new NotFoundException('Template de treino não encontrado.');
-
-		const workouts: Workout[] = [];
-		for (const athlete of athletes) {
-			workouts.push(
-				await this.workoutsService.generateWorkoutFromTemplate({
-					template,
-					athleteId: athlete.id,
-					createdBy: actor.sub,
-					scheduledDate: dto.scheduledDate,
-				}),
-			);
-		}
-		return { count: workouts.length, workouts };
 	}
 
 	private ensureValidStartDate(startDate: string) {

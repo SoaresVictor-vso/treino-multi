@@ -14,13 +14,14 @@ import Badge from '@/components/ui/Badge';
 import ErrorBox from '@/components/ui/ErrorBox';
 import MetricCard from '@/components/ui/MetricCard';
 import { Athlete, AthleteService, TrainerOption } from '@/api/services/athlete';
+import { workoutsService } from '@/api/services/workouts';
 import {
 	findAll as findWorkoutTemplates,
 	type WorkoutTemplateSummary,
 } from '@/api/services/workout-templates';
 import { getSessionUser } from '@/lib/auth';
 import { Role } from '@/lib/roles';
-import Modal from '@/components/ui/Modal';
+import PersonalRecordModal from '@/components/shared/PersonalRecordModal';
 import Input from '@/components/ui/Input';
 import { personalRecordsService, type PersonalRecord } from '@/api/services/personal-records';
 import { exerciseGroupsService, type ExerciseGroup } from '@/api/services/exercise-groups';
@@ -188,7 +189,7 @@ export default function AthletesPage() {
 		}
 		setSavingWorkout(true);
 		setError(null);
-		const result = await service.generateWorkoutsFromTemplate(
+		const result = await workoutsService.generateFromTemplate(
 			selectedAthleteIds,
 			workoutTemplateId,
 			workoutScheduledDate || undefined,
@@ -531,7 +532,7 @@ export default function AthletesPage() {
 					))
 				)}
 			</div>
-			<Modal
+			<PersonalRecordModal
 				isOpen={!!personalRecordAthlete}
 				title={`Registrar RP${personalRecordAthlete ? ` — ${personalRecordAthlete.person.name}` : ''}`}
 				description="Registre um 1RM de referência por grupo de exercícios ou exercício individual."
@@ -547,7 +548,7 @@ export default function AthletesPage() {
 					<div className="rounded-xl border border-outline-variant bg-surface-container-high p-4"><p className="mb-3 text-sm font-semibold text-primary">Registros anteriores</p>{personalRecords.length === 0 ? <p className="text-sm text-on-surface-variant">Nenhum RP registrado para este atleta.</p> : <div className="space-y-2">{personalRecords.slice(0, 5).map((record) => <div key={record.id} className="flex justify-between gap-4 text-sm"><span className="text-primary">{record.exerciseGroup?.name || record.exercise?.name}</span><span className="text-on-surface-variant">{record.value} · {formatDate(record.measuredAt)}</span></div>)}</div>}</div>
 					<div className="flex justify-end gap-3 border-t border-outline-variant pt-5"><Button variant="ghost" onClick={() => setPersonalRecordAthlete(null)}>Fechar</Button><Button onClick={() => void savePersonalRecord()} disabled={savingPersonalRecord}>{savingPersonalRecord ? 'Registrando...' : 'Registrar RP'}</Button></div>
 				</div>
-			</Modal>
+			</PersonalRecordModal>
 		</div>
 	);
 }

@@ -18,7 +18,6 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { CreateAthleteTrainerAssociationDto } from './dto/create-athlete-trainer-association.dto';
 import { CreateAthleteTrainerAssociationsDto } from './dto/create-athlete-trainer-associations.dto';
 import { EndAthleteTrainerAssociationDto } from './dto/end-athlete-trainer-association.dto';
-import { GenerateWorkoutsFromTemplateDto } from './dto/generate-workouts-from-template.dto';
 import { AthleteService } from './athlete.service';
 
 @ApiTags('athlete')
@@ -35,14 +34,6 @@ export class AthleteController {
 	@RequirePermissions(Permission.ATHLETE_READ)
 	findAthletes(@CurrentUser() actor: JwtPayload) {
 		return this.service.findAthletes(actor);
-	}
-
-	@Get('workouts/me')
-	@ApiOperation({
-		summary: 'Lista os treinos pendentes ou agendados do atleta autenticado',
-	})
-	findMyWorkouts(@CurrentUser() actor: JwtPayload) {
-		return this.service.findMyWorkouts(actor);
 	}
 
 	@Get('trainers')
@@ -73,16 +64,6 @@ export class AthleteController {
 		@CurrentUser() actor: JwtPayload,
 	) {
 		return this.service.createAssociations(dto, actor);
-	}
-
-	@Post('workouts/from-template')
-	@ApiOperation({ summary: 'Gera treinos de um template para vários atletas' })
-	@RequirePermissions(Permission.ATHLETE_MANAGE)
-	generateWorkoutsFromTemplate(
-		@Body() dto: GenerateWorkoutsFromTemplateDto,
-		@CurrentUser() actor: JwtPayload,
-	) {
-		return this.service.generateWorkoutsFromTemplate(dto, actor);
 	}
 
 	@Patch('associations/:id/end')

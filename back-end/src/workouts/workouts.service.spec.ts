@@ -1,5 +1,8 @@
 import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
+import { UsersService } from '../users/users.service';
 import { ExecutionStatus } from '../common/enums/execution-status.enum';
 import { WorkoutStatus } from '../common/enums/workout-status.enum';
 import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
@@ -34,7 +37,13 @@ describe('WorkoutsService', () => {
 	beforeEach(async () => {
 		jest.clearAllMocks();
 		const module = await Test.createTestingModule({
-			providers: [WorkoutsService, { provide: DataSource, useValue: dataSource }],
+			providers: [
+				WorkoutsService,
+				{ provide: DataSource, useValue: dataSource },
+				{ provide: getRepositoryToken(AthleteTrainerAssociation), useValue: {} },
+				{ provide: getRepositoryToken(WorkoutTemplate), useValue: {} },
+				{ provide: UsersService, useValue: {} },
+			],
 		}).compile();
 		service = module.get(WorkoutsService);
 	});
@@ -94,7 +103,7 @@ describe('WorkoutsService', () => {
 
 		await service.generateWorkoutFromTemplate({
 			...input,
-			template: { ...input.template, description: '' } as WorkoutTemplate,
+			template: { ...input.template, description: '' },
 			scheduledDate: '2026-08-10',
 		});
 
