@@ -26,6 +26,7 @@ type WorkoutTemplateExercise = Omit<
 export interface WorkoutActivityResponse extends WorkoutActivity {
 	id: number;
 	workoutTemplateId: string;
+	position: number;
 	exercise?: WorkoutTemplateExercise;
 }
 

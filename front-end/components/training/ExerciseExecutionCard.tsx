@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RiAddLine, RiMore2Fill, RiSkipForwardLine } from 'react-icons/ri';
 import type { WorkoutExecution } from '@/api/services/workouts';
 import ExecutionSet from './ExecutionSet';
@@ -13,10 +13,29 @@ type ExerciseExecutionCardProps = {
 	onSkipExercise: () => void;
 	onAddWarmup: () => void;
 	onAddSeries: () => void;
+	onTitleLongPress?: () => void;
 };
 
-export default function ExerciseExecutionCard({ sets, editable, onChange, onSkipSet, onSkipExercise, onAddWarmup, onAddSeries }: ExerciseExecutionCardProps) {
+export default function ExerciseExecutionCard({ sets, editable, onChange, onSkipSet, onSkipExercise, onAddWarmup, onAddSeries, onTitleLongPress }: ExerciseExecutionCardProps) {
 	const [menuOpen, setMenuOpen] = useState(false);
+	const reorderPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const cancelReorderPress = () => {
+		if (reorderPressTimer.current) clearTimeout(reorderPressTimer.current);
+		reorderPressTimer.current = null;
+	};
+	const startReorderPress = () => {
+		if (!editable || !onTitleLongPress) return;
+		cancelReorderPress();
+		reorderPressTimer.current = setTimeout(() => {
+			onTitleLongPress();
+			reorderPressTimer.current = null;
+		}, 1000);
+	};
+	const startTouchReorderPress = (event: React.TouchEvent) => {
+		event.preventDefault();
+		startReorderPress();
+	};
+	useEffect(() => cancelReorderPress, []);
 	const visibleSets = sets.filter((set) => set.status !== 'skipped');
 	if (!visibleSets.length) return null;
 	const exercise = visibleSets[0].exercise;
@@ -25,7 +44,19 @@ export default function ExerciseExecutionCard({ sets, editable, onChange, onSkip
 		<article className="rounded-xl border border-outline-variant bg-surface-container-low p-4 sm:p-5">
 			<div className="mb-4 flex items-start justify-between gap-3">
 				<div>
-					<h2 className="text-xl font-bold">{exercise.name}</h2>
+					<h2
+						className={`text-xl font-bold ${editable ? 'cursor-pointer select-none touch-manipulation' : ''}`}
+						onPointerDown={startReorderPress}
+						onPointerUp={cancelReorderPress}
+						onPointerLeave={cancelReorderPress}
+						onPointerCancel={cancelReorderPress}
+						onTouchStart={startTouchReorderPress}
+						onTouchEnd={cancelReorderPress}
+						onTouchCancel={cancelReorderPress}
+						onContextMenu={(event) => event.preventDefault()}
+					>
+						{exercise.name}
+					</h2>
 					{exercise.description && <p className="mt-1 text-sm text-on-surface-variant">{exercise.description}</p>}
 				</div>
 				{editable && <div className="relative shrink-0">

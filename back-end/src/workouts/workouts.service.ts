@@ -115,6 +115,29 @@ export class WorkoutsService {
 			.getRawMany();
 	}
 
+	async findMyCompletedWorkouts(actor: JwtPayload) {
+		if (!actor.roles.includes(Role.TENANT_CLIENT))
+			throw new ForbiddenException('Esta consulta é exclusiva para atletas.');
+		return this.dataSource
+			.getRepository(Workout)
+			.createQueryBuilder('workout')
+			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
+			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
+			.andWhere('workout.status = :status', { status: WorkoutStatus.COMPLETED })
+			.orderBy('workout.performedAt', 'DESC', 'NULLS LAST')
+			.addOrderBy('workout.updatedAt', 'DESC')
+			.take(5)
+			.select([
+				'workout.id AS id',
+				'workout.template_name AS "templateName"',
+				'workout.template_description AS "templateDescription"',
+				'workout.scheduled_date AS "scheduledDate"',
+				'workout.performed_at AS "performedAt"',
+				'workout.status AS status',
+			])
+			.getRawMany();
+	}
+
 	async findWorkout(id: string, actor: JwtPayload) {
 		const isOrganizationStaff = actor.roles.some((role) =>
 			[Role.ORG_ADMIN, Role.ORG_SUPPORT].includes(role),
@@ -459,8 +482,8 @@ export class WorkoutsService {
 			if (template.activities.length) {
 				await manager.save(
 					Execution,
-					template.activities.map((activity, index) =>
-						this.createExecution(manager, workout.id, activity, index),
+					template.activities.map((activity) =>
+						this.createExecution(manager, workout.id, activity),
 					),
 				);
 				const notes = this.createExerciseNotes(
@@ -517,12 +540,11 @@ export class WorkoutsService {
 		manager: EntityManager,
 		workoutId: string,
 		activity: Activity,
-		index: number,
 	) {
 		return manager.create(Execution, {
 			workoutId,
 			exerciseId: activity.exerciseId,
-			position: index + 1,
+			position: activity.position,
 			prescribedMetric1: activity.metric1,
 			prescribedMetric2: activity.metric2,
 			metric1Type: activity.type1,

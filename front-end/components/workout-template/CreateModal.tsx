@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { RiAddLine, RiHeartPulseLine } from 'react-icons/ri';
 import type { Activity } from '@/api/services/workout-templates';
 import { RiCloseLine } from 'react-icons/ri';
@@ -15,6 +15,7 @@ import type { WorkoutTemplateFormDto } from '@/api/services/workout-templates';
 import type { Exercise } from '@/api/services/parametro';
 import TenantSelect from '../shared/TenantSelect';
 import { getSessionUser } from '@/lib/auth';
+import ExerciseReorderModal from '../shared/ExerciseReorderModal';
 
 const initialActivity: Activity = {
 	exerciseId: 0,
@@ -49,6 +50,8 @@ export function CreateModal({
 		template?.exercises ?? [],
 	);
 	const [pickerOpen, setPickerOpen] = useState(false);
+	const [reorderOpen, setReorderOpen] = useState(false);
+	const reorderPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [activities, setActivities] = useState<Record<number, Activity[]>>(() =>
 		template
 			? (Object.fromEntries(
@@ -120,6 +123,25 @@ export function CreateModal({
 		}));
 	};
 
+	const cancelReorderPress = () => {
+		if (reorderPressTimer.current) clearTimeout(reorderPressTimer.current);
+		reorderPressTimer.current = null;
+	};
+
+	const startReorderPress = () => {
+		if (isViewMode) return;
+		cancelReorderPress();
+		reorderPressTimer.current = setTimeout(() => {
+			setReorderOpen(true);
+			reorderPressTimer.current = null;
+		}, 1000);
+	};
+	const startTouchReorderPress = (event: React.TouchEvent) => {
+		event.preventDefault();
+		startReorderPress();
+	};
+	useEffect(() => cancelReorderPress, []);
+
 	const moveToNextField = (event: KeyboardEvent<HTMLDivElement>) => {
 		if (event.key !== 'Enter' || event.target instanceof HTMLTextAreaElement)
 			return;
@@ -153,7 +175,7 @@ export function CreateModal({
 			tenantId,
 			name: title.trim(),
 			description: description.trim(),
-			activities: Object.values(activities).flat(),
+			activities: selected.flatMap((exercise) => activities[exercise.id] ?? []),
 		};
 		onSave(formData);
 	};
@@ -242,7 +264,19 @@ export function CreateModal({
 									<span className="text-on-surface-variant">
 										<RiHeartPulseLine />
 									</span>
-									<span className="font-semibold">{item.name}</span>
+									<h4
+										className={`font-semibold ${isViewMode ? '' : 'cursor-pointer select-none touch-manipulation'}`}
+										onPointerDown={startReorderPress}
+										onPointerUp={cancelReorderPress}
+										onPointerLeave={cancelReorderPress}
+										onPointerCancel={cancelReorderPress}
+										onTouchStart={startTouchReorderPress}
+										onTouchEnd={cancelReorderPress}
+										onTouchCancel={cancelReorderPress}
+										onContextMenu={(event) => event.preventDefault()}
+									>
+										{item.name}
+									</h4>
 								</div>
 								<div className="mt-3 space-y-3">
 									{(activities[item.id] ?? []).map((activity, configIndex) => (
@@ -306,6 +340,20 @@ export function CreateModal({
 						onClose={() => setPickerOpen(false)}
 					/>
 				)}
+				<ExerciseReorderModal
+					isOpen={reorderOpen}
+					exercises={selected.map(({ id, name }) => ({ id, name }))}
+					onClose={() => setReorderOpen(false)}
+					onApply={(exerciseIds) =>
+						setSelected((current) => {
+							const byId = new Map(current.map((exercise) => [exercise.id, exercise]));
+							return exerciseIds.flatMap((exerciseId) => {
+								const exercise = byId.get(exerciseId);
+								return exercise ? [exercise] : [];
+							});
+						})
+					}
+				/>
 			</div>
 		</div>
 	);

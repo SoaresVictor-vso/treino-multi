@@ -31,6 +31,9 @@ export class Activity {
 	@Column({ name: 'exercise_id', type: 'integer' })
 	exerciseId!: number;
 
+	@Column({ type: 'integer' })
+	position!: number;
+
 	@Column({
 		name: 'metric_1',
 		type: 'numeric',

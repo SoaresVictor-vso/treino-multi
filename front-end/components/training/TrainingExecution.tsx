@@ -8,6 +8,7 @@ import ErrorBox from '@/components/ui/ErrorBox';
 import Modal from '@/components/ui/Modal';
 import ExercisePicker from '@/components/shared/ExercisePicker';
 import PersonalRecordRequiredModal from '@/components/shared/PersonalRecordRequiredModal';
+import ExerciseReorderModal from '@/components/shared/ExerciseReorderModal';
 import ExerciseExecutionCard from './ExerciseExecutionCard';
 import { getSessionUser } from '@/lib/auth';
 import {
@@ -65,6 +66,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const [pickerOpen, setPickerOpen] = useState(false);
 	const [pickerSelection, setPickerSelection] = useState<Exercise[]>([]);
 	const [missingRpOpen, setMissingRpOpen] = useState(false);
+	const [reorderOpen, setReorderOpen] = useState(false);
 
 	const load = async () => {
 		setLoading(true);
@@ -168,6 +170,34 @@ export default function TrainingExecution({ id }: { id: string }) {
 		selected.forEach((exercise) => addSeries(exercise, 'after'));
 		setPickerOpen(false);
 	};
+	const reorderExercises = (exerciseIds: number[]) =>
+		setWorkout((current) => {
+			if (!current) return current;
+			const executionsByExercise = new Map<number, WorkoutExecution[]>();
+			current.executions.forEach((execution) => {
+				const executions = executionsByExercise.get(execution.exerciseId) ?? [];
+				executions.push(execution);
+				executionsByExercise.set(execution.exerciseId, executions);
+			});
+			const executions = exerciseIds.flatMap(
+				(exerciseId) => executionsByExercise.get(exerciseId) ?? [],
+			);
+			return {
+				...current,
+				executions: executions.map((execution, index) => ({
+					...execution,
+					position: index + 1,
+				})),
+			};
+		});
+	const reorderableExercises = Array.from(
+		new Map(
+			(workout?.executions ?? []).map((execution) => [
+				execution.exerciseId,
+				{ id: execution.exerciseId, name: execution.exercise.name },
+			]),
+		).values(),
+	);
 
 	const save = async () => {
 		if (!workout) return;
@@ -276,6 +306,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 							})}
 							onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
 							onAddSeries={() => addSeries(sets[0].exercise, 'after')}
+							onTitleLongPress={() => setReorderOpen(true)}
 						/>
 					);
 				})}
@@ -325,6 +356,12 @@ export default function TrainingExecution({ id }: { id: string }) {
 				isOpen={missingRpOpen}
 				exercises={missingRecords}
 				onClose={() => setMissingRpOpen(false)}
+			/>
+			<ExerciseReorderModal
+				isOpen={reorderOpen}
+				exercises={reorderableExercises}
+				onClose={() => setReorderOpen(false)}
+				onApply={reorderExercises}
 			/>
 		</section>
 	);

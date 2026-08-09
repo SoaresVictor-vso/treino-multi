@@ -34,6 +34,14 @@ export class WorkoutsController {
 		return this.service.findMyWorkouts(actor);
 	}
 
+	@Get('me/completed')
+	@ApiOperation({
+		summary: 'Lista os últimos cinco treinos finalizados do atleta autenticado',
+	})
+	findMyCompletedWorkouts(@CurrentUser() actor: JwtPayload) {
+		return this.service.findMyCompletedWorkouts(actor);
+	}
+
 	@Get(':id')
 	@ApiOperation({ summary: 'Exibe o treino e suas séries' })
 	findWorkout(

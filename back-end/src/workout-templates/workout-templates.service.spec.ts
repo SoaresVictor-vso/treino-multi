@@ -31,7 +31,7 @@ describe('WorkoutTemplatesService', () => {
 	let templateRepo: jest.Mocked<Repository<WorkoutTemplate>>;
 	let exerciseRepo: jest.Mocked<Repository<Exercise>>;
 	let manager: jest.Mocked<
-		Pick<EntityManager, 'create' | 'save' | 'findOne' | 'delete'>
+		Pick<EntityManager, 'create' | 'save' | 'findOne' | 'delete' | 'query'>
 	>;
 	let queryBuilder: Record<string, jest.Mock>;
 
@@ -41,8 +41,9 @@ describe('WorkoutTemplatesService', () => {
 			save: jest.fn(),
 			findOne: jest.fn(),
 			delete: jest.fn(),
+			query: jest.fn(),
 		} as unknown as jest.Mocked<
-			Pick<EntityManager, 'create' | 'save' | 'findOne' | 'delete'>
+			Pick<EntityManager, 'create' | 'save' | 'findOne' | 'delete' | 'query'>
 		>;
 		queryBuilder = {
 			leftJoin: jest.fn(),
@@ -179,6 +180,17 @@ describe('WorkoutTemplatesService', () => {
 			Activity,
 			expect.objectContaining({ workoutTemplateId: uuid }),
 		);
-		expect(manager.save).toHaveBeenCalledTimes(3);
+		expect(manager.query).toHaveBeenCalledWith(
+			expect.stringContaining('SET "position" = -"id"'),
+			[uuid, [10]],
+		);
+		expect(manager.save).toHaveBeenCalledTimes(2);
+		expect(manager.save).toHaveBeenLastCalledWith(
+			Activity,
+			expect.arrayContaining([
+				expect.objectContaining({ id: 10, position: 1 }),
+				expect.objectContaining({ exerciseId: 2, position: 2 }),
+			]),
+		);
 	});
 });

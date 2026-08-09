@@ -73,8 +73,12 @@ export class WorkoutTemplatesService {
 			if (dto.activities.length) {
 				await manager.save(
 					Activity,
-					dto.activities.map((activity) =>
-						manager.create(Activity, { ...activity, workoutTemplateId: template.id }),
+					dto.activities.map((activity, index) =>
+						manager.create(Activity, {
+							...activity,
+							workoutTemplateId: template.id,
+							position: index + 1,
+						}),
 					),
 				);
 			}
@@ -173,25 +177,21 @@ export class WorkoutTemplatesService {
 						workoutTemplateId: id,
 					});
 				}
-				const activitiesToUpdate = dto.activities.filter(
-					(activity) => activity.id !== undefined,
-				);
-				const activitiesToCreate = dto.activities.filter(
-					(activity) => activity.id === undefined,
-				);
-				if (activitiesToUpdate.length) {
-					await manager.save(
-						Activity,
-						activitiesToUpdate.map((activity) =>
-							manager.create(Activity, { ...activity, workoutTemplateId: id }),
-						),
+				if (retainedIds.size) {
+					await manager.query(
+						`UPDATE "activities" SET "position" = -"id" WHERE "workout_template_id" = $1 AND "id" = ANY($2)`,
+						[id, [...retainedIds]],
 					);
 				}
-				if (activitiesToCreate.length) {
+				if (dto.activities.length) {
 					await manager.save(
 						Activity,
-						activitiesToCreate.map((activity) =>
-							manager.create(Activity, { ...activity, workoutTemplateId: id }),
+						dto.activities.map((activity, index) =>
+							manager.create(Activity, {
+								...activity,
+								workoutTemplateId: id,
+								position: index + 1,
+							}),
 						),
 					);
 				}
@@ -260,6 +260,7 @@ export class WorkoutTemplatesService {
 				'activities.exercise.metric1',
 				'activities.exercise.metric2',
 			],
+			order: { activities: { position: 'ASC' } },
 		});
 		if (!template)
 			throw new NotFoundException(`Template de treino ${id} não encontrado.`);
