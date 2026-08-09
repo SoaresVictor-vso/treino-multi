@@ -3,12 +3,20 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { clearAuthCookie } from '@/lib/auth';
-import { NavItemPublic } from '@/lib/navigation';
 import React from 'react';
 import * as icons from 'react-icons/ri';
+import { clearAuthCookie } from '@/lib/auth';
+import { NavItemPublic } from '@/lib/navigation';
 
-export default function Sidebar({ items }: { items: NavItemPublic[] }) {
+export default function Sidebar({
+	items,
+	mobileOpen,
+	onMobileClose,
+}: {
+	items: NavItemPublic[];
+	mobileOpen: boolean;
+	onMobileClose: () => void;
+}) {
 	const pathname = usePathname();
 	const router = useRouter();
 	const [collapsed, setCollapsed] = useState(true);
@@ -18,76 +26,90 @@ export default function Sidebar({ items }: { items: NavItemPublic[] }) {
 		router.push('/login');
 	}
 
-	return (
-		<aside
-			className={
-				`${collapsed ? 'w-16' : 'w-64'} sticky top-0 h-screen min-h-0 shrink-0 flex flex-col ` +
-				`transition-all duration-300 bg-surface-container `
-			}
-		>
-			<div className="px-3 py-4 border-b-4 border-outline-variant flex items-center justify-between">
-				{!collapsed && (
-					<span className="text-xl font-bold tracking-tight truncate">
-						Treino Multi
-					</span>
-				)}
-				<button
-					onClick={() => setCollapsed((v) => !v)}
-					className="ml-auto p-1.5 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
-					aria-label={collapsed ? 'Abrir menu' : 'Fechar menu'}
-				>
-					{React.createElement(
-						(collapsed
-							? icons.RiMenuUnfoldLine
-							: icons.RiMenuFoldLine) as React.ElementType,
-						{ className: 'w-5 h-5 text-primary' },
+	function navigationContent(compact: boolean, mobile = false) {
+		return (
+			<>
+				<div className="flex items-center justify-between border-b-4 border-outline-variant px-3 py-4">
+					{(!compact || mobile) && (
+						<span className="truncate text-xl font-bold tracking-tight">Treino Multi</span>
 					)}
-				</button>
-			</div>
-
-			<nav className="flex-1 min-h-0 overflow-y-auto px-2 py-4 space-y-1 ">
-				{items.map((item) => {
-					const isActive = pathname.startsWith(item.href);
-					const rawIcon =
-						icons[item.icon as keyof typeof icons] || icons.RiFileForbidLine;
-					return (
-						<Link
-							key={item.href}
-							href={item.href}
-							title={collapsed ? item.label : undefined}
-							// className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
-							//     ? "bg-gray-600"
-							//     : " hover:bg-gray-500"
-							//     } ${collapsed ? "justify-center" : ""}`}
-
-							className={
-								'flex items-center gap-3 px-4 py-3 rounded' +
-								(isActive
-									? 'text-primary font-bold border-r-2 border-primary bg-surface-variant/10 transition-transform scale-[0.98]'
-									: 'text-secondary-fixed-dim font-medium hover:text-primary hover:bg-surface-variant transition-colors duration-200')
-							}
+					{!mobile && (
+						<button
+							onClick={() => setCollapsed((value) => !value)}
+							className="ml-auto rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
+							aria-label={compact ? 'Abrir menu' : 'Fechar menu'}
 						>
-							{React.createElement(rawIcon as React.ElementType, {
-								className: 'w-5 h-5 shrink-0',
-							})}
-							{!collapsed && <span className="text-xl ps-1">{item.label}</span>}
-						</Link>
-					);
-				})}
-			</nav>
+							{React.createElement(
+								(compact ? icons.RiMenuUnfoldLine : icons.RiMenuFoldLine) as React.ElementType,
+								{ className: 'h-5 w-5 text-primary' },
+							)}
+						</button>
+					)}
+					{mobile && (
+						<button
+							onClick={onMobileClose}
+							className="ml-auto rounded-lg p-2 text-primary transition-colors hover:bg-surface-variant"
+							aria-label="Fechar menu"
+						>
+							<icons.RiCloseLine className="h-6 w-6" />
+						</button>
+					)}
+				</div>
 
-			<div className="px-2 py-4 border-t border-gray-700">
-				<button
-					onClick={handleLogout}
-					title={collapsed ? 'Sair' : undefined}
-					className={`flex items-center gap-3 w-full px-3 py-2 rounded-lg text-xl font-medium  hover:text-white transition-colors ${collapsed ? 'justify-center' : ''}`}
-				>
-					{React.createElement(icons.RiLogoutBoxRLine as React.ElementType, {
-						className: 'w-5 h-5 shrink-0 text-primary',
+				<nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-4" aria-label="Navegação principal">
+					{items.map((item) => {
+						const isActive = pathname.startsWith(item.href);
+						const rawIcon = icons[item.icon as keyof typeof icons] || icons.RiFileForbidLine;
+						return (
+							<Link
+								key={item.href}
+								href={item.href}
+								title={compact ? item.label : undefined}
+								onClick={mobile ? onMobileClose : undefined}
+								className={
+									'flex items-center gap-3 rounded px-4 py-3' +
+									(isActive
+										? ' scale-[0.98] border-r-2 border-primary bg-surface-variant/10 font-bold text-primary transition-transform'
+										: ' font-medium text-secondary-fixed-dim transition-colors duration-200 hover:bg-surface-variant hover:text-primary')
+								}
+							>
+								{React.createElement(rawIcon as React.ElementType, { className: 'h-5 w-5 shrink-0' })}
+								{!compact && <span className="ps-1 text-xl">{item.label}</span>}
+							</Link>
+						);
 					})}
-					{!collapsed && 'Sair'}
-				</button>
-			</div>
-		</aside>
+				</nav>
+
+				<div className="border-t border-gray-700 px-2 py-4">
+					<button
+						onClick={handleLogout}
+						title={compact ? 'Sair' : undefined}
+						className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xl font-medium transition-colors hover:text-white ${compact ? 'justify-center' : ''}`}
+					>
+						{React.createElement(icons.RiLogoutBoxRLine as React.ElementType, {
+							className: 'h-5 w-5 shrink-0 text-primary',
+						})}
+						{!compact && 'Sair'}
+					</button>
+				</div>
+			</>
+		);
+	}
+
+	return (
+		<>
+			<aside className={`${collapsed ? 'w-16' : 'w-64'} sticky top-0 hidden h-screen min-h-0 shrink-0 flex-col bg-surface-container transition-all duration-300 lg:flex`}>
+				{navigationContent(collapsed)}
+			</aside>
+			{mobileOpen && (
+				<aside
+					id="mobile-navigation"
+					className="fixed inset-0 z-[60] flex h-screen w-screen flex-col bg-surface-container lg:hidden"
+					aria-label="Menu de navegação"
+				>
+					{navigationContent(false, true)}
+				</aside>
+			)}
+		</>
 	);
 }
