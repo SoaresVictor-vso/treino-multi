@@ -13,6 +13,21 @@ function formatScheduledDate(date: string | null) {
 	}).format(new Date(`${date}`));
 }
 
+const workoutStatusPresentation = {
+	pending: {
+		label: 'Pendente',
+		className: 'bg-secondary-container text-on-secondary-container',
+	},
+	scheduled: {
+		label: 'Agendado',
+		className: 'bg-primary-container text-on-primary-container',
+	},
+	in_progress: {
+		label: 'Em andamento',
+		className: 'bg-tertiary-container text-on-tertiary-container',
+	},
+} satisfies Record<MyWorkout['status'], { label: string; className: string }>;
+
 export default function ClientWorkouts() {
 	const [workouts, setWorkouts] = useState<MyWorkout[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -44,7 +59,7 @@ export default function ClientWorkouts() {
 					id="my-workouts-title"
 					className="mt-1 text-2xl leading-tight font-bold tracking-tight sm:text-3xl lg:text-4xl"
 				>
-					Treinos pendentes e agendados
+					Meus treinos
 				</h1>
 			</div>
 
@@ -56,38 +71,44 @@ export default function ClientWorkouts() {
 				<ErrorBox message={error} />
 			) : workouts.length === 0 ? (
 				<div className="rounded-lg border border-outline-variant bg-surface-container-low p-4 sm:p-6">
-					<p className="type-headline-md">Nenhum treino pendente</p>
+					<p className="type-headline-md">Nenhum treino disponível</p>
 					<p className="type-body-md mt-2 text-on-surface-variant">
 						Quando um treino for disponibilizado, ele aparecerá aqui.
 					</p>
 				</div>
 			) : (
 				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
-					{workouts.map((workout) => (
-						<Link
-							key={workout.id}
-							href={`/training/${workout.id}`}
-							className="flex min-w-0 flex-col rounded-lg border border-outline-variant bg-surface-container-low p-4 transition-colors hover:border-primary-fixed hover:bg-surface-container sm:p-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-fixed"
-							aria-label={`Abrir treino ${workout.templateName}`}
-						>
-							<div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
-								<h2 className="type-headline-md break-words">
-									{workout.templateName}
-								</h2>
-								<span className="type-label-caps shrink-0 rounded-full bg-primary-container px-2 py-1 text-on-primary-container">
-									{workout.status === 'scheduled' ? 'Agendado' : 'Pendente'}
-								</span>
-							</div>
-							{workout.templateDescription && (
-								<p className="type-body-md mt-3 break-words text-on-surface-variant">
-									{workout.templateDescription}
+					{workouts.map((workout) => {
+						const status = workoutStatusPresentation[workout.status];
+
+						return (
+							<Link
+								key={workout.id}
+								href={`/training/${workout.id}`}
+								className="flex min-w-0 flex-col rounded-lg border border-outline-variant bg-surface-container-low p-4 transition-colors hover:border-primary-fixed hover:bg-surface-container sm:p-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-fixed"
+								aria-label={`Abrir treino ${workout.templateName}, ${status.label}`}
+							>
+								<div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
+									<h2 className="type-headline-md break-words">
+										{workout.templateName}
+									</h2>
+									<span
+										className={`type-label-caps shrink-0 rounded-full px-2 py-1 ${status.className}`}
+									>
+										{status.label}
+									</span>
+								</div>
+								{workout.templateDescription && (
+									<p className="type-body-md mt-3 break-words text-on-surface-variant">
+										{workout.templateDescription}
+									</p>
+								)}
+								<p className="type-body-md mt-5 pt-1 text-primary-fixed sm:mt-auto sm:pt-5">
+									{formatScheduledDate(workout.scheduledDate)}
 								</p>
-							)}
-							<p className="type-body-md mt-5 pt-1 text-primary-fixed sm:mt-auto sm:pt-5">
-								{formatScheduledDate(workout.scheduledDate)}
-							</p>
-						</Link>
-					))}
+							</Link>
+						);
+					})}
 				</div>
 			)}
 		</section>

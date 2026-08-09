@@ -1,19 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-	RiAddLine,
-	RiArrowLeftLine,
-	RiPlayLine,
-	RiSaveLine,
-} from 'react-icons/ri';
+import { RiAddLine, RiArrowLeftLine, RiPlayLine, RiSaveLine } from 'react-icons/ri';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import ErrorBox from '@/components/ui/ErrorBox';
 import Modal from '@/components/ui/Modal';
 import ExercisePicker from '@/components/shared/ExercisePicker';
 import PersonalRecordRequiredModal from '@/components/shared/PersonalRecordRequiredModal';
-import ExecutionSet from './ExecutionSet';
+import ExerciseExecutionCard from './ExerciseExecutionCard';
 import { getSessionUser } from '@/lib/auth';
 import {
 	workoutsService,
@@ -110,51 +105,67 @@ export default function TrainingExecution({ id }: { id: string }) {
 		[workout],
 	);
 
-	const updateExecution = (position: number, patch: Partial<WorkoutExecution>) =>
+	const updateExecution = (executionId: number, patch: Partial<WorkoutExecution>) =>
 		setWorkout((current) =>
 			current
 				? {
 						...current,
 						executions: current.executions.map((item) =>
-							item.position === position ? { ...item, ...patch } : item,
+						item.id === executionId ? { ...item, ...patch } : item,
 						),
 					}
 				: current,
 		);
-	const addSeries = (exercise: WorkoutExecution['exercise']) =>
+	const addSeries = (
+		exercise: WorkoutExecution['exercise'],
+		placement: 'before' | 'after',
+	) =>
 		setWorkout((current) => {
 			if (!current) return current;
-			const position =
-				Math.max(0, ...current.executions.map((item) => item.position)) + 1;
+			const position = Math.max(0, ...current.executions.map((item) => item.position)) + 1;
+			const exerciseSetIndexes = current.executions
+				.map((item, index) => ({ item, index }))
+				.filter(({ item }) => item.exerciseId === exercise.id && item.status !== 'skipped');
+			const sourceSet =
+				placement === 'before'
+					? exerciseSetIndexes[0]?.item
+					: exerciseSetIndexes.at(-1)?.item;
+			const insertionIndex = sourceSet
+				? placement === 'before'
+					? exerciseSetIndexes[0].index
+					: exerciseSetIndexes.at(-1)!.index + 1
+				: current.executions.length;
+			const executions = [...current.executions];
+			executions.splice(insertionIndex, 0, {
+				id: -position,
+				exerciseId: exercise.id,
+				position,
+				prescribedMetric1: sourceSet?.prescribedMetric1 ?? null,
+				prescribedMetric2: sourceSet?.prescribedMetric2 ?? null,
+				metric1Type: sourceSet?.metric1Type ?? 'v',
+				metric2Type: sourceSet?.metric2Type ?? 'v',
+				prescribedPse: sourceSet?.prescribedPse ?? null,
+				prescribedRestDuration: sourceSet?.prescribedRestDuration ?? null,
+				performedMetric1: sourceSet?.performedMetric1 ?? null,
+				performedMetric2: sourceSet?.performedMetric2 ?? null,
+				performedPse: sourceSet?.performedPse ?? null,
+				performedRestDuration: sourceSet?.performedRestDuration ?? null,
+				performedNote: null,
+				status: 'in_progress',
+				exercise,
+				referenceGroup: null,
+				referencePersonalRecord: null,
+			});
 			return {
 				...current,
-				executions: [
-					...current.executions,
-					{
-						id: -position,
-						exerciseId: exercise.id,
-						position,
-						prescribedMetric1: null,
-						prescribedMetric2: null,
-						metric1Type: 'v',
-						metric2Type: 'v',
-						prescribedPse: null,
-						prescribedRestDuration: null,
-						performedMetric1: null,
-						performedMetric2: null,
-						performedPse: null,
-						performedRestDuration: null,
-						performedNote: null,
-						status: 'in_progress',
-						exercise,
-						referenceGroup: null,
-						referencePersonalRecord: null,
-					},
-				],
+				executions: executions.map((item, index) => ({
+					...item,
+					position: index + 1,
+				})),
 			};
 		});
 	const addExercises = (selected: Exercise[]) => {
-		selected.forEach((exercise) => addSeries(exercise));
+		selected.forEach((exercise) => addSeries(exercise, 'after'));
 		setPickerOpen(false);
 	};
 
@@ -252,63 +263,20 @@ export default function TrainingExecution({ id }: { id: string }) {
 					const sets = groupedSets ?? [];
 					if (!sets.length) return null;
 					return (
-						<article
+						<ExerciseExecutionCard
 							key={exerciseId}
-							className="rounded-xl border border-outline-variant bg-surface-container-low p-4 sm:p-5"
-						>
-							<div className="mb-4 flex items-start justify-between gap-3">
-								<div>
-									<h2 className="text-xl font-bold">{sets[0].exercise.name}</h2>
-									{sets[0].exercise.description && (
-										<p className="mt-1 text-sm text-on-surface-variant">
-											{sets[0].exercise.description}
-										</p>
-									)}
-								</div>
-								{editable && (
-									<div className="flex gap-2">
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() =>
-												sets.forEach(
-													(item) =>
-														item.status === 'in_progress' &&
-														updateExecution(item.position, { status: 'skipped' }),
-												)
-											}
-										>
-											Pular exercício
-										</Button>
-										<Button
-											variant="outline"
-											size="sm"
-											onClick={() => addSeries(sets[0].exercise)}
-										>
-											<RiAddLine /> Série
-										</Button>
-									</div>
-								)}
-							</div>
-							<div className="space-y-3">
-								{sets.map((execution, index) => (
-									<ExecutionSet
-										key={`${execution.id}-${execution.position}`}
-										execution={execution}
-										number={index + 1}
-										editable={editable}
-										onChange={(key, value) =>
-											updateExecution(execution.position, {
-												[key]: value,
-											} as Partial<WorkoutExecution>)
-										}
-										onSkip={() =>
-											updateExecution(execution.position, { status: 'skipped' })
-										}
-									/>
-								))}
-							</div>
-						</article>
+							sets={sets}
+							editable={editable}
+							onChange={(executionId, key, value) =>
+								updateExecution(executionId, { [key]: value } as Partial<WorkoutExecution>)
+							}
+							onSkipSet={(executionId) => updateExecution(executionId, { status: 'skipped' })}
+							onSkipExercise={() => sets.forEach((item) => {
+								if (item.status === 'in_progress') updateExecution(item.id, { status: 'skipped' });
+							})}
+							onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
+							onAddSeries={() => addSeries(sets[0].exercise, 'after')}
+						/>
 					);
 				})}
 			</div>

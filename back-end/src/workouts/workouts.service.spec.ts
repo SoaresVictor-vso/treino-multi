@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
 import { UsersService } from '../users/users.service';
 import { ExecutionStatus } from '../common/enums/execution-status.enum';
+import { Role } from '../common/enums/role.enum';
 import { WorkoutStatus } from '../common/enums/workout-status.enum';
 import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
 import { Execution } from './entities/execution.entity';
@@ -31,7 +32,9 @@ describe('WorkoutsService', () => {
 		save: jest.fn(),
 	};
 	const dataSource = {
-		transaction: jest.fn((callback) => callback(manager)),
+		transaction: jest.fn((callback: (manager: typeof manager) => unknown) =>
+			callback(manager),
+		),
 	};
 
 	beforeEach(async () => {
@@ -114,5 +117,35 @@ describe('WorkoutsService', () => {
 				status: WorkoutStatus.SCHEDULED,
 			}),
 		);
+	});
+
+	it('impede iniciar um treino quando o atleta já tem outro em andamento', async () => {
+		const workout = {
+			id: 'workout-id',
+			athleteId: input.athleteId,
+			status: WorkoutStatus.PENDING,
+		} as Workout;
+		const workoutRepository = {
+			existsBy: jest.fn().mockResolvedValue(true),
+		};
+		Object.assign(manager, {
+			query: jest.fn().mockResolvedValue(undefined),
+			getRepository: jest.fn().mockReturnValue(workoutRepository),
+		});
+		jest.spyOn(service as any, 'findWritableWorkout').mockResolvedValue(workout);
+
+		await expect(
+			service.startWorkout('workout-id', {
+				sub: input.athleteId,
+				tenantId: input.template.tenantId,
+				roles: [Role.TENANT_CLIENT],
+			}),
+		).rejects.toThrow('Já existe um treino em andamento para este atleta.');
+
+		expect(workoutRepository.existsBy).toHaveBeenCalledWith({
+			athleteId: input.athleteId,
+			status: WorkoutStatus.IN_PROGRESS,
+		});
+		expect(manager.save).not.toHaveBeenCalled();
 	});
 });

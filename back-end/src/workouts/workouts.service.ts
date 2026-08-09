@@ -92,9 +92,18 @@ export class WorkoutsService {
 			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
 			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
 			.andWhere('workout.status IN (:...statuses)', {
-				statuses: [WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED],
+				statuses: [
+					WorkoutStatus.PENDING,
+					WorkoutStatus.SCHEDULED,
+					WorkoutStatus.IN_PROGRESS,
+				],
 			})
-			.orderBy('workout.scheduledDate', 'ASC', 'NULLS FIRST')
+			.orderBy(
+				'CASE WHEN workout.status = :inProgressStatus THEN 0 ELSE 1 END',
+				'ASC',
+			)
+			.setParameter('inProgressStatus', WorkoutStatus.IN_PROGRESS)
+			.addOrderBy('workout.scheduledDate', 'ASC', 'NULLS FIRST')
 			.addOrderBy('workout.createdAt', 'DESC')
 			.select([
 				'workout.id AS id',
@@ -277,6 +286,18 @@ export class WorkoutsService {
 		)
 			throw new BadRequestException('Este treino não pode mais ser iniciado.');
 		await this.dataSource.transaction(async (manager) => {
+			// Serializa inícios do mesmo atleta, inclusive quando são treinos distintos.
+			await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+				workout.athleteId,
+			]);
+			const hasWorkoutInProgress = await manager.getRepository(Workout).existsBy({
+				athleteId: workout.athleteId,
+				status: WorkoutStatus.IN_PROGRESS,
+			});
+			if (hasWorkoutInProgress)
+				throw new BadRequestException(
+					'Já existe um treino em andamento para este atleta.',
+				);
 			workout.status = WorkoutStatus.IN_PROGRESS;
 			workout.performedAt = new Date();
 			workout.updatedBy = actor.sub;
@@ -307,6 +328,18 @@ export class WorkoutsService {
 			throw new BadRequestException('As posições das séries devem ser únicas.');
 		await this.dataSource.transaction(async (manager) => {
 			const current = await manager.find(Execution, { where: { workoutId: id } });
+			if (current.length) {
+				const temporaryPositionOffset =
+					Math.max(...current.map((execution) => execution.position)) +
+					dto.executions.length +
+					1;
+				await manager
+					.createQueryBuilder()
+					.update(Execution)
+					.set({ position: () => `position + ${temporaryPositionOffset}` })
+					.where('workout_id = :id', { id })
+					.execute();
+			}
 			const currentById = new Map(
 				current.map((execution) => [execution.id, execution]),
 			);
@@ -346,11 +379,7 @@ export class WorkoutsService {
 		const unresolved = await this.dataSource.getRepository(Execution).count({
 			where: {
 				workoutId: id,
-				status: In([
-					ExecutionStatus.PENDING,
-					ExecutionStatus.IN_PROGRESS,
-					ExecutionStatus.CANCELLED,
-				]),
+				status: In([ExecutionStatus.PENDING, ExecutionStatus.IN_PROGRESS]),
 			},
 		});
 		if (unresolved)

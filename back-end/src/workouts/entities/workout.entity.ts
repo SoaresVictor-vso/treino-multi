@@ -19,6 +19,10 @@ import { WorkoutExerciseNote } from './workout-exercise-note.entity';
 @Entity('workouts')
 @Index(['athleteId', 'scheduledDate'])
 @Index(['tenantId', 'status', 'scheduledDate'])
+@Index('UQ_workouts_athlete_in_progress', ['athleteId'], {
+	unique: true,
+	where: `"status" = 'in_progress'`,
+})
 export class Workout {
 	@PrimaryGeneratedColumn('uuid')
 	id!: string;

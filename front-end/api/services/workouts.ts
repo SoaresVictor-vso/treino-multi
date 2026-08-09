@@ -1,7 +1,7 @@
 import { authenticatedRequest } from '@/api/client';
 import type { Exercise, Metric } from '@/api/services/parametro';
 
-export type ExecutionStatus = 'pending' | 'in_progress' | 'completed' | 'skipped' | 'cancelled';
+export type ExecutionStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
 export type WorkoutStatus = ExecutionStatus;
 
 export type WorkoutExecution = {
@@ -40,7 +40,7 @@ export type MyWorkout = {
 	templateName: string;
 	templateDescription: string;
 	scheduledDate: string | null;
-	status: 'pending' | 'scheduled';
+	status: 'pending' | 'scheduled' | 'in_progress';
 };
 
 export type GenerateWorkoutsFromTemplateResponse = { count: number };
