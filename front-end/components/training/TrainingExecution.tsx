@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { RiAddLine, RiArrowLeftLine, RiPlayLine, RiSaveLine } from 'react-icons/ri';
+import {
+	RiAddLine,
+	RiArrowLeftLine,
+	RiPlayLine,
+	RiSaveLine,
+} from 'react-icons/ri';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import ErrorBox from '@/components/ui/ErrorBox';
@@ -15,8 +20,8 @@ import {
 	workoutsService,
 	type WorkoutDetail,
 	type WorkoutExecution,
-} from '@/api/services/workouts';
-import type { Exercise } from '@/api/services/parametro';
+} from '@/gateway/services/workouts';
+import type { Exercise } from '@/gateway/services/parametro';
 
 function serializeExecution(execution: WorkoutExecution) {
 	const {
@@ -116,13 +121,16 @@ export default function TrainingExecution({ id }: { id: string }) {
 		[workout],
 	);
 
-	const updateExecution = (executionId: number, patch: Partial<WorkoutExecution>) =>
+	const updateExecution = (
+		executionId: number,
+		patch: Partial<WorkoutExecution>,
+	) =>
 		setWorkout((current) =>
 			current
 				? {
 						...current,
 						executions: current.executions.map((item) =>
-						item.id === executionId ? { ...item, ...patch } : item,
+							item.id === executionId ? { ...item, ...patch } : item,
 						),
 					}
 				: current,
@@ -133,10 +141,13 @@ export default function TrainingExecution({ id }: { id: string }) {
 	) =>
 		setWorkout((current) => {
 			if (!current) return current;
-			const position = Math.max(0, ...current.executions.map((item) => item.position)) + 1;
+			const position =
+				Math.max(0, ...current.executions.map((item) => item.position)) + 1;
 			const exerciseSetIndexes = current.executions
 				.map((item, index) => ({ item, index }))
-				.filter(({ item }) => item.exerciseId === exercise.id && item.status !== 'skipped');
+				.filter(
+					({ item }) => item.exerciseId === exercise.id && item.status !== 'skipped',
+				);
 			const sourceSet =
 				placement === 'before'
 					? exerciseSetIndexes[0]?.item
@@ -332,7 +343,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 					<Button onClick={() => setStartOpen(true)}>
 						<RiPlayLine /> Iniciar treino
 					</Button>
-			)}
+				)}
 			<div className="space-y-5">
 				{executionGroups.map(([exerciseId, sets]) => {
 					if (!sets.length) return null;
@@ -342,12 +353,19 @@ export default function TrainingExecution({ id }: { id: string }) {
 							sets={sets}
 							editable={editable}
 							onChange={(executionId, key, value) =>
-								updateExecution(executionId, { [key]: value } as Partial<WorkoutExecution>)
+								updateExecution(executionId, {
+									[key]: value,
+								} as Partial<WorkoutExecution>)
 							}
-							onSkipSet={(executionId) => updateExecution(executionId, { status: 'skipped' })}
-							onSkipExercise={() => sets.forEach((item) => {
-								if (item.status === 'in_progress') updateExecution(item.id, { status: 'skipped' });
-							})}
+							onSkipSet={(executionId) =>
+								updateExecution(executionId, { status: 'skipped' })
+							}
+							onSkipExercise={() =>
+								sets.forEach((item) => {
+									if (item.status === 'in_progress')
+										updateExecution(item.id, { status: 'skipped' });
+								})
+							}
 							onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
 							onAddSeries={() => addSeries(sets[0].exercise, 'after')}
 							onTitleLongPress={() => setReorderOpen(true)}

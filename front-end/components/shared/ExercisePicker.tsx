@@ -5,13 +5,13 @@ import { RiCheckLine, RiCloseLine, RiHeartPulseLine } from 'react-icons/ri';
 import {
 	ParametersService,
 	type ExerciseParameter,
-} from '@/api/services/parametro';
+} from '@/gateway/services/parametro';
 import Button from '@/components/ui/Button';
 import {
 	MetricFieldType,
 	type Exercise,
 	type Metric,
-} from '@/api/services/parametro';
+} from '@/gateway/services/parametro';
 
 const metricByName: Record<string, MetricFieldType> = {
 	repeticoes: MetricFieldType.INT,
@@ -94,19 +94,38 @@ export default function ExercisePicker({
 		const normalizedQuery = query.trim().toLocaleLowerCase();
 		const firstSelected = selected[0];
 		return exercises.filter((exercise) => {
-			const matchesQuery = !normalizedQuery || `${exercise.name} ${descriptions[exercise.id] ?? ''}`
-				.toLocaleLowerCase()
-				.includes(normalizedQuery);
-			const metricReference = requiredMetrics ?? (matchMetricsOfFirstSelection && firstSelected
-				? { metric1Id: firstSelected.metric_1.id, metric2Id: firstSelected.metric_2?.id ?? null }
-				: null);
-			const matchesMetrics = !metricReference || (
-				exercise.metric_1.id === metricReference.metric1Id &&
-				(exercise.metric_2?.id ?? null) === metricReference.metric2Id
+			const matchesQuery =
+				!normalizedQuery ||
+				`${exercise.name} ${descriptions[exercise.id] ?? ''}`
+					.toLocaleLowerCase()
+					.includes(normalizedQuery);
+			const metricReference =
+				requiredMetrics ??
+				(matchMetricsOfFirstSelection && firstSelected
+					? {
+							metric1Id: firstSelected.metric_1.id,
+							metric2Id: firstSelected.metric_2?.id ?? null,
+						}
+					: null);
+			const matchesMetrics =
+				!metricReference ||
+				(exercise.metric_1.id === metricReference.metric1Id &&
+					(exercise.metric_2?.id ?? null) === metricReference.metric2Id);
+			return (
+				matchesQuery &&
+				matchesMetrics &&
+				(!filterExercise || filterExercise(exercise))
 			);
-			return matchesQuery && matchesMetrics && (!filterExercise || filterExercise(exercise));
 		});
-	}, [exercises, descriptions, filterExercise, matchMetricsOfFirstSelection, query, requiredMetrics, selected]);
+	}, [
+		exercises,
+		descriptions,
+		filterExercise,
+		matchMetricsOfFirstSelection,
+		query,
+		requiredMetrics,
+		selected,
+	]);
 
 	const toggle = (exercise: Exercise) => {
 		const isSelected = selected.some((item) => item.id === exercise.id);

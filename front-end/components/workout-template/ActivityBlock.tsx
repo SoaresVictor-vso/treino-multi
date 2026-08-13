@@ -2,12 +2,12 @@
 import { useState } from 'react';
 import { RiDeleteBinLine } from 'react-icons/ri';
 import Badge from '@/components/ui/Badge';
-import { type Activity } from '@/api/services/workout-templates';
+import { type Activity } from '@/gateway/services/workout-templates';
 import {
 	MetricFieldType,
 	type Exercise,
 	type Metric,
-} from '@/api/services/parametro';
+} from '@/gateway/services/parametro';
 
 import { MetricField } from './MetricField';
 import { RestDurationField } from './RestDurationField';

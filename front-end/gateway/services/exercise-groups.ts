@@ -1,4 +1,4 @@
-import { authenticatedRequest } from '@/api/client';
+import { authenticatedRequest } from '@/gateway/client';
 
 export type ExerciseGroup = {
 	id: number;
@@ -12,7 +12,13 @@ export type ExerciseGroup = {
 
 export type ExerciseGroupExercise = {
 	exerciseId: number;
-	exercise: { id: number; name: string; description: string; metric1Id: number; metric2Id: number | null };
+	exercise: {
+		id: number;
+		name: string;
+		description: string;
+		metric1Id: number;
+		metric2Id: number | null;
+	};
 };
 
 export type SaveExerciseGroupDto = {
@@ -32,7 +38,9 @@ export type UpdateExerciseGroupDto = {
 export const exerciseGroupsService = {
 	findAll: () => authenticatedRequest<ExerciseGroup[]>('exercise-groups'),
 	findExercises: (id: number) =>
-		authenticatedRequest<ExerciseGroupExercise[]>(`exercise-groups/${id}/exercises`),
+		authenticatedRequest<ExerciseGroupExercise[]>(
+			`exercise-groups/${id}/exercises`,
+		),
 	create: (dto: SaveExerciseGroupDto) =>
 		authenticatedRequest<ExerciseGroup>('exercise-groups', {
 			method: 'POST',

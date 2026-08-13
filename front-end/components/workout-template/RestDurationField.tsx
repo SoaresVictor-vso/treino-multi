@@ -1,6 +1,9 @@
 'use client';
 import Input from '@/components/ui/Input';
-import { secondsToTime, timeToSeconds } from '@/api/services/workout-templates';
+import {
+	secondsToTime,
+	timeToSeconds,
+} from '@/gateway/services/workout-templates';
 export function RestDurationField({
 	value,
 	onChange,

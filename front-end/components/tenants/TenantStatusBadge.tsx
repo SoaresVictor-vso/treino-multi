@@ -1,4 +1,4 @@
-import { TenantListItemDto } from '@/api/dto/tenant/list-tenant.dto';
+import { TenantListItemDto } from '@/gateway/dto/tenant/list-tenant.dto';
 import StatusBadge, { BadgeTypes } from '@/components/ui/Badge';
 
 type TenantStatus = 'active' | 'inactive' | 'archived';

@@ -2,8 +2,8 @@
 
 import { useEffect, useState, type ChangeEvent } from 'react';
 import Select, { type SelectProps } from '@/components/ui/Select';
-import { TenantService } from '@/api/services/tenant';
-import type { TenantListItemDto } from '@/api/dto/tenant/list-tenant.dto';
+import { TenantService } from '@/gateway/services/tenant';
+import type { TenantListItemDto } from '@/gateway/dto/tenant/list-tenant.dto';
 
 const tenantService = new TenantService();
 

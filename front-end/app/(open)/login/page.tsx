@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button';
 import ErrorBox from '@/components/ui/ErrorBox';
 import validateCPF from '@/utilities/validators/cpf';
 import validateEmail from '@/utilities/validators/email';
-import { LoginService } from '@/api/services/login';
+import { LoginService } from '@/gateway/services/login';
 import { setAuthCookie } from '@/lib/auth';
 import usePersistedState from '@/hooks/usePersistedState';
 

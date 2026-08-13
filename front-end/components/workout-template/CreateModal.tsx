@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { RiAddLine, RiHeartPulseLine } from 'react-icons/ri';
-import type { Activity } from '@/api/services/workout-templates';
+import type { Activity } from '@/gateway/services/workout-templates';
 import { RiCloseLine } from 'react-icons/ri';
 import Input from '../ui/Input';
 import Textarea from '../ui/Textarea';
@@ -10,9 +10,9 @@ import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import { ActivityBlock } from './ActivityBlock';
 import ExercisePicker from '../shared/ExercisePicker';
-import type { Template } from '@/api/services/workout-templates';
-import type { WorkoutTemplateFormDto } from '@/api/services/workout-templates';
-import type { Exercise } from '@/api/services/parametro';
+import type { Template } from '@/gateway/services/workout-templates';
+import type { WorkoutTemplateFormDto } from '@/gateway/services/workout-templates';
+import type { Exercise } from '@/gateway/services/parametro';
 import TenantSelect from '../shared/TenantSelect';
 import { getSessionUser } from '@/lib/auth';
 import ExerciseReorderModal from '../shared/ExerciseReorderModal';

@@ -1,4 +1,4 @@
-import { authenticatedRequest } from '@/api/client';
+import { authenticatedRequest } from '@/gateway/client';
 import { indexedDbService, type IndexedDbEntity } from '@/lib/indexeddb';
 import {
 	createFulltextSearch,

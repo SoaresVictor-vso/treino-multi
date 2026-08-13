@@ -2,10 +2,10 @@
 
 import React, { startTransition, useDeferredValue, useEffect } from 'react';
 import Button from '@/components/ui/Button';
-import { TenantService } from '@/api/services/tenant';
-import { UsersService } from '@/api/services/users';
-import { UserListItemDto } from '@/api/dto/user/list-user.dto';
-import { TenantListItemDto } from '@/api/dto/tenant/list-tenant.dto';
+import { TenantService } from '@/gateway/services/tenant';
+import { UsersService } from '@/gateway/services/users';
+import { UserListItemDto } from '@/gateway/dto/user/list-user.dto';
+import { TenantListItemDto } from '@/gateway/dto/tenant/list-tenant.dto';
 import ErrorBox from '@/components/ui/ErrorBox';
 import Select from '@/components/ui/Select';
 import { getSessionUser } from '@/lib/auth';

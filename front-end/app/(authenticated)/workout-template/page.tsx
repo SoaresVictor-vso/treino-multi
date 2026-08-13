@@ -13,8 +13,8 @@ import type {
 	TemplateModalState,
 	WorkoutTemplateFormDto,
 	UpdateWorkoutTemplateDto,
-} from '@/api/services/workout-templates';
-import * as workoutTemplatesService from '@/api/services/workout-templates';
+} from '@/gateway/services/workout-templates';
+import * as workoutTemplatesService from '@/gateway/services/workout-templates';
 
 const toTemplate = (
 	item: workoutTemplatesService.WorkoutTemplateResponse,
@@ -109,11 +109,11 @@ export default function WorkoutTemplatePage() {
 	const saveTemplate = async (workoutTemplate: WorkoutTemplateFormDto) => {
 		try {
 			const created = await workoutTemplatesService.create({
-			...workoutTemplate,
-			activities: workoutTemplate.activities.map(({ id: _id, ...activity }) =>
-				activity,
-			),
-		});
+				...workoutTemplate,
+				activities: workoutTemplate.activities.map(
+					({ id: _id, ...activity }) => activity,
+				),
+			});
 			if (!created.data) {
 				setError(
 					created.error ||

@@ -1,11 +1,15 @@
 import { RiHeartPulseLine } from 'react-icons/ri';
-import type { WorkoutTemplateSummary } from '@/api/services/workout-templates';
+import type { WorkoutTemplateSummary } from '@/gateway/services/workout-templates';
 
-export default function TemplatePreview({ template }: { template: WorkoutTemplateSummary }) {
+export default function TemplatePreview({
+	template,
+}: {
+	template: WorkoutTemplateSummary;
+}) {
 	return (
 		<aside className="rounded-lg border border-outline-variant bg-surface-container-low p-5">
 			<p className="type-label-caps text-primary-fixed-dim">Prévia da template</p>
-		<h2 className="mt-2 text-xl font-bold">{template.name}</h2>
+			<h2 className="mt-2 text-xl font-bold">{template.name}</h2>
 			<p className="mt-3 text-sm leading-6 text-on-surface-variant">
 				{template.description}
 			</p>

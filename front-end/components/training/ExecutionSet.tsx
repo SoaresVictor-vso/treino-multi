@@ -1,14 +1,28 @@
 'use client';
 
 import { useState, type PointerEvent } from 'react';
-import { RiArrowGoBackLine, RiCheckLine, RiDeleteBinLine } from 'react-icons/ri';
+import {
+	RiArrowGoBackLine,
+	RiCheckLine,
+	RiDeleteBinLine,
+} from 'react-icons/ri';
 import { MetricField } from '@/components/workout-template/MetricField';
 import { RestDurationField } from '@/components/workout-template/RestDurationField';
-import type { ExecutionStatus, WorkoutExecution } from '@/api/services/workouts';
+import type {
+	ExecutionStatus,
+	WorkoutExecution,
+} from '@/gateway/services/workouts';
 
 const SWIPE_THRESHOLD = 72;
 
-export default function ExecutionSet({ execution, number, editable, onChange, onSkip, onStatusChange }: {
+export default function ExecutionSet({
+	execution,
+	number,
+	editable,
+	onChange,
+	onSkip,
+	onStatusChange,
+}: {
 	execution: WorkoutExecution;
 	number: number;
 	editable: boolean;
@@ -21,7 +35,8 @@ export default function ExecutionSet({ execution, number, editable, onChange, on
 	const [dragOffset, setDragOffset] = useState(0);
 	const locked = !editable || execution.status === 'skipped';
 	const fieldsDisabled = locked || execution.status === 'completed';
-	const value = <T extends number | null>(performed: T, prescribed: T) => performed ?? prescribed ?? null;
+	const value = <T extends number | null>(performed: T, prescribed: T) =>
+		performed ?? prescribed ?? null;
 	const hasRequiredMetrics =
 		value(execution.performedMetric1, execution.prescribedMetric1) !== null &&
 		(!execution.exercise.metric_2 ||
@@ -41,10 +56,16 @@ export default function ExecutionSet({ execution, number, editable, onChange, on
 
 	return (
 		<div className="relative overflow-hidden rounded-lg">
-			<div className="absolute inset-y-0 left-0 flex w-24 items-center justify-center bg-green-600 text-white" aria-hidden="true">
+			<div
+				className="absolute inset-y-0 left-0 flex w-24 items-center justify-center bg-green-600 text-white"
+				aria-hidden="true"
+			>
 				<RiCheckLine size={25} />
 			</div>
-			<div className="absolute inset-y-0 right-0 flex w-24 items-center justify-center bg-secondary-container text-on-secondary-container" aria-hidden="true">
+			<div
+				className="absolute inset-y-0 right-0 flex w-24 items-center justify-center bg-secondary-container text-on-secondary-container"
+				aria-hidden="true"
+			>
 				<RiArrowGoBackLine size={22} />
 			</div>
 			<div
@@ -65,11 +86,23 @@ export default function ExecutionSet({ execution, number, editable, onChange, on
 					);
 				}}
 				onPointerUp={finishDrag}
-				onPointerCancel={() => { setDragStartX(null); setDragOffset(0); }}
+				onPointerCancel={() => {
+					setDragStartX(null);
+					setDragOffset(0);
+				}}
 			>
-				<div className={`grid items-end gap-2 ${execution.exercise.metric_2 ? 'grid-cols-[28px_minmax(0,1fr)_minmax(0,1fr)]' : 'grid-cols-[28px_minmax(0,1fr)]'}`}>
+				<div
+					className={`grid items-end gap-2 ${execution.exercise.metric_2 ? 'grid-cols-[28px_minmax(0,1fr)_minmax(0,1fr)]' : 'grid-cols-[28px_minmax(0,1fr)]'}`}
+				>
 					<div className="relative flex items-center justify-center self-center">
-						<button type="button" disabled={fieldsDisabled} onClick={() => setMenuOpen((open) => !open)} aria-label={`Abrir opções da série ${number}`} aria-expanded={menuOpen} className="rounded-md disabled:cursor-default">
+						<button
+							type="button"
+							disabled={fieldsDisabled}
+							onClick={() => setMenuOpen((open) => !open)}
+							aria-label={`Abrir opções da série ${number}`}
+							aria-expanded={menuOpen}
+							className="rounded-md disabled:cursor-default"
+						>
 							<span
 								className={`inline-flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-semibold ${
 									execution.status === 'completed'
@@ -80,13 +113,60 @@ export default function ExecutionSet({ execution, number, editable, onChange, on
 								{number}
 							</span>
 						</button>
-						{menuOpen && !fieldsDisabled && <div className="absolute left-0 top-full z-10 mt-1 w-44 rounded border border-outline-variant bg-surface-container p-2 shadow-xl">
-							<RestDurationField value={value(execution.performedRestDuration, execution.prescribedRestDuration) ?? 0} disabled={fieldsDisabled} onChange={(item) => onChange('performedRestDuration', item)} />
-							<button type="button" onClick={() => { setMenuOpen(false); onSkip(); }} className="mt-2 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-error hover:bg-error-container/20"><RiDeleteBinLine /> Remover</button>
-						</div>}
+						{menuOpen && !fieldsDisabled && (
+							<div className="absolute left-0 top-full z-10 mt-1 w-44 rounded border border-outline-variant bg-surface-container p-2 shadow-xl">
+								<RestDurationField
+									value={
+										value(
+											execution.performedRestDuration,
+											execution.prescribedRestDuration,
+										) ?? 0
+									}
+									disabled={fieldsDisabled}
+									onChange={(item) => onChange('performedRestDuration', item)}
+								/>
+								<button
+									type="button"
+									onClick={() => {
+										setMenuOpen(false);
+										onSkip();
+									}}
+									className="mt-2 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-error hover:bg-error-container/20"
+								>
+									<RiDeleteBinLine /> Remover
+								</button>
+							</div>
+						)}
 					</div>
-					<MetricField metric={execution.exercise.metric_1} value={value(execution.performedMetric1, execution.prescribedMetric1) ?? undefined} type="v" disabled={fieldsDisabled} onTypeChange={() => {}} onChange={(item) => onChange('performedMetric1', item === '' ? null : Number(item))} />
-					{execution.exercise.metric_2 && <MetricField metric={execution.exercise.metric_2} value={value(execution.performedMetric2, execution.prescribedMetric2) ?? undefined} type={execution.metric2Type ?? 'v'} allowPercent disabled={fieldsDisabled} onTypeChange={() => {}} onChange={(item) => onChange('performedMetric2', item === '' ? null : Number(item))} />}
+					<MetricField
+						metric={execution.exercise.metric_1}
+						value={
+							value(execution.performedMetric1, execution.prescribedMetric1) ??
+							undefined
+						}
+						type="v"
+						disabled={fieldsDisabled}
+						onTypeChange={() => {}}
+						onChange={(item) =>
+							onChange('performedMetric1', item === '' ? null : Number(item))
+						}
+					/>
+					{execution.exercise.metric_2 && (
+						<MetricField
+							metric={execution.exercise.metric_2}
+							value={
+								value(execution.performedMetric2, execution.prescribedMetric2) ??
+								undefined
+							}
+							type={execution.metric2Type ?? 'v'}
+							allowPercent
+							disabled={fieldsDisabled}
+							onTypeChange={() => {}}
+							onChange={(item) =>
+								onChange('performedMetric2', item === '' ? null : Number(item))
+							}
+						/>
+					)}
 				</div>
 				{execution.status === 'completed' && (
 					<div

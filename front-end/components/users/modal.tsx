@@ -14,11 +14,14 @@ import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import Select from '../ui/Select';
 import Switch from '../ui/Switch';
-import { CreateUserDto, TenantFunction } from '@/api/dto/user/create-user.dto';
+import {
+	CreateUserDto,
+	TenantFunction,
+} from '@/gateway/dto/user/create-user.dto';
 import * as yup from 'yup';
-import { TenantListItemDto } from '@/api/dto/tenant/list-tenant.dto';
-import { UserListItemDto } from '@/api/dto/user/list-user.dto';
-import { UsersService } from '@/api/services/users';
+import { TenantListItemDto } from '@/gateway/dto/tenant/list-tenant.dto';
+import { UserListItemDto } from '@/gateway/dto/user/list-user.dto';
+import { UsersService } from '@/gateway/services/users';
 import React from 'react';
 import { Role } from '@/lib/roles';
 
@@ -208,7 +211,8 @@ export default function UserModal(props: {
 			if (effectiveTenantId && !form.tenantFunction) {
 				pendingFields.push('função');
 			}
-			if (form.password.length < 8) pendingFields.push('senha de ao menos 8 caracteres');
+			if (form.password.length < 8)
+				pendingFields.push('senha de ao menos 8 caracteres');
 			if (form.password !== form.passwordConfirmation) {
 				pendingFields.push('confirmação de senha igual à senha');
 			}
@@ -458,31 +462,31 @@ export default function UserModal(props: {
 						</p>
 					)}
 					<div className="flex items-center justify-end gap-3">
-					<Button
-						type="button"
-						variant="outline"
-						onClick={props.onClose}
-						disabled={isSubmitting}
-					>
-						{mode === 'edit' ? 'Cancelar' : 'Fechar'}
-					</Button>
-					{mode !== 'view' && (
 						<Button
-							type="submit"
-							disabled={!canSubmit}
-							aria-describedby={
-								submitDisabledReason ? 'user-submit-disabled-reason' : undefined
-							}
+							type="button"
+							variant="outline"
+							onClick={props.onClose}
+							disabled={isSubmitting}
 						>
-							{mode === 'edit'
-								? isSubmitting
-									? 'Salvando...'
-									: 'Salvar alterações'
-								: isSubmitting
-									? 'Salvando...'
-									: 'Criar usuário'}
+							{mode === 'edit' ? 'Cancelar' : 'Fechar'}
 						</Button>
-					)}
+						{mode !== 'view' && (
+							<Button
+								type="submit"
+								disabled={!canSubmit}
+								aria-describedby={
+									submitDisabledReason ? 'user-submit-disabled-reason' : undefined
+								}
+							>
+								{mode === 'edit'
+									? isSubmitting
+										? 'Salvando...'
+										: 'Salvar alterações'
+									: isSubmitting
+										? 'Salvando...'
+										: 'Criar usuário'}
+							</Button>
+						)}
 					</div>
 				</div>
 			</form>

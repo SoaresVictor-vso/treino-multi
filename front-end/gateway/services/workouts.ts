@@ -1,7 +1,11 @@
-import { authenticatedRequest } from '@/api/client';
-import type { Exercise, Metric } from '@/api/services/parametro';
+import { authenticatedRequest } from '@/gateway/client';
+import type { Exercise, Metric } from '@/gateway/services/parametro';
 
-export type ExecutionStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+export type ExecutionStatus =
+	| 'pending'
+	| 'in_progress'
+	| 'completed'
+	| 'skipped';
 export type WorkoutStatus = ExecutionStatus;
 
 export type WorkoutExecution = {
@@ -22,7 +26,11 @@ export type WorkoutExecution = {
 	status: ExecutionStatus;
 	exercise: Exercise & { metric_1: Metric; metric_2?: Metric | null };
 	referenceGroup: { id: number; name: string } | null;
-	referencePersonalRecord: { id: string; value: number; measuredAt: string } | null;
+	referencePersonalRecord: {
+		id: string;
+		value: number;
+		measuredAt: string;
+	} | null;
 };
 
 export type WorkoutDetail = {
@@ -50,14 +58,44 @@ export type CompletedWorkout = Omit<MyWorkout, 'status'> & {
 
 export type GenerateWorkoutsFromTemplateResponse = { count: number };
 
-export type UpdateWorkoutExecution = Omit<WorkoutExecution, 'id' | 'exercise' | 'referenceGroup' | 'referencePersonalRecord' | 'metric1Type' | 'metric2Type'> & { id?: number };
+export type UpdateWorkoutExecution = Omit<
+	WorkoutExecution,
+	| 'id'
+	| 'exercise'
+	| 'referenceGroup'
+	| 'referencePersonalRecord'
+	| 'metric1Type'
+	| 'metric2Type'
+> & { id?: number };
 
 export const workoutsService = {
 	findMine: () => authenticatedRequest<MyWorkout[]>('workouts/me'),
-	findMyCompleted: () => authenticatedRequest<CompletedWorkout[]>('workouts/me/completed'),
+	findMyCompleted: () =>
+		authenticatedRequest<CompletedWorkout[]>('workouts/me/completed'),
 	findOne: (id: string) => authenticatedRequest<WorkoutDetail>(`workouts/${id}`),
-	start: (id: string) => authenticatedRequest<WorkoutDetail>(`workouts/${id}/start`, { method: 'PATCH' }),
-	updateExecutions: (id: string, executions: UpdateWorkoutExecution[]) => authenticatedRequest<WorkoutDetail>(`workouts/${id}/executions`, { method: 'PATCH', body: JSON.stringify({ executions }) }),
-	complete: (id: string) => authenticatedRequest<WorkoutDetail>(`workouts/${id}/complete`, { method: 'PATCH' }),
-	generateFromTemplate: (athleteIds: string[], templateId: string, scheduledDate?: string) => authenticatedRequest<GenerateWorkoutsFromTemplateResponse>('workouts/from-template', { method: 'POST', body: JSON.stringify({ athleteIds, templateId, scheduledDate }) }),
+	start: (id: string) =>
+		authenticatedRequest<WorkoutDetail>(`workouts/${id}/start`, {
+			method: 'PATCH',
+		}),
+	updateExecutions: (id: string, executions: UpdateWorkoutExecution[]) =>
+		authenticatedRequest<WorkoutDetail>(`workouts/${id}/executions`, {
+			method: 'PATCH',
+			body: JSON.stringify({ executions }),
+		}),
+	complete: (id: string) =>
+		authenticatedRequest<WorkoutDetail>(`workouts/${id}/complete`, {
+			method: 'PATCH',
+		}),
+	generateFromTemplate: (
+		athleteIds: string[],
+		templateId: string,
+		scheduledDate?: string,
+	) =>
+		authenticatedRequest<GenerateWorkoutsFromTemplateResponse>(
+			'workouts/from-template',
+			{
+				method: 'POST',
+				body: JSON.stringify({ athleteIds, templateId, scheduledDate }),
+			},
+		),
 };

@@ -1,7 +1,7 @@
 'use client';
 import Input from '@/components/ui/Input';
-import { Metric, MetricFieldType } from '@/api/services/parametro';
-import type { RegisterType } from '@/api/services/workout-templates';
+import { Metric, MetricFieldType } from '@/gateway/services/parametro';
+import type { RegisterType } from '@/gateway/services/workout-templates';
 import { secondsToTime, timeToSeconds } from '@/lib/tools';
 
 export function MetricField({

@@ -1,6 +1,6 @@
 import EntityTableShell from '@/components/shared/table/EntityTableShell';
 import Button from '@/components/ui/Button';
-import { UserListItemDto } from '@/api/dto/user/list-user.dto';
+import { UserListItemDto } from '@/gateway/dto/user/list-user.dto';
 import { RiUser3Line, RiEyeLine, RiEditLine } from 'react-icons/ri';
 import Badge, { BadgeTypes } from '../../../components/ui/Badge';
 import { mask } from '@/lib/tools';

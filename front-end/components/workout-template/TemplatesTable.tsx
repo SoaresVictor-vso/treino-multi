@@ -1,6 +1,6 @@
 import { RiSearchLine } from 'react-icons/ri';
 import TemplateActions from './TemplateActions';
-import type { WorkoutTemplateSummary } from '@/api/services/workout-templates';
+import type { WorkoutTemplateSummary } from '@/gateway/services/workout-templates';
 
 type TemplatesTableProps = {
 	templates: WorkoutTemplateSummary[];

@@ -4,20 +4,20 @@ import {
 	createTenantInitialValues,
 	createTenantYupSchema,
 	type CreateTenantDto,
-} from '@/api/dto/tenant/create-tenant.dto';
+} from '@/gateway/dto/tenant/create-tenant.dto';
 import {
 	updateTenantYupSchema,
 	type UpdateTenantDto,
-} from '@/api/dto/tenant/update-tenant.dto';
+} from '@/gateway/dto/tenant/update-tenant.dto';
 import {
 	createTenantAdminInitialValues,
 	createTenantAdminYupSchema,
 	type CreateTenantAdminDto,
-} from '@/api/dto/tenant/create-tenant-admin.dto';
-import { TenantDetailsDto } from '@/api/dto/tenant/detail-tenant.dto';
-import { TenantListItemDto } from '@/api/dto/tenant/list-tenant.dto';
-import { ApiResponse } from '@/api/client';
-import { TenantService } from '@/api/services/tenant';
+} from '@/gateway/dto/tenant/create-tenant-admin.dto';
+import { TenantDetailsDto } from '@/gateway/dto/tenant/detail-tenant.dto';
+import { TenantListItemDto } from '@/gateway/dto/tenant/list-tenant.dto';
+import { ApiResponse } from '@/gateway/client';
+import { TenantService } from '@/gateway/services/tenant';
 import ErrorBox from '@/components/ui/ErrorBox';
 import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';

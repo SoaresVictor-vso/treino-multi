@@ -1,4 +1,4 @@
-import { TenantListItemDto } from '@/api/dto/tenant/list-tenant.dto';
+import { TenantListItemDto } from '@/gateway/dto/tenant/list-tenant.dto';
 import Button from '@/components/ui/Button';
 import EntityTableShell from '@/components/shared/table/EntityTableShell';
 import {

@@ -1,4 +1,4 @@
-import { authenticatedRequest } from '@/api/client';
+import { authenticatedRequest } from '@/gateway/client';
 
 export type PersonalRecord = {
 	id: string;
@@ -18,7 +18,9 @@ export type CreatePersonalRecordDto = {
 
 export const personalRecordsService = {
 	findByAthlete: (athleteId: string) =>
-		authenticatedRequest<PersonalRecord[]>(`personal-records/athletes/${athleteId}`),
+		authenticatedRequest<PersonalRecord[]>(
+			`personal-records/athletes/${athleteId}`,
+		),
 	create: (dto: CreatePersonalRecordDto) =>
 		authenticatedRequest<PersonalRecord>('personal-records', {
 			method: 'POST',

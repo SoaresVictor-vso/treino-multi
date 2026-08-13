@@ -5,10 +5,10 @@ export type {
 	Template,
 	TemplateModalState,
 	WorkoutTemplate,
-} from '@/api/services/workout-templates';
+} from '@/gateway/services/workout-templates';
 
 export type {
 	MetricFieldType,
 	Exercise,
 	Metric,
-} from '@/api/services/parametro';
+} from '@/gateway/services/parametro';

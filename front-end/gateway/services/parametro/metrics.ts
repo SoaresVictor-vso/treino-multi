@@ -1,4 +1,4 @@
-import { authenticatedRequest } from '@/api/client';
+import { authenticatedRequest } from '@/gateway/client';
 
 export enum MetricFieldType {
 	INT = 'int',
