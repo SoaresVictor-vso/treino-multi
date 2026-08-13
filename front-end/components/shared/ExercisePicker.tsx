@@ -118,36 +118,36 @@ export default function ExercisePicker({
 	};
 
 	return (
-		<div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
-			<div className="w-full max-w-xl rounded-lg border border-outline-variant bg-surface-container p-6">
-				<div className="mb-5 flex justify-between">
+		<div className="fixed inset-0 z-[60] flex items-end justify-center overflow-y-auto bg-black/80 sm:items-center sm:p-4">
+			<div className="flex h-full w-full flex-col border border-outline-variant bg-surface-container p-4 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-xl sm:rounded-lg sm:p-6">
+				<div className="mb-4 flex shrink-0 justify-between gap-4 sm:mb-5">
 					<div>
 						<p className="type-label-caps text-primary-fixed-dim">
 							Seleção de exercícios
 						</p>
-						<h2 className="mt-2 text-xl font-bold">Escolha a sequência</h2>
+						<h2 className="mt-2 text-lg font-bold sm:text-xl">Escolha a sequência</h2>
 					</div>
-					<button onClick={onClose} aria-label="Fechar">
-						<RiCloseLine size={24} />
+					<button onClick={onClose} aria-label="Fechar" className="shrink-0 p-1">
+						<RiCloseLine className="text-2xl" />
 					</button>
 				</div>
 				<input
 					value={query}
 					onChange={(event) => setQuery(event.target.value)}
 					placeholder="Nome ou descrição do exercício"
-					className="mb-4 w-full border-b border-outline bg-transparent px-3 py-2 text-sm outline-none"
+					className="mb-4 w-full shrink-0 border-b border-outline bg-transparent px-3 py-2 text-sm outline-none"
 				/>
-				<div className="max-h-[55vh] space-y-2 overflow-y-auto">
+				<div className="min-h-0 flex-1 space-y-2 overflow-y-auto sm:max-h-[55vh] sm:flex-none">
 					{visibleExercises.map((exercise) => {
 						const order = selected.findIndex((item) => item.id === exercise.id) + 1;
 						return (
 							<button
 								key={exercise.id}
 								onClick={() => toggle(exercise)}
-								className={`relative flex w-full items-center gap-4 rounded border p-3 text-left ${order ? 'border-primary-fixed-dim bg-surface-container-high' : 'border-outline-variant'}`}
+								className={`relative flex w-full items-center gap-3 rounded border p-3 text-left sm:gap-4 ${order ? 'border-primary-fixed-dim bg-surface-container-high' : 'border-outline-variant'}`}
 							>
-								<span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded bg-surface-container-highest text-primary">
-									<RiHeartPulseLine size={28} />
+								<span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded bg-surface-container-highest text-primary sm:h-14 sm:w-14">
+									<RiHeartPulseLine className="text-2xl sm:text-3xl" />
 									{order > 0 && (
 										<span className="absolute inset-0 flex items-center justify-center rounded bg-black/70 text-xl font-bold text-primary-fixed-dim">
 											{order}
@@ -162,12 +162,12 @@ export default function ExercisePicker({
 										</span>
 									)}
 								</span>
-								{order > 0 && <RiCheckLine size={22} />}
+								{order > 0 && <RiCheckLine className="shrink-0 text-xl" />}
 							</button>
 						);
 					})}
 				</div>
-				<div className="mt-6 flex justify-end border-t border-outline-variant pt-5">
+				<div className="mt-4 flex shrink-0 justify-end border-t border-outline-variant pt-4 sm:mt-6 sm:pt-5">
 					<Button onClick={onClose}>OK</Button>
 				</div>
 			</div>
