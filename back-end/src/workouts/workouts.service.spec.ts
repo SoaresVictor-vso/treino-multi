@@ -149,4 +149,34 @@ describe('WorkoutsService', () => {
 		});
 		expect(manager.save).not.toHaveBeenCalled();
 	});
+
+	it('impede iniciar um treino percentual sem os RPs necessários', async () => {
+		const workout = {
+			id: 'workout-id',
+			athleteId: input.athleteId,
+			status: WorkoutStatus.PENDING,
+		} as Workout;
+		const workoutRepository = {
+			existsBy: jest.fn().mockResolvedValue(false),
+		};
+		Object.assign(manager, {
+			query: jest
+				.fn()
+				.mockResolvedValueOnce(undefined)
+				.mockResolvedValueOnce([{ missing: true }]),
+			getRepository: jest.fn().mockReturnValue(workoutRepository),
+		});
+		jest.spyOn(service as any, 'findWritableWorkout').mockResolvedValue(workout);
+
+		await expect(
+			service.startWorkout('workout-id', {
+				sub: input.athleteId,
+				tenantId: input.template.tenantId,
+				roles: [Role.TENANT_CLIENT],
+			}),
+		).rejects.toThrow('Cadastre os RPs necessários antes de iniciar o treino.');
+
+		expect(workoutRepository.existsBy).not.toHaveBeenCalled();
+		expect(manager.save).not.toHaveBeenCalled();
+	});
 });

@@ -251,9 +251,19 @@ export class WorkoutsService {
 					exerciseId: Number(execution.exerciseId),
 					position: Number(execution.position),
 					prescribedMetric1: numberOrNull(execution.prescribedMetric1),
-					prescribedMetric2: numberOrNull(execution.prescribedMetric2),
+					prescribedMetric2:
+						execution.metric2Type === 'p' &&
+						execution.recordId !== null &&
+						execution.prescribedMetric2 !== null
+							? (Number(execution.prescribedMetric2) *
+									Number(execution.recordValue)) /
+								100
+							: numberOrNull(execution.prescribedMetric2),
 					metric1Type: execution.metric1Type,
-					metric2Type: execution.metric2Type,
+					metric2Type:
+						execution.metric2Type === 'p' && execution.recordId !== null
+							? 'v'
+							: execution.metric2Type,
 					prescribedPse: numberOrNull(execution.prescribedPse),
 					prescribedRestDuration: numberOrNull(execution.prescribedRestDuration),
 					performedMetric1: numberOrNull(execution.performedMetric1),
@@ -313,6 +323,35 @@ export class WorkoutsService {
 			await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
 				workout.athleteId,
 			]);
+			const missingPersonalRecords = await manager.query(
+				`SELECT 1
+				FROM executions execution
+				WHERE execution.workout_id = $1
+					AND execution.metric2_type = 'p'
+					AND NOT EXISTS (
+						SELECT 1
+						FROM personal_records record
+						WHERE record.athlete_id = $2
+							AND record.deleted_at IS NULL
+							AND (
+								record.exercise_id = execution.exercise_id
+								OR record.exercise_group_id = (
+									SELECT membership.exercise_group_id
+									FROM exercise_group_exercises membership
+									WHERE membership.exercise_id = execution.exercise_id
+										AND membership.deleted_at IS NULL
+									ORDER BY membership.id
+									LIMIT 1
+								)
+							)
+					)
+					LIMIT 1`,
+				[id, workout.athleteId],
+			);
+			if (missingPersonalRecords?.length)
+				throw new BadRequestException(
+					'Cadastre os RPs necessários antes de iniciar o treino.',
+				);
 			const hasWorkoutInProgress = await manager.getRepository(Workout).existsBy({
 				athleteId: workout.athleteId,
 				status: WorkoutStatus.IN_PROGRESS,
@@ -351,6 +390,16 @@ export class WorkoutsService {
 			throw new BadRequestException('As posições das séries devem ser únicas.');
 		await this.dataSource.transaction(async (manager) => {
 			const current = await manager.find(Execution, { where: { workoutId: id } });
+			const submittedIds = dto.executions
+				.map((execution) => execution.id)
+				.filter((executionId): executionId is number => executionId !== undefined);
+			if (new Set(submittedIds).size !== submittedIds.length)
+				throw new BadRequestException('Uma série só pode ser enviada uma vez.');
+			const submittedIdSet = new Set(submittedIds);
+			if (current.some((execution) => !submittedIdSet.has(execution.id)))
+				throw new BadRequestException(
+					'Todas as séries existentes devem ser enviadas para preservar a ordem.',
+				);
 			if (current.length) {
 				const temporaryPositionOffset =
 					Math.max(...current.map((execution) => execution.position)) +

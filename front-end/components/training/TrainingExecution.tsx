@@ -45,15 +45,24 @@ function statusLabel(status: WorkoutDetail['status']) {
 function preloadPrescribedValues(workout: WorkoutDetail): WorkoutDetail {
 	return {
 		...workout,
-		executions: workout.executions.map((execution) => ({
-			...execution,
-			performedMetric1: execution.performedMetric1 ?? execution.prescribedMetric1,
-			performedMetric2: execution.performedMetric2 ?? execution.prescribedMetric2,
-			performedPse: execution.performedPse ?? execution.prescribedPse,
-			performedRestDuration:
-				execution.performedRestDuration ?? execution.prescribedRestDuration,
-		})),
+		executions: workout.executions
+			.toSorted((left, right) => left.position - right.position)
+			.map((execution, index) => ({
+				...execution,
+				position: index + 1,
+				performedMetric1: execution.performedMetric1 ?? execution.prescribedMetric1,
+				performedMetric2: execution.performedMetric2 ?? execution.prescribedMetric2,
+				performedPse: execution.performedPse ?? execution.prescribedPse,
+				performedRestDuration:
+					execution.performedRestDuration ?? execution.prescribedRestDuration,
+			})),
 	};
+}
+
+function serializeExecutions(executions: WorkoutExecution[]) {
+	return executions.map((execution, index) =>
+		serializeExecution({ ...execution, position: index + 1 }),
+	);
 }
 
 export default function TrainingExecution({ id }: { id: string }) {
@@ -167,7 +176,36 @@ export default function TrainingExecution({ id }: { id: string }) {
 			};
 		});
 	const addExercises = (selected: Exercise[]) => {
-		selected.forEach((exercise) => addSeries(exercise, 'after'));
+		setWorkout((current) => {
+			if (!current) return current;
+			const firstNewPosition = current.executions.length + 1;
+			return {
+				...current,
+				executions: [
+					...current.executions,
+					...selected.map((exercise, index) => ({
+						id: -(firstNewPosition + index),
+						exerciseId: exercise.id,
+						position: firstNewPosition + index,
+						prescribedMetric1: null,
+						prescribedMetric2: null,
+						metric1Type: 'v' as const,
+						metric2Type: 'v' as const,
+						prescribedPse: null,
+						prescribedRestDuration: null,
+						performedMetric1: null,
+						performedMetric2: null,
+						performedPse: null,
+						performedRestDuration: null,
+						performedNote: null,
+						status: 'in_progress' as const,
+						exercise,
+						referenceGroup: null,
+						referencePersonalRecord: null,
+					})),
+				],
+			};
+		});
 		setPickerOpen(false);
 	};
 	const reorderExercises = (exerciseIds: number[]) =>
@@ -198,6 +236,15 @@ export default function TrainingExecution({ id }: { id: string }) {
 			]),
 		).values(),
 	);
+	const executionGroups = useMemo(() => {
+		const groups = new Map<number, WorkoutExecution[]>();
+		(workout?.executions ?? []).forEach((execution) => {
+			const sets = groups.get(execution.exerciseId) ?? [];
+			sets.push(execution);
+			groups.set(execution.exerciseId, sets);
+		});
+		return Array.from(groups.entries());
+	}, [workout?.executions]);
 
 	const save = async () => {
 		if (!workout) return;
@@ -205,7 +252,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 		setError(null);
 		const response = await workoutsService.updateExecutions(
 			workout.id,
-			workout.executions.map(serializeExecution),
+			serializeExecutions(workout.executions),
 		);
 		if (!response.success || !response.data)
 			setError(response.error || 'Não foi possível salvar as séries.');
@@ -227,7 +274,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 		setError(null);
 		const saveResult = await workoutsService.updateExecutions(
 			workout.id,
-			workout.executions.map(serializeExecution),
+			serializeExecutions(workout.executions),
 		);
 		if (!saveResult.success || !saveResult.data) {
 			setError(saveResult.error || 'Não foi possível salvar as séries.');
@@ -285,12 +332,9 @@ export default function TrainingExecution({ id }: { id: string }) {
 					<Button onClick={() => setStartOpen(true)}>
 						<RiPlayLine /> Iniciar treino
 					</Button>
-				)}
+			)}
 			<div className="space-y-5">
-				{Object.entries(
-					Object.groupBy(workout.executions, (item) => item.exerciseId),
-				).map(([exerciseId, groupedSets]) => {
-					const sets = groupedSets ?? [];
+				{executionGroups.map(([exerciseId, sets]) => {
 					if (!sets.length) return null;
 					return (
 						<ExerciseExecutionCard
@@ -350,6 +394,11 @@ export default function TrainingExecution({ id }: { id: string }) {
 					selected={pickerSelection}
 					onChange={setPickerSelection}
 					onClose={() => void addExercises(pickerSelection)}
+					filterExercise={(exercise) =>
+						!(workout?.executions ?? []).some(
+							(execution) => execution.exerciseId === exercise.id,
+						)
+					}
 				/>
 			)}
 			<PersonalRecordRequiredModal
