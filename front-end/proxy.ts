@@ -22,7 +22,7 @@ function parseJwt(token: string): JwtPayload | null {
 	}
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 
 	if (PUBLIC_PATHS.some((path) => pathname.startsWith(path))) {
@@ -44,10 +44,6 @@ export function middleware(request: NextRequest) {
 	}
 
 	const allowedRoles = getAllowedRoles(pathname);
-
-	console.log(`Acessando ${pathname} com token de usuário ${payload.sub}`);
-	console.log(allowedRoles);
-	console.log(payload);
 
 	if (
 		allowedRoles !== null &&
