@@ -528,6 +528,22 @@ export class WorkoutsService {
 		actor: JwtPayload,
 	) {
 		const athleteIds = [...new Set(dto.athleteIds)];
+		const hasAthleteManagement = actor.roles.some((role) =>
+			[Role.ORG_ADMIN, Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER].includes(
+				role,
+			),
+		);
+		if (!hasAthleteManagement) {
+			const associations = await this.associations.findBy({
+				trainerId: actor.sub,
+				athleteId: In(athleteIds),
+				endDate: IsNull(),
+			});
+			if (associations.length !== athleteIds.length)
+				throw new ForbiddenException(
+					'Você só pode atribuir treinos aos seus atletas vinculados.',
+				);
+		}
 		const [athletes, template] = await Promise.all([
 			this.usersService.findTenantUser(athleteIds, actor.tenantId),
 			this.templates.findOne({

@@ -42,6 +42,7 @@ export enum Permission {
 	WORKOUT_TEMPLATES_DELETE = 'workout-templates:delete',
 	WORKOUT_TEMPLATES_DELETE_TENANT = 'workout-templates:delete-tenant',
 	WORKOUT_TEMPLATES_DELETE_ALL = 'workout-templates:delete-all',
+	WORKOUT_ASSIGN = 'workouts:assign',
 
 	// Exercícios
 	EXERCISES_READ = 'exercises:read',

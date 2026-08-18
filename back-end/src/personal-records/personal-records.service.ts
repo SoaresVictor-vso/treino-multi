@@ -44,6 +44,7 @@ export class PersonalRecordsService {
 
 		if (actor.tenantId && actor.tenantId !== athlete.tenantId)
 			throw new ForbiddenException('O atleta não pertence ao seu tenant.');
+		await this.assertCanReadAthlete(athlete, actor);
 
 		if (group && athlete.tenantId !== group.tenantId)
 			throw new BadRequestException(

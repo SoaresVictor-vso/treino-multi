@@ -23,6 +23,11 @@ import { UpdatePersonalRecordDto } from './dto/update-personal-record.dto';
 import { PersonalRecordsService } from './personal-records.service';
 
 const MANAGE_ROLES = [Role.ORG_ADMIN, Role.ORG_SUPPORT, Role.TENANT_ADMIN];
+const CREATE_ROLES = [
+	...MANAGE_ROLES,
+	Role.TENANT_TRAINER,
+	Role.TENANT_TRAINER_MASTER,
+];
 
 @ApiTags('personal-records')
 @ApiBearerAuth('JWT')
@@ -42,7 +47,7 @@ export class PersonalRecordsController {
 
 	@Post()
 	@UseGuards(RolesGuard)
-	@Roles(...MANAGE_ROLES)
+	@Roles(...CREATE_ROLES)
 	@ApiOperation({ summary: 'Registra o 1RM de referência de um atleta' })
 	create(
 		@Body() dto: CreatePersonalRecordDto,

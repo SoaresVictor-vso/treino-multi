@@ -92,7 +92,7 @@ export class WorkoutsController {
 
 	@Post('from-template')
 	@ApiOperation({ summary: 'Gera treinos de um template para vários atletas' })
-	@RequirePermissions(Permission.ATHLETE_MANAGE)
+	@RequirePermissions(Permission.WORKOUT_ASSIGN)
 	generateWorkoutsFromTemplate(
 		@Body() dto: GenerateWorkoutsFromTemplateDto,
 		@CurrentUser() actor: JwtPayload,

@@ -36,6 +36,7 @@ describe('WorkoutsService', () => {
 			callback(manager),
 		),
 	};
+	const associations = { findBy: jest.fn() };
 
 	beforeEach(async () => {
 		jest.clearAllMocks();
@@ -43,7 +44,10 @@ describe('WorkoutsService', () => {
 			providers: [
 				WorkoutsService,
 				{ provide: DataSource, useValue: dataSource },
-				{ provide: getRepositoryToken(AthleteTrainerAssociation), useValue: {} },
+				{
+					provide: getRepositoryToken(AthleteTrainerAssociation),
+					useValue: associations,
+				},
 				{ provide: getRepositoryToken(WorkoutTemplate), useValue: {} },
 				{ provide: UsersService, useValue: {} },
 			],
@@ -157,6 +161,21 @@ describe('WorkoutsService', () => {
 				roles: [Role.TENANT_CLIENT],
 			}),
 		).rejects.toThrow('Esta consulta é exclusiva para treinadores.');
+	});
+
+	it('impede o treinador de atribuir treino a atletas sem vínculo ativo', async () => {
+		associations.findBy.mockResolvedValue([]);
+
+		await expect(
+			service.generateWorkoutsFromTemplate(
+				{ athleteIds: [input.athleteId], templateId: input.template.id },
+				{
+					sub: input.createdBy,
+					tenantId: input.template.tenantId,
+					roles: [Role.TENANT_TRAINER],
+				},
+			),
+		).rejects.toThrow('Você só pode atribuir treinos aos seus atletas vinculados.');
 	});
 
 	it('impede iniciar um treino quando o atleta já tem outro em andamento', async () => {

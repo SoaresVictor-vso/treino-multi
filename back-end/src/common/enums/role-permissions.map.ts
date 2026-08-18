@@ -27,6 +27,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 		Permission.WORKOUT_TEMPLATES_UPDATE,
 		Permission.WORKOUT_TEMPLATES_DELETE,
 		Permission.WORKOUT_TEMPLATES_READ_TENANT,
+		Permission.WORKOUT_ASSIGN,
 		Permission.EXERCISES_READ,
 		Permission.ATHLETE_READ,
 	],
