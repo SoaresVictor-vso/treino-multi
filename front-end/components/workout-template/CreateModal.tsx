@@ -7,7 +7,6 @@ import { RiCloseLine } from 'react-icons/ri';
 import Input from '../ui/Input';
 import Textarea from '../ui/Textarea';
 import Button from '../ui/Button';
-import Modal from '../ui/Modal';
 import { ActivityBlock } from './ActivityBlock';
 import ExercisePicker from '../shared/ExercisePicker';
 import type { Template } from '@/gateway/services/workout-templates';
@@ -181,20 +180,20 @@ export function CreateModal({
 	};
 	return (
 		<div
-			className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-4"
+			className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto bg-black/75 sm:items-center sm:p-4"
 			role="dialog"
 			aria-modal="true"
 		>
 			<div
-				className="my-auto max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-lg border border-outline-variant bg-surface-container p-6 shadow-2xl"
+				className="flex h-dvh w-full flex-col overflow-y-auto bg-surface-container p-4 shadow-2xl sm:my-auto sm:h-auto sm:max-h-[calc(100vh-2rem)] sm:max-w-2xl sm:rounded-lg sm:border sm:border-outline-variant sm:p-6"
 				onKeyDown={moveToNextField}
 			>
-				<div className="mb-6 flex justify-between border-b border-outline-variant pb-5">
-					<div>
+				<div className="mb-5 flex items-start justify-between gap-4 border-b border-outline-variant pb-4 sm:mb-6 sm:pb-5">
+					<div className="min-w-0">
 						<p className="type-label-caps text-primary-fixed-dim">
 							{mode === 'create' ? 'Nova template' : 'Template de treino'}
 						</p>
-						<h2 className="mt-2 text-2xl font-bold">
+						<h2 className="mt-2 text-xl font-bold sm:text-2xl">
 							{mode === 'create'
 								? 'Cadastrar template de treino'
 								: isViewMode
@@ -205,7 +204,7 @@ export function CreateModal({
 					<button
 						onClick={onClose}
 						aria-label="Fechar"
-						className="text-on-surface-variant hover:text-primary"
+						className="shrink-0 text-on-surface-variant hover:text-primary"
 					>
 						<RiCloseLine size={24} />
 					</button>
@@ -236,8 +235,8 @@ export function CreateModal({
 						rows={3}
 					/>
 				</fieldset>
-				<div className="mt-7">
-					<div className="flex items-center justify-between">
+				<div className="mt-6 sm:mt-7">
+					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<h3 className="type-headline-md">
 							Exercícios{' '}
 							<span className="ml-2 text-sm font-normal text-on-surface-variant">
@@ -245,7 +244,12 @@ export function CreateModal({
 							</span>
 						</h3>
 						{!isViewMode && (
-							<Button variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => setPickerOpen(true)}
+								className="w-full sm:w-auto"
+							>
 								<RiAddLine /> Adicionar exercício
 							</Button>
 						)}
@@ -255,7 +259,7 @@ export function CreateModal({
 							<div
 								key={item.id}
 								data-exercise-id={item.id}
-								className="rounded border border-outline-variant bg-surface-container-low p-4"
+								className="rounded border border-outline-variant bg-surface-container-low p-3 sm:p-4"
 							>
 								<div className="flex items-center gap-3">
 									<span className="w-6 font-mono text-primary-fixed-dim">
@@ -316,12 +320,13 @@ export function CreateModal({
 						)}
 					</div>
 				</div>
-				<div className="mt-7 flex justify-end gap-3 border-t border-outline-variant pt-5">
-					<Button variant="outline" onClick={onClose}>
+				<div className="mt-6 flex flex-col-reverse gap-3 border-t border-outline-variant pt-4 sm:mt-7 sm:flex-row sm:justify-end sm:pt-5">
+					<Button variant="outline" onClick={onClose} className="w-full sm:w-auto">
 						{isViewMode ? 'Fechar' : 'Cancelar'}
 					</Button>
 					{!isViewMode && (
 						<Button
+							className="w-full sm:w-auto"
 							disabled={
 								!title.trim() ||
 								!tenantId ||

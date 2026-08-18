@@ -41,8 +41,8 @@ export function ActivityBlock({
 			data-block-index={index}
 			className="rounded border border-outline-variant bg-surface-container-high px-2 py-1.5"
 		>
-			<div className="grid items-end gap-2 grid-cols-[28px_1fr_1fr_1fr_1fr]">
-				<div className="relative flex items-center justify-center my-auto">
+			<div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[auto_repeat(4,minmax(0,1fr))]">
+				<div className="relative col-span-full flex items-center sm:col-span-1 sm:justify-center">
 					<button
 						type="button"
 						disabled={disabled}

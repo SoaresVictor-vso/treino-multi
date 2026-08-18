@@ -14,7 +14,7 @@ export function RestDurationField({
 	disabled?: boolean;
 }) {
 	return (
-		<div className="block text-[11px] font-semibold leading-none text-on-surface-variant">
+		<div className="block text-xs font-semibold leading-none text-on-surface-variant">
 			Descanso
 			<div className="mt-1 flex h-8">
 				<Input

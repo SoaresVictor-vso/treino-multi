@@ -74,7 +74,7 @@ export function MetricField({
 	};
 
 	return (
-		<div className="block text-[11px] font-semibold leading-none text-on-surface-variant">
+		<div className="block text-xs font-semibold leading-none text-on-surface-variant">
 			{label}
 			{unit ? ` (${unit})` : ''}
 			{optional ? ' (opcional)' : ''}
@@ -102,7 +102,7 @@ export function MetricField({
 						type="button"
 						disabled={disabled}
 						onClick={() => onTypeChange(type === 'p' ? 'v' : 'p')}
-						className="h-[30px] w-auto px-1 rounded-r-lg border border-l-0 border-outline-variant bg-surface-container-highest text-xs font-bold text-primary-fixed-dim"
+						className="h-full w-auto rounded-r-lg border border-l-0 border-outline-variant bg-surface-container-highest px-1 text-xs font-bold text-primary-fixed-dim"
 						aria-label={`Alternar unidade entre porcentagem e valor, atual ${metric.symbol}`}
 					>
 						{type === 'p' ? '%' : metric.symbol}
