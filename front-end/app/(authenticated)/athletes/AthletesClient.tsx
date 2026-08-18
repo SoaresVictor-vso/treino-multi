@@ -24,6 +24,7 @@ import {
 	type WorkoutTemplateSummary,
 } from '@/gateway/services/workout-templates';
 import PersonalRecordModal from '@/components/shared/PersonalRecordModal';
+import ExercisePicker from '@/components/shared/ExercisePicker';
 import Input from '@/components/ui/Input';
 import {
 	personalRecordsService,
@@ -41,6 +42,7 @@ import {
 	metricsService,
 	type Metric,
 } from '@/gateway/services/parametro/metrics';
+import type { Exercise } from '@/gateway/services/parametro/exercises';
 
 const service = new AthleteService();
 const NO_TRAINER_VALUE = '__none__';
@@ -95,6 +97,10 @@ export default function AthletesClient({
 		'group' | 'exercise'
 	>('group');
 	const [recordReferenceId, setRecordReferenceId] = useState('');
+	const [recordExercisePickerOpen, setRecordExercisePickerOpen] =
+		useState(false);
+	const [selectedRecordExercise, setSelectedRecordExercise] =
+		useState<Exercise | null>(null);
 	const [recordValue, setRecordValue] = useState('');
 	const [recordMeasuredAt, setRecordMeasuredAt] = useState(
 		new Date().toISOString().slice(0, 10),
@@ -260,6 +266,8 @@ export default function AthletesClient({
 		setRecordMetrics(metricList);
 		setRecordReferenceType('group');
 		setRecordReferenceId('');
+		setSelectedRecordExercise(null);
+		setRecordExercisePickerOpen(false);
 		setRecordValue('');
 		setRecordMeasuredAt(new Date().toISOString().slice(0, 10));
 		setPersonalRecordAthlete(athlete);
@@ -295,6 +303,7 @@ export default function AthletesClient({
 				result.data ? [result.data, ...current] : current,
 			);
 			setRecordReferenceId('');
+			setSelectedRecordExercise(null);
 			setRecordValue('');
 		}
 		setSavingPersonalRecord(false);
@@ -614,31 +623,36 @@ export default function AthletesClient({
 							onChange={(event) => {
 								setRecordReferenceType(event.target.value as 'group' | 'exercise');
 								setRecordReferenceId('');
+								setSelectedRecordExercise(null);
 							}}
 							options={[
 								{ value: 'group', label: 'Grupo de exercícios' },
 								{ value: 'exercise', label: 'Exercício individual' },
 							]}
 						/>
-						<Select
-							label={
-								recordReferenceType === 'group' ? 'Grupo de exercícios' : 'Exercício'
-							}
-							value={recordReferenceId}
-							onChange={(event) => setRecordReferenceId(event.target.value)}
-							placeholder="Selecione"
-							options={
-								recordReferenceType === 'group'
-									? exerciseGroups.map((group) => ({
-											value: String(group.id),
-											label: group.name,
-										}))
-									: recordExercises.map((exercise) => ({
-											value: String(exercise.id),
-											label: exercise.name,
-										}))
-							}
-						/>
+						{recordReferenceType === 'group' ? (
+							<Select
+								label="Grupo de exercícios"
+								value={recordReferenceId}
+								onChange={(event) => setRecordReferenceId(event.target.value)}
+								placeholder="Selecione"
+								options={exerciseGroups.map((group) => ({
+									value: String(group.id),
+									label: group.name,
+								}))}
+							/>
+						) : (
+							<div>
+								<p className="mb-1 block text-xs text-on-surface-variant">Exercício</p>
+								<Button
+									variant="outline"
+									className="w-full justify-between"
+									onClick={() => setRecordExercisePickerOpen(true)}
+								>
+									{selectedRecordExercise?.name || 'Selecionar exercício'}
+								</Button>
+							</div>
+						)}
 						<Input
 							label={`Valor do 1RM${recordMetricSymbol ? ` (${recordMetricSymbol})` : ''}`}
 							type="number"
@@ -697,6 +711,22 @@ export default function AthletesClient({
 						</Button>
 					</div>
 				</div>
+				{recordExercisePickerOpen && (
+					<ExercisePicker
+						selected={selectedRecordExercise ? [selectedRecordExercise] : []}
+						onChange={(selection) => {
+							const exercise = selection.at(-1) ?? null;
+							setSelectedRecordExercise(exercise);
+							setRecordReferenceId(exercise ? String(exercise.id) : '');
+						}}
+						onClose={() => setRecordExercisePickerOpen(false)}
+						filterExercise={(exercise) =>
+							recordExercises.some(
+								(recordExercise) => Number(recordExercise.id) === exercise.id,
+							)
+						}
+					/>
+				)}
 			</PersonalRecordModal>
 		</div>
 	);
