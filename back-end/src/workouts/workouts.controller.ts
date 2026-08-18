@@ -42,6 +42,15 @@ export class WorkoutsController {
 		return this.service.findMyCompletedWorkouts(actor);
 	}
 
+	@Get('trainer')
+	@ApiOperation({
+		summary:
+			'Lista os treinos dos atletas vinculados ao treinador autenticado',
+	})
+	findTrainerWorkouts(@CurrentUser() actor: JwtPayload) {
+		return this.service.findTrainerWorkouts(actor);
+	}
+
 	@Get(':id')
 	@ApiOperation({ summary: 'Exibe o treino e suas séries' })
 	findWorkout(

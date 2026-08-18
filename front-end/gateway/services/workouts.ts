@@ -56,6 +56,17 @@ export type CompletedWorkout = Omit<MyWorkout, 'status'> & {
 	performedAt: string | null;
 };
 
+export type TrainerWorkout = {
+	id: string;
+	athleteId: string;
+	athleteName: string;
+	templateName: string;
+	templateDescription: string;
+	scheduledDate: string | null;
+	performedAt: string | null;
+	status: 'pending' | 'scheduled' | 'in_progress' | 'completed';
+};
+
 export type GenerateWorkoutsFromTemplateResponse = { count: number };
 
 export type UpdateWorkoutExecution = Omit<
@@ -72,6 +83,8 @@ export const workoutsService = {
 	findMine: () => authenticatedRequest<MyWorkout[]>('workouts/me'),
 	findMyCompleted: () =>
 		authenticatedRequest<CompletedWorkout[]>('workouts/me/completed'),
+	findTrainerWorkouts: () =>
+		authenticatedRequest<TrainerWorkout[]>('workouts/trainer'),
 	findOne: (id: string) => authenticatedRequest<WorkoutDetail>(`workouts/${id}`),
 	start: (id: string) =>
 		authenticatedRequest<WorkoutDetail>(`workouts/${id}/start`, {

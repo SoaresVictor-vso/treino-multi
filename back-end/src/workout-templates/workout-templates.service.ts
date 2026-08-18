@@ -116,9 +116,7 @@ export class WorkoutTemplatesService {
 				permissions.includes(Permission.WORKOUT_TEMPLATES_READ_TENANT) &&
 				actor.tenantId
 			) {
-				if (permissions.includes(Permission.WORKOUT_TEMPLATES_READ)) {
-					query.where('template.createdBy = :actorId', { actorId: actor.sub });
-				}
+				query.where('template.tenantId = :tenantId', { tenantId: actor.tenantId });
 			} else if (permissions.includes(Permission.WORKOUT_TEMPLATES_READ)) {
 				query.where('template.createdBy = :actorId', { actorId: actor.sub });
 			} else {

@@ -92,6 +92,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 			setWorkout(prescribedWorkout);
 			setError(null);
 			if (
+				getSessionUser()?.sub === response.data.athleteId &&
 				response.data.executions.some(
 					(item) => item.metric2Type === 'p' && !item.referencePersonalRecord,
 				)

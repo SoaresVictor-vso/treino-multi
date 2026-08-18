@@ -138,6 +138,65 @@ export class WorkoutsService {
 			.getRawMany();
 	}
 
+	async findTrainerWorkouts(actor: JwtPayload) {
+		const isTrainer = actor.roles.some((role) =>
+			[Role.TENANT_TRAINER, Role.TENANT_TRAINER_MASTER].includes(role),
+		);
+		if (!isTrainer)
+			throw new ForbiddenException('Esta consulta é exclusiva para treinadores.');
+		if (!actor.tenantId)
+			throw new ForbiddenException('O treinador precisa estar vinculado a um tenant.');
+
+		return this.dataSource.query<
+			{
+				id: string;
+				athleteId: string;
+				athleteName: string;
+				templateName: string;
+				templateDescription: string;
+				scheduledDate: string | null;
+				performedAt: string | null;
+				status: WorkoutStatus;
+			}[]
+		>(
+			`SELECT
+				workout.id AS id,
+				workout.athlete_id AS "athleteId",
+				person.name AS "athleteName",
+				workout.template_name AS "templateName",
+				workout.template_description AS "templateDescription",
+				workout.scheduled_date AS "scheduledDate",
+				workout.performed_at AS "performedAt",
+				workout.status AS status
+			FROM workouts workout
+			INNER JOIN athlete_trainer_associations association
+				ON association.athlete_id = workout.athlete_id
+				AND association.treinador_id = $1
+				AND association.data_fim IS NULL
+			INNER JOIN users athlete ON athlete.id = workout.athlete_id
+			INNER JOIN persons person ON person.id = athlete.person_id
+			WHERE workout.tenant_id = $2
+				AND (
+					workout.status IN ('pending', 'scheduled', 'in_progress')
+					OR (
+						workout.status = 'completed'
+						AND workout.performed_at >= CURRENT_DATE - INTERVAL '7 days'
+					)
+				)
+			ORDER BY
+				CASE workout.status
+					WHEN 'in_progress' THEN 0
+					WHEN 'pending' THEN 1
+					WHEN 'scheduled' THEN 2
+					ELSE 3
+				END,
+				workout.performed_at DESC NULLS LAST,
+				workout.scheduled_date ASC NULLS FIRST,
+				person.name ASC`,
+			[actor.sub, actor.tenantId],
+		);
+	}
+
 	async findWorkout(id: string, actor: JwtPayload) {
 		const isOrganizationStaff = actor.roles.some((role) =>
 			[Role.ORG_ADMIN, Role.ORG_SUPPORT].includes(role),

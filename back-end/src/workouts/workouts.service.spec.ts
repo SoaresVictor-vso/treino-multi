@@ -120,6 +120,45 @@ describe('WorkoutsService', () => {
 		);
 	});
 
+	it('lista para o treinador apenas os treinos dos seus atletas vinculados', async () => {
+		const rows = [
+			{
+				id: 'workout-id',
+				athleteId: input.athleteId,
+				athleteName: 'Atleta',
+				templateName: 'Treino A',
+				templateDescription: 'Descrição',
+				scheduledDate: null,
+				performedAt: null,
+				status: WorkoutStatus.IN_PROGRESS,
+			},
+		];
+		const query = jest.fn().mockResolvedValue(rows);
+		Object.assign(dataSource, { query });
+
+		await expect(
+			service.findTrainerWorkouts({
+				sub: input.createdBy,
+				tenantId: input.template.tenantId,
+				roles: [Role.TENANT_TRAINER],
+			}),
+		).resolves.toEqual(rows);
+		expect(query).toHaveBeenCalledWith(
+			expect.stringContaining("workout.status = 'completed'"),
+			[input.createdBy, input.template.tenantId],
+		);
+	});
+
+	it('impede atletas de consultarem o painel de treinador', async () => {
+		await expect(
+			service.findTrainerWorkouts({
+				sub: input.athleteId,
+				tenantId: input.template.tenantId,
+				roles: [Role.TENANT_CLIENT],
+			}),
+		).rejects.toThrow('Esta consulta é exclusiva para treinadores.');
+	});
+
 	it('impede iniciar um treino quando o atleta já tem outro em andamento', async () => {
 		const workout = {
 			id: 'workout-id',
