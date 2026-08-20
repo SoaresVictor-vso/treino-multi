@@ -22,21 +22,36 @@ export class ExercisesService {
 		private readonly metricRepo: Repository<Metric>,
 	) {}
 
-	async create(dto: CreateExerciseDto): Promise<Exercise> {
+	async create(
+		dto: CreateExerciseDto,
+		tenantId: string | null = null,
+	): Promise<Exercise> {
 		await this.ensureMetrics(dto.metric1Id, dto.metric2Id);
-		return this.exerciseRepo.save(
-			this.exerciseRepo.create({ ...dto, name: dto.name.toUpperCase() }),
-		);
+		const payload = {
+			...dto,
+			name: dto.name.toUpperCase(),
+			...(tenantId ? { tenantId } : {}),
+		};
+		return this.exerciseRepo.save(this.exerciseRepo.create(payload));
 	}
 
-	async findAll(): Promise<ReadExercise[]> {
-		const exercises = await this.exerciseRepo.find({ order: { name: 'ASC' } });
+	async findAll(tenantId: string | null = null): Promise<ReadExercise[]> {
+		const exercises = await this.exerciseRepo.find({
+			...(tenantId ? { where: [{ tenantId: IsNull() }, { tenantId }] } : {}),
+			order: { name: 'ASC' },
+		});
 		return exercises.map((exercise) => this.toReadModel(exercise));
 	}
 
-	async findChangesSince(since: Date | null): Promise<ExerciseChanges> {
+	async findChangesSince(
+		since: Date | null,
+		tenantId: string | null = null,
+	): Promise<ExerciseChanges> {
 		if (!since) {
-			const exercises = await this.exerciseRepo.find({ order: { name: 'ASC' } });
+			const exercises = await this.exerciseRepo.find({
+				...(tenantId ? { where: [{ tenantId: IsNull() }, { tenantId }] } : {}),
+				order: { name: 'ASC' },
+			});
 			return {
 				exercises: exercises.map((exercise) => this.toReadModel(exercise)),
 				deletedIds: [],
@@ -44,18 +59,33 @@ export class ExercisesService {
 			};
 		}
 
+		const activeWhere = tenantId
+			? [
+					{ createdAt: MoreThan(since), deletedAt: IsNull(), tenantId: IsNull() },
+					{ createdAt: MoreThan(since), deletedAt: IsNull(), tenantId },
+					{ updatedAt: MoreThan(since), deletedAt: IsNull(), tenantId: IsNull() },
+					{ updatedAt: MoreThan(since), deletedAt: IsNull(), tenantId },
+				]
+			: [
+					{ createdAt: MoreThan(since), deletedAt: IsNull() },
+					{ updatedAt: MoreThan(since), deletedAt: IsNull() },
+				];
+		const deletedWhere = tenantId
+			? [
+					{ deletedAt: MoreThan(since), tenantId: IsNull() },
+					{ deletedAt: MoreThan(since), tenantId },
+				]
+			: { deletedAt: MoreThan(since) };
+
 		const [exercises, deletedExercises] = await Promise.all([
 			this.exerciseRepo.find({
 				withDeleted: true,
-				where: [
-					{ createdAt: MoreThan(since), deletedAt: IsNull() },
-					{ updatedAt: MoreThan(since), deletedAt: IsNull() },
-				],
+				where: activeWhere,
 				order: { updatedAt: 'ASC' },
 			}),
 			this.exerciseRepo.find({
 				withDeleted: true,
-				where: { deletedAt: MoreThan(since) },
+				where: deletedWhere,
 				select: { id: true },
 			}),
 		]);

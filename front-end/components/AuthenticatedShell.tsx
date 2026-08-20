@@ -4,17 +4,23 @@ import { useState } from 'react';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import { NavItemPublic } from '@/lib/navigation';
+import { PermissionProvider } from '@/components/shared/PermissionProvider';
 
 export default function AuthenticatedShell({
 	children,
 	navItems,
+	canCreateExercise,
+	isGlobal,
 }: {
 	children: React.ReactNode;
 	navItems: NavItemPublic[];
+	canCreateExercise: boolean;
+	isGlobal: boolean;
 }) {
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
 	return (
+		<PermissionProvider canCreateExercise={canCreateExercise} isGlobal={isGlobal}>
 		<div className="flex min-h-screen">
 			<Sidebar
 				items={navItems}
@@ -30,5 +36,6 @@ export default function AuthenticatedShell({
 				<div className="space-y-6 p-4 sm:p-6 lg:p-10 xl:p-16">{children}</div>
 			</main>
 		</div>
+		</PermissionProvider>
 	);
 }

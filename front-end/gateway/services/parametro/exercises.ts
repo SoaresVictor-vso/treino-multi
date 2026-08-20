@@ -46,6 +46,14 @@ export interface ExercisesServiceContract {
 	search(query: string): Promise<ExerciseParameter[]>;
 }
 
+export type CreateExerciseInput = {
+	name: string;
+	description?: string;
+	metric1Id: number;
+	metric2Id?: number;
+	visualUrl?: string;
+};
+
 const EXERCISES_STORE = 'exercises';
 const EXERCISES_SYNC_CURSOR_KEY = 'last_sync_exercises';
 
@@ -143,6 +151,13 @@ export class ExercisesService implements ExercisesServiceContract {
 			metric2Id: result.metric2Id ? Number(result.metric2Id) : null,
 			visualUrl: result.visualUrl,
 		}));
+	}
+
+	public async create(dto: CreateExerciseInput) {
+		return authenticatedRequest<ExerciseParameter>('exercises', {
+			method: 'POST',
+			body: JSON.stringify(dto),
+		});
 	}
 
 	private rebuildIndex(items: ExerciseParameter[]): void {

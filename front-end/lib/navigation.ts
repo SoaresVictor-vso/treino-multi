@@ -74,6 +74,13 @@ const NAV_ITEMS: { [href: string]: NavItem } = {
 		allowedRoles: [Role.ORG_ADMIN, Role.ORG_SUPPORT, Role.TENANT_ADMIN],
 		hidden: false,
 	},
+	'/exercises': {
+		href: '/exercises',
+		label: 'Cadastro de exercícios',
+		icon: 'RiHeartPulseLine',
+		allowedRoles: [Role.ORG_ADMIN, Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER],
+		hidden: false,
+	},
 	'/teste': {
 		href: '/tenants',
 		label: 'Tenants',
