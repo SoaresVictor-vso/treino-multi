@@ -149,9 +149,28 @@ describe('WorkoutsService', () => {
 		).resolves.toEqual(rows);
 		expect(query).toHaveBeenCalledWith(
 			expect.stringContaining("workout.status = 'completed'"),
-			[input.createdBy, input.template.tenantId],
+			[input.createdBy, input.template.tenantId, false],
 		);
 	});
+
+	it.each([Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER])(
+		'lista todos os treinos do tenant para %s',
+		async (role) => {
+			const query = jest.fn().mockResolvedValue([]);
+			Object.assign(dataSource, { query });
+
+			await service.findTrainerWorkouts({
+				sub: input.createdBy,
+				tenantId: input.template.tenantId,
+				roles: [role],
+			});
+
+			expect(query).toHaveBeenCalledWith(
+				expect.stringContaining('$3::boolean OR association.athlete_id IS NOT NULL'),
+				[input.createdBy, input.template.tenantId, true],
+			);
+		},
+	);
 
 	it('impede atletas de consultarem o painel de treinador', async () => {
 		await expect(
@@ -160,7 +179,9 @@ describe('WorkoutsService', () => {
 				tenantId: input.template.tenantId,
 				roles: [Role.TENANT_CLIENT],
 			}),
-		).rejects.toThrow('Esta consulta é exclusiva para treinadores.');
+		).rejects.toThrow(
+			'Esta consulta é exclusiva para administradores e treinadores.',
+		);
 	});
 
 	it('impede o treinador de atribuir treino a atletas sem vínculo ativo', async () => {

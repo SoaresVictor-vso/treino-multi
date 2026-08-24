@@ -92,7 +92,11 @@ function WorkoutSection({
 	);
 }
 
-export default function TrainerWorkouts() {
+export default function TrainerWorkouts({
+	showAllAthletes = false,
+}: {
+	showAllAthletes?: boolean;
+}) {
 	const [workouts, setWorkouts] = useState<TrainerWorkout[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -121,7 +125,7 @@ export default function TrainerWorkouts() {
 			<div className="max-w-2xl">
 				<p className="type-label-caps text-primary-fixed">Acompanhamento</p>
 				<h1 id="trainer-workouts-title" className="mt-1 text-2xl leading-tight font-bold tracking-tight sm:text-3xl lg:text-4xl">
-					Treinos dos meus atletas
+					{showAllAthletes ? 'Treinos dos atletas' : 'Treinos dos meus atletas'}
 				</h1>
 			</div>
 			{loading ? (
@@ -131,7 +135,11 @@ export default function TrainerWorkouts() {
 			) : workouts.length === 0 ? (
 				<div className="rounded-lg border border-outline-variant bg-surface-container-low p-4 sm:p-6">
 					<p className="type-headline-md">Nenhum treino para acompanhar</p>
-					<p className="type-body-md mt-2 text-on-surface-variant">Os treinos dos atletas vinculados aparecerão aqui.</p>
+					<p className="type-body-md mt-2 text-on-surface-variant">
+						{showAllAthletes
+							? 'Os treinos dos atletas deste tenant aparecerão aqui.'
+							: 'Os treinos dos atletas vinculados aparecerão aqui.'}
+					</p>
 				</div>
 			) : (
 				<div className="space-y-7">

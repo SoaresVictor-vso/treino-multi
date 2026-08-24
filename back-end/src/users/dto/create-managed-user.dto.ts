@@ -77,14 +77,15 @@ export class CreateManagedUserDto {
 
 	@ApiPropertyOptional({
 		example: 'admin',
-		enum: ['admin', 'trainer', 'client'],
+		enum: ['admin', 'trainer', 'trainer-master', 'client'],
 		nullable: true,
 	})
 	@ValidateIf((_obj, value) => value !== undefined && value !== null)
-	@IsIn(['admin', 'trainer', 'client'], {
-		message: "tenantFunction deve ser 'admin', 'trainer' ou 'client'",
+	@IsIn(['admin', 'trainer', 'trainer-master', 'client'], {
+		message:
+			"tenantFunction deve ser 'admin', 'trainer', 'trainer-master' ou 'client'",
 	})
 	tenantFunction!: TenantFunction | null;
 }
 
-export type TenantFunction = 'admin' | 'trainer' | 'client';
+export type TenantFunction = 'admin' | 'trainer' | 'trainer-master' | 'client';

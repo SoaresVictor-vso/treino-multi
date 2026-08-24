@@ -8,10 +8,24 @@ export default async function Home() {
 	const showClientWorkouts = user?.roles.includes(Role.TENANT_CLIENT) ?? false;
 	const showTrainerWorkouts =
 		user?.roles.some((role) =>
-			[Role.TENANT_TRAINER, Role.TENANT_TRAINER_MASTER].includes(role),
+			[
+				Role.TENANT_ADMIN,
+				Role.TENANT_TRAINER,
+				Role.TENANT_TRAINER_MASTER,
+			].includes(role),
 		) ?? false;
 
 	if (!showClientWorkouts && !showTrainerWorkouts) return null;
 
-	return showTrainerWorkouts ? <TrainerWorkouts /> : <ClientWorkouts />;
+	return showTrainerWorkouts ? (
+		<TrainerWorkouts
+			showAllAthletes={
+				user?.roles.some((role) =>
+					[Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER].includes(role),
+				) ?? false
+			}
+		/>
+	) : (
+		<ClientWorkouts />
+	);
 }

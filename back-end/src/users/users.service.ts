@@ -511,10 +511,12 @@ export class UsersService {
 		if (!dto.tenantId) return Role.ORG_ADMIN;
 		else if (dto.tenantFunction === 'admin') return Role.TENANT_ADMIN;
 		else if (dto.tenantFunction === 'trainer') return Role.TENANT_TRAINER;
+		else if (dto.tenantFunction === 'trainer-master')
+			return Role.TENANT_TRAINER_MASTER;
 		else if (dto.tenantFunction === 'client') return Role.TENANT_CLIENT;
 		else
 			throw new BadRequestException(
-				'tenantFunction inválido. Deve ser "admin", "trainer" ou "client".',
+				'tenantFunction inválido. Deve ser "admin", "trainer", "trainer-master" ou "client".',
 			);
 	}
 }

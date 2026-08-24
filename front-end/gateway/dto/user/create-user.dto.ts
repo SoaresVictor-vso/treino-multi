@@ -12,4 +12,4 @@ export type CreateUserDto = {
 	tenantFunction: TenantFunction | null;
 };
 
-export type TenantFunction = 'admin' | 'trainer' | 'client';
+export type TenantFunction = 'admin' | 'trainer' | 'trainer-master' | 'client';

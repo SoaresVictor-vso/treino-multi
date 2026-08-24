@@ -152,13 +152,22 @@ export class WorkoutsService {
 	}
 
 	async findTrainerWorkouts(actor: JwtPayload) {
-		const isTrainer = actor.roles.some((role) =>
-			[Role.TENANT_TRAINER, Role.TENANT_TRAINER_MASTER].includes(role),
+		const isTrainerOrAdmin = actor.roles.some((role) =>
+			[
+				Role.TENANT_ADMIN,
+				Role.TENANT_TRAINER,
+				Role.TENANT_TRAINER_MASTER,
+			].includes(role),
 		);
-		if (!isTrainer)
-			throw new ForbiddenException('Esta consulta é exclusiva para treinadores.');
+		const canViewAllAthletes = actor.roles.some((role) =>
+			[Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER].includes(role),
+		);
+		if (!isTrainerOrAdmin)
+			throw new ForbiddenException(
+				'Esta consulta é exclusiva para administradores e treinadores.',
+			);
 		if (!actor.tenantId)
-			throw new ForbiddenException('O treinador precisa estar vinculado a um tenant.');
+			throw new ForbiddenException('O usuário precisa estar vinculado a um tenant.');
 
 		return this.dataSource.query<
 			{
@@ -182,13 +191,14 @@ export class WorkoutsService {
 				workout.performed_at AS "performedAt",
 				workout.status AS status
 			FROM workouts workout
-			INNER JOIN athlete_trainer_associations association
+			LEFT JOIN athlete_trainer_associations association
 				ON association.athlete_id = workout.athlete_id
 				AND association.treinador_id = $1
 				AND association.data_fim IS NULL
 			INNER JOIN users athlete ON athlete.id = workout.athlete_id
 			INNER JOIN persons person ON person.id = athlete.person_id
 			WHERE workout.tenant_id = $2
+				AND ($3::boolean OR association.athlete_id IS NOT NULL)
 				AND (
 					workout.status IN ('pending', 'scheduled', 'in_progress')
 					OR (
@@ -206,7 +216,7 @@ export class WorkoutsService {
 				workout.performed_at DESC NULLS LAST,
 				workout.scheduled_date ASC NULLS FIRST,
 				person.name ASC`,
-			[actor.sub, actor.tenantId],
+			[actor.sub, actor.tenantId, canViewAllAthletes],
 		);
 	}
 
@@ -214,9 +224,11 @@ export class WorkoutsService {
 		const isOrganizationStaff = actor.roles.some((role) =>
 			[Role.ORG_ADMIN, Role.ORG_SUPPORT].includes(role),
 		);
-		const isTenantAdmin = actor.roles.includes(Role.TENANT_ADMIN);
 		const isTrainer = actor.roles.some((role) =>
 			[Role.TENANT_TRAINER, Role.TENANT_TRAINER_MASTER].includes(role),
+		);
+		const canReadAllTenantWorkouts = actor.roles.some((role) =>
+			[Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER].includes(role),
 		);
 		const rows = await this.dataSource.query<WorkoutExecutionRow[]>(
 			`SELECT
@@ -300,7 +312,7 @@ export class WorkoutsService {
 				id,
 				actor.sub,
 				isOrganizationStaff,
-				isTenantAdmin,
+				canReadAllTenantWorkouts,
 				actor.tenantId,
 				isTrainer,
 			],

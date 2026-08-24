@@ -46,7 +46,7 @@ export class WorkoutsController {
 	@Get('trainer')
 	@ApiOperation({
 		summary:
-			'Lista os treinos dos atletas vinculados ao treinador autenticado',
+			'Lista os treinos do tenant para administradores e treinadores líderes, ou dos atletas vinculados para treinadores',
 	})
 	findTrainerWorkouts(@CurrentUser() actor: JwtPayload) {
 		return this.service.findTrainerWorkouts(actor);
