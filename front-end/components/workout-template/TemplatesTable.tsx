@@ -80,7 +80,7 @@ export default function TemplatesTable({
 											<div className="flex items-center gap-3">
 												<span className="truncate font-bold">{template.name}</span>
 												<span className="shrink-0 rounded-sm bg-primary-fixed-dim/15 px-2 py-1 font-mono text-xs text-primary-fixed-dim">
-													{template.exercises.length} exercícios
+													{template.exercises?.length ?? 0} exercícios
 												</span>
 											</div>
 											<p className="mt-2 truncate text-sm text-on-surface-variant">
