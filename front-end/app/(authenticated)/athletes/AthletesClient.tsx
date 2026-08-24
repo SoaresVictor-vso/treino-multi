@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
 	RiAddLine,
+	RiWeightLine,
 	RiCalendarScheduleLine,
+	RiClipboardLine,
 	RiMedalLine,
 	RiSearchLine,
 	RiUserLine,
@@ -26,6 +29,8 @@ import {
 import PersonalRecordModal from '@/components/shared/PersonalRecordModal';
 import ExercisePicker from '@/components/shared/ExercisePicker';
 import Input from '@/components/ui/Input';
+import Modal from '@/components/ui/Modal';
+import TrainingForm, { type TrainingFormValues } from '@/components/training/TrainingForm';
 import {
 	personalRecordsService,
 	type PersonalRecord,
@@ -109,6 +114,9 @@ export default function AthletesClient({
 	const [personalRecordError, setPersonalRecordError] = useState<string | null>(
 		null,
 	);
+	const [workoutAthlete, setWorkoutAthlete] = useState<Athlete | null>(null);
+	const [savingAthleteWorkout, setSavingAthleteWorkout] = useState(false);
+	const [athleteWorkoutError, setAthleteWorkoutError] = useState<string | null>(null);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -307,6 +315,19 @@ export default function AthletesClient({
 			setRecordValue('');
 		}
 		setSavingPersonalRecord(false);
+	};
+
+	const saveAthleteWorkout = async (values: TrainingFormValues) => {
+		if (!workoutAthlete) return;
+		setSavingAthleteWorkout(true);
+		setAthleteWorkoutError(null);
+		const result = await workoutsService.createForAthlete(workoutAthlete.id, values);
+		setSavingAthleteWorkout(false);
+		if (!result.success) {
+			setAthleteWorkoutError(result.error || 'Não foi possível criar o treino.');
+			return;
+		}
+		setWorkoutAthlete(null);
 	};
 
 	const allVisibleSelected =
@@ -558,7 +579,10 @@ export default function AthletesClient({
 									className="h-4 w-4 self-center accent-primary-container"
 								/>
 							)}
-							<div className="flex items-center gap-3">
+							<Link
+								href={`/athlete/${athlete.id}`}
+								className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-fixed-dim"
+							>
 								<span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-container/15 text-primary-fixed-dim">
 									<RiUserLine size={20} />
 								</span>
@@ -570,7 +594,7 @@ export default function AthletesClient({
 											'Contato não informado'}
 									</p>
 								</div>
-							</div>
+							</Link>
 							<div>
 								<span className="text-xs text-on-surface-variant md:hidden">
 									Treinador:{' '}
@@ -591,14 +615,52 @@ export default function AthletesClient({
 								/>
 							</div>
 							{canRegisterPersonalRecord && (
-								<div>
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => void openPersonalRecord(athlete)}
-									>
-										<RiMedalLine size={17} /> Registrar RP
-									</Button>
+								<div className="flex flex-wrap gap-2">
+									<div className="group relative">
+										<Button
+											variant="ghost"
+											size="icon"
+											aria-label={`Registrar RP para ${athlete.person.name}`}
+											onClick={() => void openPersonalRecord(athlete)}
+										>
+											<RiMedalLine size={18} />
+										</Button>
+										<span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-inverse-surface px-2 py-1 text-xs text-inverse-on-surface opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+											Registrar RP
+										</span>
+									</div>
+									{canAssignWorkouts && (
+										<>
+											<div className="group relative">
+												<Button
+													variant="outline"
+													size="icon"
+													aria-label={`Adicionar treino para ${athlete.person.name}`}
+													onClick={() => {
+														setAthleteWorkoutError(null);
+														setWorkoutAthlete(athlete);
+													}}
+												>
+													<RiWeightLine size={18} />
+												</Button>
+												<span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-inverse-surface px-2 py-1 text-xs text-inverse-on-surface opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+													Adicionar treino
+												</span>
+											</div>
+											<div className="group relative">
+												<Link
+													href={`/athlete/${athlete.id}`}
+														aria-label={`Gerenciar ${athlete.person.name}`}
+														className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-outline-variant text-on-surface-variant transition-colors hover:border-primary-fixed-dim/40 hover:bg-surface-variant/60 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/30"
+													>
+														<RiClipboardLine size={18} />
+													</Link>
+													<span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-inverse-surface px-2 py-1 text-xs text-inverse-on-surface opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+														Gerenciar atleta
+													</span>
+											</div>
+										</>
+									)}
 								</div>
 							)}
 						</div>
@@ -728,6 +790,20 @@ export default function AthletesClient({
 					/>
 				)}
 			</PersonalRecordModal>
+			<Modal
+				isOpen={!!workoutAthlete}
+				title={`Adicionar treino${workoutAthlete ? ` — ${workoutAthlete.person.name}` : ''}`}
+				description="Monte um treino avulso para este atleta."
+				onClose={() => !savingAthleteWorkout && setWorkoutAthlete(null)}
+			>
+				{athleteWorkoutError && <ErrorBox message={athleteWorkoutError} />}
+				<TrainingForm
+					onSubmit={saveAthleteWorkout}
+					onCancel={() => setWorkoutAthlete(null)}
+					isSubmitting={savingAthleteWorkout}
+					submitLabel="Criar treino"
+				/>
+			</Modal>
 		</div>
 	);
 }

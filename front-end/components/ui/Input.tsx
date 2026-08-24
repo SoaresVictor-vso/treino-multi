@@ -1,6 +1,7 @@
 import {
 	ChangeEvent,
 	ReactNode,
+	MouseEvent,
 	forwardRef,
 	InputHTMLAttributes,
 	useEffect,
@@ -36,6 +37,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 			className = '',
 			placeholder,
 			onChange,
+			onClick,
 			value,
 			defaultValue,
 			mask,
@@ -93,6 +95,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 			if (value === undefined) setHasValue(event.target.value.length > 0);
 
 			onChange?.(event);
+		};
+
+		const handleClick = (event: MouseEvent<HTMLInputElement>) => {
+			onClick?.(event);
+			try {
+				event.currentTarget.select();
+			} catch {
+				// Alguns tipos nativos, como date, não permitem seleção programática.
+			}
 		};
 
 		let roundedClass;
@@ -154,6 +165,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 							className
 						}
 						onChange={handleChange}
+						onClick={handleClick}
 						value={typeof value === 'string' ? applyMask(value) : value}
 						defaultValue={
 							typeof defaultValue === 'string' ? applyMask(defaultValue) : defaultValue

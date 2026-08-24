@@ -2,12 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { RiAddLine, RiPlayLine } from 'react-icons/ri';
 import {
 	workoutsService,
 	type CompletedWorkout,
 	type MyWorkout,
 } from '@/gateway/services/workouts';
 import ErrorBox from '@/components/ui/ErrorBox';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import Select from '@/components/ui/Select';
+import Input from '@/components/ui/Input';
+import TrainingForm, {
+	type TrainingFormValues,
+} from '@/components/training/TrainingForm';
 
 function formatScheduledDate(date: string | null) {
 	if (!date) return 'Disponível para realizar';
@@ -33,12 +42,73 @@ const workoutStatusPresentation = {
 } satisfies Record<MyWorkout['status'], { label: string; className: string }>;
 
 export default function ClientWorkouts() {
+	const router = useRouter();
 	const [workouts, setWorkouts] = useState<MyWorkout[]>([]);
 	const [completedWorkouts, setCompletedWorkouts] = useState<CompletedWorkout[]>(
 		[],
 	);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [createOpen, setCreateOpen] = useState(false);
+	const [creating, setCreating] = useState(false);
+	const [createError, setCreateError] = useState<string | null>(null);
+	const [startOpen, setStartOpen] = useState(false);
+	const [selectedWorkoutId, setSelectedWorkoutId] = useState('');
+	const [starting, setStarting] = useState(false);
+	const [startError, setStartError] = useState<string | null>(null);
+	const [emptyWorkoutName, setEmptyWorkoutName] = useState('');
+	const inProgressWorkout = workouts.find(
+		(workout) => workout.status === 'in_progress',
+	);
+	const hasWorkoutInProgress = !!inProgressWorkout;
+	const availableToStart = workouts.filter((workout) =>
+		['pending', 'scheduled'].includes(workout.status),
+	);
+
+	const createWorkout = async (values: TrainingFormValues) => {
+		setCreating(true);
+		setCreateError(null);
+		const response = await workoutsService.createMine(values);
+		setCreating(false);
+		if (!response.success || !response.data) {
+			setCreateError(response.error || 'Não foi possível criar o treino.');
+			return;
+		}
+		setCreateOpen(false);
+		router.push(`/training/${response.data.id}`);
+	};
+
+	const startWorkout = async () => {
+		if (!selectedWorkoutId) return;
+		setStarting(true);
+		setStartError(null);
+		let workoutId = selectedWorkoutId;
+		if (selectedWorkoutId === '__empty__') {
+			const createResponse = await workoutsService.createMine({
+				name: emptyWorkoutName.trim() || undefined,
+				activities: [],
+			});
+			workoutId = createResponse.data?.id ?? '';
+			if (!createResponse.success || !workoutId) {
+				setStarting(false);
+				setStartError(createResponse.error || 'Não foi possível criar o novo treino.');
+				return;
+			}
+		}
+		if (!workoutId) {
+			setStarting(false);
+			setStartError('Não foi possível criar o novo treino.');
+			return;
+		}
+		const response = await workoutsService.start(workoutId);
+		setStarting(false);
+		if (!response.success || !response.data) {
+			setStartError(response.error || 'Não foi possível iniciar o treino.');
+			return;
+		}
+		setStartOpen(false);
+		router.push(`/training/${response.data.id}`);
+	};
 
 	useEffect(() => {
 		let isMounted = true;
@@ -67,14 +137,49 @@ export default function ClientWorkouts() {
 			className="mx-auto w-full max-w-7xl space-y-5 sm:space-y-7"
 			aria-labelledby="my-workouts-title"
 		>
-			<div className="max-w-2xl">
-				<p className="type-label-caps text-primary-fixed">Minha rotina</p>
-				<h1
-					id="my-workouts-title"
-					className="mt-1 text-2xl leading-tight font-bold tracking-tight sm:text-3xl lg:text-4xl"
-				>
-					Meus treinos
-				</h1>
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+				<div className="max-w-2xl">
+					<p className="type-label-caps text-primary-fixed">Minha rotina</p>
+					<h1
+						id="my-workouts-title"
+						className="mt-1 text-2xl leading-tight font-bold tracking-tight sm:text-3xl lg:text-4xl"
+					>
+						Meus treinos
+					</h1>
+				</div>
+				<div className="flex flex-col gap-3 sm:flex-row">
+					<Button
+						className="w-full sm:w-auto"
+						variant="outline"
+						onClick={() => {
+							setCreateError(null);
+							setCreateOpen(true);
+						}}
+					>
+						<RiAddLine /> Criar treino
+					</Button>
+					{hasWorkoutInProgress ? (
+						<Button
+							className="w-full sm:w-auto"
+							onClick={() => router.push(`/training/${inProgressWorkout.id}`)}
+						>
+							<RiPlayLine /> Retomar treino
+						</Button>
+					) : (
+						<Button
+							className="w-full sm:w-auto"
+							disabled={isLoading}
+							onClick={() => {
+								setStartError(null);
+								setEmptyWorkoutName('');
+								setSelectedWorkoutId(availableToStart[0]?.id ?? '__empty__');
+								setStartOpen(true);
+							}}
+						>
+							<RiPlayLine /> Iniciar treino
+						</Button>
+					)}
+				</div>
 			</div>
 
 			{isLoading ? (
@@ -173,6 +278,64 @@ export default function ClientWorkouts() {
 					)}
 				</>
 			)}
+			<Modal
+				isOpen={createOpen}
+				title="Criar treino do zero"
+				description="Monte um treino avulso com os exercícios e séries que deseja realizar."
+				onClose={() => !creating && setCreateOpen(false)}
+			>
+				{createError && <ErrorBox message={createError} />}
+				<TrainingForm
+					onSubmit={createWorkout}
+					onCancel={() => setCreateOpen(false)}
+					isSubmitting={creating}
+					submitLabel="Criar treino"
+				/>
+			</Modal>
+			<Modal
+				isOpen={startOpen}
+				title="Iniciar treino"
+				description="Selecione um treino pendente ou agendado para começar agora."
+				onClose={() => !starting && setStartOpen(false)}
+			>
+				<div className="space-y-5">
+					{startError && <ErrorBox message={startError} />}
+					<Select
+						label="Treino"
+						value={selectedWorkoutId}
+						onChange={(event) => setSelectedWorkoutId(event.target.value)}
+						placeholder="Selecione um treino"
+						options={[
+							...availableToStart.map((workout) => ({
+								value: workout.id,
+								label: `${workout.templateName} · ${formatScheduledDate(workout.scheduledDate)}`,
+							})),
+							{ value: '__empty__', label: 'Criar novo treino' },
+						]}
+					/>
+					{selectedWorkoutId === '__empty__' && (
+						<Input
+							label="Nome do treino (opcional)"
+							value={emptyWorkoutName}
+							maxLength={100}
+							onChange={(event) => setEmptyWorkoutName(event.target.value)}
+							placeholder="Ex.: Treino livre"
+							hint="Sem nome, será usado automaticamente o nome do aluno e a data atual."
+						/>
+					)}
+					<div className="flex justify-end gap-3 border-t border-outline-variant pt-5">
+						<Button variant="outline" onClick={() => setStartOpen(false)}>
+							Cancelar
+						</Button>
+						<Button
+							disabled={!selectedWorkoutId || starting}
+							onClick={() => void startWorkout()}
+						>
+							<RiPlayLine /> {starting ? 'Iniciando...' : 'Iniciar treino'}
+						</Button>
+					</div>
+				</div>
+			</Modal>
 		</section>
 	);
 }
