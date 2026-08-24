@@ -7,7 +7,7 @@ import {
 	RiPlayLine,
 	RiSaveLine,
 } from 'react-icons/ri';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import ErrorBox from '@/components/ui/ErrorBox';
 import Modal from '@/components/ui/Modal';
@@ -71,6 +71,7 @@ function serializeExecutions(executions: WorkoutExecution[]) {
 }
 
 export default function TrainingExecution({ id }: { id: string }) {
+	const router = useRouter();
 	const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -314,12 +315,13 @@ export default function TrainingExecution({ id }: { id: string }) {
 		<section className="mx-auto w-full max-w-5xl space-y-5 pb-10">
 			<div className="flex items-start justify-between gap-4">
 				<div>
-					<Link
-						href="/home"
+					<button
+						type="button"
+						onClick={() => router.back()}
 						className="mb-3 inline-flex items-center gap-1 text-sm text-primary-fixed"
 					>
 						<RiArrowLeftLine /> Voltar
-					</Link>
+					</button>
 					<p className="type-label-caps text-primary-fixed">Execução do treino</p>
 					<h1 className="mt-1 text-3xl font-bold">{workout.templateName}</h1>
 					{workout.templateDescription && (
