@@ -97,7 +97,7 @@ export class WorkoutTemplatesService {
 			.leftJoin('t.activities', 'a')
 			.leftJoin('a.exercise', 'e')
 			.select(
-				'ARRAY_AGG(DISTINCT e.name) FILTER (WHERE e.name IS NOT NULL)',
+				"COALESCE(ARRAY_AGG(DISTINCT e.name) FILTER (WHERE e.name IS NOT NULL), ARRAY[]::text[])",
 				'exercises',
 			)
 			.where('t.id = template.id');

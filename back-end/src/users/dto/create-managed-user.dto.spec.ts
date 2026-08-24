@@ -1,7 +1,9 @@
 import { validate } from 'class-validator';
 import { CreateManagedUserDto } from './create-managed-user.dto';
 
-const validUser = (tenantFunction: 'admin' | 'trainer' | 'client') =>
+const validUser = (
+	tenantFunction: 'admin' | 'trainer' | 'trainer-master' | 'client',
+) =>
 	Object.assign(new CreateManagedUserDto(), {
 		name: 'João da Silva',
 		email: 'joao@example.com',
@@ -19,7 +21,7 @@ describe('CreateManagedUserDto', () => {
 		expect(await validate(dto)).toHaveLength(0);
 	});
 
-	it.each(['admin', 'trainer'] as const)(
+	it.each(['admin', 'trainer', 'trainer-master'] as const)(
 		'exige documento para %s de tenant',
 		async (tenantFunction) => {
 			const dto = validUser(tenantFunction);

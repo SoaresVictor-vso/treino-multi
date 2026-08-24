@@ -141,6 +141,8 @@ export default function UserModal(props: {
 						? 'admin'
 						: tenantRole === Role.TENANT_TRAINER
 							? 'trainer'
+							: tenantRole === Role.TENANT_TRAINER_MASTER
+								? 'trainer-master'
 							: tenantRole === Role.TENANT_CLIENT
 								? 'client'
 								: '',
@@ -406,6 +408,7 @@ export default function UserModal(props: {
 						options={[
 							{ value: 'admin', label: 'Administrador' },
 							{ value: 'trainer', label: 'Treinador' },
+							{ value: 'trainer-master', label: 'Treinador líder' },
 							{ value: 'client', label: 'Aluno' },
 						]}
 						error={errors.tenantFunction}

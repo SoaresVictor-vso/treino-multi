@@ -146,6 +146,10 @@ describe('WorkoutTemplatesService', () => {
 				exercises: ['Supino'],
 			},
 		]);
+		expect(queryBuilder.select).toHaveBeenCalledWith(
+			expect.stringContaining('COALESCE(ARRAY_AGG'),
+			'exercises',
+		);
 		await service.update(
 			uuid,
 			{ activities: [{ exerciseId: 1, type1: 'v', pse: 7 }] },

@@ -1,12 +1,13 @@
 import { authenticatedRequest } from '@/gateway/client';
 import type { Exercise, Metric } from '@/gateway/services/parametro';
+import type { Activity } from '@/gateway/services/workout-templates';
 
 export type ExecutionStatus =
 	| 'pending'
 	| 'in_progress'
 	| 'completed'
 	| 'skipped';
-export type WorkoutStatus = ExecutionStatus;
+export type WorkoutStatus = ExecutionStatus | 'scheduled' | 'cancelled';
 
 export type WorkoutExecution = {
 	id: number;
@@ -69,6 +70,27 @@ export type TrainerWorkout = {
 
 export type GenerateWorkoutsFromTemplateResponse = { count: number };
 
+export type CreateMyWorkoutDto = {
+	name?: string;
+	description?: string;
+	activities?: Activity[];
+	scheduledDate?: string;
+};
+
+export type AthleteWorkout = {
+	id: string;
+	templateName: string;
+	templateDescription: string;
+	scheduledDate: string | null;
+	performedAt: string | null;
+	status: WorkoutStatus;
+};
+
+export type AthleteWorkoutsResponse = {
+	athlete: { id: string; name: string };
+	workouts: AthleteWorkout[];
+};
+
 export type UpdateWorkoutExecution = Omit<
 	WorkoutExecution,
 	| 'id'
@@ -85,6 +107,8 @@ export const workoutsService = {
 		authenticatedRequest<CompletedWorkout[]>('workouts/me/completed'),
 	findTrainerWorkouts: () =>
 		authenticatedRequest<TrainerWorkout[]>('workouts/trainer'),
+	findByAthlete: (athleteId: string) =>
+		authenticatedRequest<AthleteWorkoutsResponse>(`workouts/athletes/${athleteId}`),
 	findOne: (id: string) => authenticatedRequest<WorkoutDetail>(`workouts/${id}`),
 	start: (id: string) =>
 		authenticatedRequest<WorkoutDetail>(`workouts/${id}/start`, {
@@ -107,8 +131,27 @@ export const workoutsService = {
 		authenticatedRequest<GenerateWorkoutsFromTemplateResponse>(
 			'workouts/from-template',
 			{
-				method: 'POST',
-				body: JSON.stringify({ athleteIds, templateId, scheduledDate }),
-			},
-		),
+			method: 'POST',
+			body: JSON.stringify({ athleteIds, templateId, scheduledDate }),
+		},
+	),
+	createMine: (workout: CreateMyWorkoutDto) =>
+		authenticatedRequest<WorkoutDetail>('workouts/me', {
+			method: 'POST',
+			body: JSON.stringify(workout),
+		}),
+	createForAthlete: (athleteId: string, workout: CreateMyWorkoutDto) =>
+		authenticatedRequest<WorkoutDetail>(`workouts/athletes/${athleteId}`, {
+			method: 'POST',
+			body: JSON.stringify(workout),
+		}),
+	updateDraft: (id: string, workout: CreateMyWorkoutDto) =>
+		authenticatedRequest<WorkoutDetail>(`workouts/${id}/draft`, {
+			method: 'PATCH',
+			body: JSON.stringify(workout),
+		}),
+	cancel: (id: string) =>
+		authenticatedRequest<WorkoutDetail>(`workouts/${id}/cancel`, {
+			method: 'PATCH',
+		}),
 };

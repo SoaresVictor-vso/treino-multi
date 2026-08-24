@@ -16,6 +16,7 @@ import { Permission } from '../common/enums/permission.enum';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { GenerateWorkoutsFromTemplateDto } from './dto/generate-workouts-from-template.dto';
+import { CreateWorkoutDto } from './dto/create-workout.dto';
 import { UpdateWorkoutExecutionsDto } from './dto/update-workout-executions.dto';
 import { WorkoutsService } from './workouts.service';
 
@@ -45,10 +46,19 @@ export class WorkoutsController {
 	@Get('trainer')
 	@ApiOperation({
 		summary:
-			'Lista os treinos dos atletas vinculados ao treinador autenticado',
+			'Lista os treinos do tenant para administradores e treinadores líderes, ou dos atletas vinculados para treinadores',
 	})
 	findTrainerWorkouts(@CurrentUser() actor: JwtPayload) {
 		return this.service.findTrainerWorkouts(actor);
+	}
+
+	@Get('athletes/:athleteId')
+	@RequirePermissions(Permission.WORKOUT_ASSIGN)
+	findAthleteWorkouts(
+		@Param('athleteId', new ParseUUIDPipe()) athleteId: string,
+		@CurrentUser() actor: JwtPayload,
+	) {
+		return this.service.findAthleteWorkouts(athleteId, actor);
 	}
 
 	@Get(':id')
@@ -98,5 +108,43 @@ export class WorkoutsController {
 		@CurrentUser() actor: JwtPayload,
 	) {
 		return this.service.generateWorkoutsFromTemplate(dto, actor);
+	}
+
+	@Post('me')
+	@ApiOperation({ summary: 'Cria um treino avulso para o atleta autenticado' })
+	createMyWorkout(
+		@Body() dto: CreateWorkoutDto,
+		@CurrentUser() actor: JwtPayload,
+	) {
+		return this.service.createMyWorkout(dto, actor);
+	}
+
+	@Post('athletes/:athleteId')
+	@RequirePermissions(Permission.WORKOUT_ASSIGN)
+	createWorkoutForAthlete(
+		@Param('athleteId', new ParseUUIDPipe()) athleteId: string,
+		@Body() dto: CreateWorkoutDto,
+		@CurrentUser() actor: JwtPayload,
+	) {
+		return this.service.createWorkoutForAthlete(athleteId, dto, actor);
+	}
+
+	@Patch(':id/draft')
+	@RequirePermissions(Permission.WORKOUT_ASSIGN)
+	updateWorkoutDraft(
+		@Param('id', new ParseUUIDPipe()) id: string,
+		@Body() dto: CreateWorkoutDto,
+		@CurrentUser() actor: JwtPayload,
+	) {
+		return this.service.updateWorkoutDraft(id, dto, actor);
+	}
+
+	@Patch(':id/cancel')
+	@RequirePermissions(Permission.WORKOUT_ASSIGN)
+	cancelWorkout(
+		@Param('id', new ParseUUIDPipe()) id: string,
+		@CurrentUser() actor: JwtPayload,
+	) {
+		return this.service.cancelWorkout(id, actor);
 	}
 }
