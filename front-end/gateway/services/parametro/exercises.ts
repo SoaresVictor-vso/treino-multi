@@ -105,7 +105,7 @@ export class ExercisesService implements ExercisesServiceContract {
 				: null;
 		const { exercises, deletedIds, syncedAt } = await this.buscar(since);
 
-		const normalized = exercises.map((exercise) => ({
+		const normalized = exercises?.map((exercise) => ({
 			id: exercise.id.toString(),
 			name: exercise.name,
 			description: exercise.description ?? '',

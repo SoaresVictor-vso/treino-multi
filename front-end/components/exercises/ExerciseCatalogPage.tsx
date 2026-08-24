@@ -9,7 +9,10 @@ import {
 	exercisesService,
 	type ExerciseParameter,
 } from '@/gateway/services/parametro/exercises';
-import { metricsService, type Metric } from '@/gateway/services/parametro/metrics';
+import {
+	metricsService,
+	type Metric,
+} from '@/gateway/services/parametro/metrics';
 import type { Exercise } from '@/gateway/services/parametro';
 
 export default function ExerciseCatalogPage({
@@ -31,7 +34,7 @@ export default function ExerciseCatalogPage({
 					metrics.map((metric) => [metric.id, metric]),
 				);
 				setMetricsById(metricsById);
-				const nextCatalog = exercises.flatMap((exercise) => {
+				const nextCatalog = exercises?.flatMap((exercise) => {
 					const metric1 = metricsById[exercise.metric1Id];
 					if (!metric1) return [];
 					const metric2 = exercise.metric2Id
@@ -51,7 +54,10 @@ export default function ExerciseCatalogPage({
 				setCatalog(nextCatalog);
 				setDescriptions(
 					Object.fromEntries(
-						exercises.map((exercise) => [Number(exercise.id), exercise.description ?? '']),
+						exercises?.map((exercise) => [
+							Number(exercise.id),
+							exercise.description ?? '',
+						]),
 					),
 				);
 			},
@@ -61,7 +67,9 @@ export default function ExerciseCatalogPage({
 	const handleCreated = (exercise: ExerciseParameter) => {
 		const metric1 = metricsById[exercise.metric1Id];
 		if (!metric1) return;
-		const metric2 = exercise.metric2Id ? metricsById[exercise.metric2Id] : undefined;
+		const metric2 = exercise.metric2Id
+			? metricsById[exercise.metric2Id]
+			: undefined;
 		setCatalog((current) => [
 			...current.filter((item) => item.id !== Number(exercise.id)),
 			{
@@ -101,10 +109,19 @@ export default function ExerciseCatalogPage({
 			{createOpen && (
 				<div className="fixed inset-0 z-[70] flex items-stretch justify-center overflow-y-auto bg-black/80 p-3 sm:items-center sm:p-6">
 					<div className="relative flex h-full w-full flex-col overflow-y-auto border border-outline-variant bg-surface-container p-4 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-xl sm:rounded-lg sm:p-6">
-						<button type="button" onClick={() => setCreateOpen(false)} aria-label="Fechar cadastro de exercício" className="absolute right-4 top-4 z-10 rounded p-1 text-on-surface-variant hover:bg-surface-variant hover:text-primary">
+						<button
+							type="button"
+							onClick={() => setCreateOpen(false)}
+							aria-label="Fechar cadastro de exercício"
+							className="absolute right-4 top-4 z-10 rounded p-1 text-on-surface-variant hover:bg-surface-variant hover:text-primary"
+						>
 							<RiCloseLine className="text-2xl" />
 						</button>
-						<ExerciseForm isGlobal={isGlobal} canCreateExercise={canCreateExercise} onCreated={handleCreated} />
+						<ExerciseForm
+							isGlobal={isGlobal}
+							canCreateExercise={canCreateExercise}
+							onCreated={handleCreated}
+						/>
 					</div>
 				</div>
 			)}

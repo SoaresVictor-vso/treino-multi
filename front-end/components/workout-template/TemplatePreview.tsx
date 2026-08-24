@@ -17,7 +17,7 @@ export default function TemplatePreview({
 				Sequência
 			</h3>
 			<div className="space-y-2">
-				{template.exercises.map((exercise, index) => (
+				{template.exercises?.map((exercise, index) => (
 					<div
 						key={exercise}
 						className="flex items-center gap-3 rounded border border-outline-variant bg-surface-container p-3"

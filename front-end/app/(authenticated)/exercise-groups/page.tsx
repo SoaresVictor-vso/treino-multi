@@ -123,7 +123,7 @@ export default function ExerciseGroupsPage() {
 		const ids = result.data.map((item) => item.exerciseId);
 		const metricById = new Map(metrics.map((metric) => [metric.id, metric]));
 		const exerciseById = new Map(
-			exercises.map((exercise) => [Number(exercise.id), exercise]),
+			exercises?.map((exercise) => [Number(exercise.id), exercise]),
 		);
 		const selectedExercises = ids.flatMap((id) => {
 			const exercise = exerciseById.get(id);
@@ -415,7 +415,7 @@ export default function ExerciseGroupsPage() {
 					filterExercise={(exercise) =>
 						!isOrgActor ||
 						!form.tenantId ||
-						exercises.some(
+						exercises?.some(
 							(item) =>
 								Number(item.id) === exercise.id &&
 								(!item.tenantId || item.tenantId === form.tenantId),
