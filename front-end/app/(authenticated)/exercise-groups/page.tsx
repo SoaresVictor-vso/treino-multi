@@ -256,7 +256,7 @@ export default function ExerciseGroupsPage() {
 				/>
 				<MetricCard
 					label="Exercícios"
-					value={exercises.length}
+					value={exercises?.length ?? 0}
 					description="Exercícios disponíveis no catálogo."
 				/>
 			</section>

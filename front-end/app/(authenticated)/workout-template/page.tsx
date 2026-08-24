@@ -225,7 +225,7 @@ export default function WorkoutTemplatePage() {
 			<TemplateStats
 				templateCount={templates.length}
 				exerciseCount={templates.reduce(
-					(total, item) => total + item.exercises.length,
+					(total, item) => total + (item.exercises?.length ?? 0),
 					0,
 				)}
 			/>
