@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { RiAddLine, RiHeartPulseLine } from 'react-icons/ri';
+import { RiAddLine, RiDeleteBinLine, RiHeartPulseLine } from 'react-icons/ri';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Textarea from '@/components/ui/Textarea';
@@ -69,6 +69,15 @@ export default function TrainingForm({
 		setSelected(next);
 	};
 
+	const removeExercise = (exerciseId: number) => {
+		setSelected((current) => current.filter((exercise) => exercise.id !== exerciseId));
+		setActivities((current) =>
+			Object.fromEntries(
+				Object.entries(current).filter(([id]) => Number(id) !== exerciseId),
+			) as Record<number, Activity[]>,
+		);
+	};
+
 	const updateActivity = (
 		exerciseId: number,
 		index: number,
@@ -124,12 +133,22 @@ export default function TrainingForm({
 				<div className="mt-3 space-y-4">
 					{selected.map((exercise, exerciseIndex) => (
 						<div key={exercise.id} className="rounded border border-outline-variant bg-surface-container-low p-3 sm:p-4">
-							<div className="flex items-center gap-3">
-								<span className="w-6 font-mono text-primary-fixed-dim">{exerciseIndex + 1}.</span>
-								<RiHeartPulseLine className="text-on-surface-variant" />
-								<h4 className="font-semibold">{exercise.name}</h4>
+							<div className="flex items-center justify-between gap-3">
+								<div className="flex min-w-0 items-center gap-3">
+									<span className="w-6 font-mono text-primary-fixed-dim">{exerciseIndex + 1}.</span>
+									<RiHeartPulseLine className="shrink-0 text-on-surface-variant" />
+									<h4 className="truncate font-semibold">{exercise.name}</h4>
+								</div>
+								<button
+									type="button"
+									onClick={() => removeExercise(exercise.id)}
+									aria-label={`Remover exercício ${exercise.name}`}
+									className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded text-error hover:bg-error-container/20"
+								>
+									<RiDeleteBinLine />
+								</button>
 							</div>
-							<div className="mt-3 space-y-3">
+								<div className="mt-3 space-y-3">
 								{(activities[exercise.id] ?? []).map((activity, index) => (
 									<ActivityBlock
 										key={`${exercise.id}-${index}`}

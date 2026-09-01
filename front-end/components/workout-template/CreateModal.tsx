@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { RiAddLine, RiHeartPulseLine } from 'react-icons/ri';
+import { RiAddLine, RiDeleteBinLine, RiHeartPulseLine } from 'react-icons/ri';
 import type { Activity } from '@/gateway/services/workout-templates';
 import { RiCloseLine } from 'react-icons/ri';
 import Input from '../ui/Input';
@@ -120,6 +120,15 @@ export function CreateModal({
 				(_, activityIndex) => activityIndex !== index,
 			),
 		}));
+	};
+
+	const removeExercise = (exerciseId: number) => {
+		setSelected((current) => current.filter((exercise) => exercise.id !== exerciseId));
+		setActivities((current) =>
+			Object.fromEntries(
+				Object.entries(current).filter(([id]) => Number(id) !== exerciseId),
+			) as Record<number, Activity[]>,
+		);
 	};
 
 	const cancelReorderPress = () => {
@@ -261,13 +270,14 @@ export function CreateModal({
 								data-exercise-id={item.id}
 								className="rounded border border-outline-variant bg-surface-container-low p-3 sm:p-4"
 							>
-								<div className="flex items-center gap-3">
-									<span className="w-6 font-mono text-primary-fixed-dim">
-										{index + 1}.
-									</span>
-									<span className="text-on-surface-variant">
-										<RiHeartPulseLine />
-									</span>
+								<div className="flex items-center justify-between gap-3">
+									<div className="flex min-w-0 items-center gap-3">
+										<span className="w-6 font-mono text-primary-fixed-dim">
+											{index + 1}.
+										</span>
+										<span className="shrink-0 text-on-surface-variant">
+											<RiHeartPulseLine />
+										</span>
 									<h4
 										className={`font-semibold ${isViewMode ? '' : 'cursor-pointer select-none touch-manipulation'}`}
 										onPointerDown={startReorderPress}
@@ -281,6 +291,17 @@ export function CreateModal({
 									>
 										{item.name}
 									</h4>
+									</div>
+									{!isViewMode && (
+										<button
+											type="button"
+											onClick={() => removeExercise(item.id)}
+											aria-label={`Remover exercício ${item.name}`}
+											className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded text-error hover:bg-error-container/20"
+										>
+											<RiDeleteBinLine />
+										</button>
+									)}
 								</div>
 								<div className="mt-3 space-y-3">
 									{(activities[item.id] ?? []).map((activity, configIndex) => (
