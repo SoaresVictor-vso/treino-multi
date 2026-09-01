@@ -137,6 +137,24 @@ export default function TrainingExecution({ id }: { id: string }) {
 					}
 				: current,
 		);
+	const updateAthleteNote = (exerciseId: number, athleteNote: string) =>
+		setWorkout((current) => {
+			if (!current) return current;
+			const existing = current.exerciseNotes.find(
+				(note) => note.exerciseId === exerciseId,
+			);
+			return {
+				...current,
+				exerciseNotes: existing
+					? current.exerciseNotes.map((note) =>
+							note.exerciseId === exerciseId ? { ...note, athleteNote } : note,
+						)
+					: [
+							...current.exerciseNotes,
+							{ exerciseId, note: null, athleteNote },
+						],
+			};
+		});
 	const addSeries = (
 		exercise: WorkoutExecution['exercise'],
 		placement: 'before' | 'after',
@@ -266,6 +284,10 @@ export default function TrainingExecution({ id }: { id: string }) {
 		const response = await workoutsService.updateExecutions(
 			workout.id,
 			serializeExecutions(workout.executions),
+			workout.exerciseNotes.map(({ exerciseId, athleteNote }) => ({
+				exerciseId,
+				athleteNote,
+			})),
 		);
 		if (!response.success || !response.data)
 			setError(response.error || 'Não foi possível salvar as séries.');
@@ -288,6 +310,10 @@ export default function TrainingExecution({ id }: { id: string }) {
 		const saveResult = await workoutsService.updateExecutions(
 			workout.id,
 			serializeExecutions(workout.executions),
+			workout.exerciseNotes.map(({ exerciseId, athleteNote }) => ({
+				exerciseId,
+				athleteNote,
+			})),
 		);
 		if (!saveResult.success || !saveResult.data) {
 			setError(saveResult.error || 'Não foi possível salvar as séries.');
@@ -354,6 +380,12 @@ export default function TrainingExecution({ id }: { id: string }) {
 						<ExerciseExecutionCard
 							key={exerciseId}
 							sets={sets}
+							exerciseNote={workout.exerciseNotes.find(
+								(note) => note.exerciseId === exerciseId,
+							)}
+							onAthleteNoteChange={(athleteNote) =>
+								updateAthleteNote(exerciseId, athleteNote)
+							}
 							editable={editable}
 							onChange={(executionId, key, value) =>
 								updateExecution(executionId, {

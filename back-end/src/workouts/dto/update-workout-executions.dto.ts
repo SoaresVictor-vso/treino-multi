@@ -6,6 +6,7 @@ import {
 	IsNumber,
 	IsOptional,
 	IsString,
+	MaxLength,
 	Min,
 	ValidateNested,
 } from 'class-validator';
@@ -27,9 +28,26 @@ export class UpdateWorkoutExecutionDto {
 	@IsOptional() @IsEnum(ExecutionStatus) status?: ExecutionStatus;
 }
 
+export class UpdateWorkoutExerciseNoteDto {
+	@IsInt()
+	@Min(1)
+	exerciseId!: number;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(2000)
+	athleteNote?: string | null;
+}
+
 export class UpdateWorkoutExecutionsDto {
 	@IsArray()
 	@ValidateNested({ each: true })
 	@Type(() => UpdateWorkoutExecutionDto)
 	executions!: UpdateWorkoutExecutionDto[];
+
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => UpdateWorkoutExerciseNoteDto)
+	exerciseNotes?: UpdateWorkoutExerciseNoteDto[];
 }

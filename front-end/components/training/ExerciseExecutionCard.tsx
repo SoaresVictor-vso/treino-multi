@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { RiAddLine, RiMore2Fill, RiSkipForwardLine } from 'react-icons/ri';
-import type { WorkoutExecution } from '@/gateway/services/workouts';
+import Textarea from '@/components/ui/Textarea';
+import type {
+	WorkoutExecution,
+	WorkoutExerciseNote,
+} from '@/gateway/services/workouts';
 import ExecutionSet from './ExecutionSet';
 
 type ExerciseExecutionCardProps = {
@@ -18,6 +22,8 @@ type ExerciseExecutionCardProps = {
 	onAddWarmup: () => void;
 	onAddSeries: () => void;
 	onTitleLongPress?: () => void;
+	exerciseNote?: WorkoutExerciseNote;
+	onAthleteNoteChange: (note: string) => void;
 };
 
 export default function ExerciseExecutionCard({
@@ -29,8 +35,11 @@ export default function ExerciseExecutionCard({
 	onAddWarmup,
 	onAddSeries,
 	onTitleLongPress,
+	exerciseNote,
+	onAthleteNoteChange,
 }: ExerciseExecutionCardProps) {
 	const [menuOpen, setMenuOpen] = useState(false);
+	const [noteOpen, setNoteOpen] = useState(false);
 	const reorderPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const cancelReorderPress = () => {
 		if (reorderPressTimer.current) clearTimeout(reorderPressTimer.current);
@@ -52,6 +61,8 @@ export default function ExerciseExecutionCard({
 	const visibleSets = sets.filter((set) => set.status !== 'skipped');
 	if (!visibleSets.length) return null;
 	const exercise = visibleSets[0].exercise;
+	const trainerNote = exerciseNote?.note;
+	const athleteNote = exerciseNote?.athleteNote;
 
 	return (
 		<article className="rounded-xl border border-outline-variant bg-surface-container-low p-4 sm:p-5">
@@ -88,7 +99,20 @@ export default function ExerciseExecutionCard({
 							<RiMore2Fill size={20} />
 						</button>
 						{menuOpen && (
-							<div className="absolute right-0 top-full z-10 mt-1 w-44 rounded border border-outline-variant bg-surface-container p-1 shadow-xl">
+							<div className="absolute right-0 top-full z-10 mt-1 w-48 rounded border border-outline-variant bg-surface-container p-1 shadow-xl">
+								<button
+									type="button"
+									onClick={() => {
+										setMenuOpen(false);
+										if (athleteNote) {
+											onAthleteNoteChange('');
+											setNoteOpen(false);
+										} else setNoteOpen(true);
+									}}
+									className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-surface-variant"
+								>
+									{athleteNote ? 'Remover minha nota' : 'Criar minha nota'}
+								</button>
 								<button
 									type="button"
 									onClick={() => {
@@ -104,6 +128,29 @@ export default function ExerciseExecutionCard({
 					</div>
 				)}
 			</div>
+			{trainerNote && (
+				<div className="mb-4 rounded-lg border border-white p-3 text-sm text-on-surface">
+					<p className="font-semibold">Nota do treinador</p>
+					<p className="mt-1 whitespace-pre-wrap">{trainerNote}</p>
+				</div>
+			)}
+			{editable && (noteOpen || athleteNote) ? (
+				<div className="mb-4">
+					<Textarea
+						label="Sua nota (opcional)"
+						value={athleteNote ?? ''}
+						maxLength={2000}
+						onChange={(event) => onAthleteNoteChange(event.target.value)}
+						placeholder="Registre como foi a execução deste exercício"
+						rows={2}
+					/>
+				</div>
+			) : athleteNote ? (
+				<div className="mb-4 rounded-lg bg-surface-container-high p-3 text-sm text-on-surface-variant">
+					<p className="font-semibold text-on-surface">Nota do atleta</p>
+					<p className="mt-1 whitespace-pre-wrap">{athleteNote}</p>
+				</div>
+			) : null}
 			<div className="space-y-3">
 				{editable && (
 					<button

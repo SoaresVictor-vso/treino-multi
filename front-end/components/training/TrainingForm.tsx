@@ -1,9 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { RiAddLine, RiDeleteBinLine, RiHeartPulseLine } from 'react-icons/ri';
+import {
+	RiAddLine,
+	RiDeleteBinLine,
+	RiFileCloseLine,
+	RiFileEditLine,
+	RiHeartPulseLine,
+} from 'react-icons/ri';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
+import Modal from '@/components/ui/Modal';
 import Textarea from '@/components/ui/Textarea';
 import ExercisePicker from '@/components/shared/ExercisePicker';
 import { ActivityBlock } from '@/components/workout-template/ActivityBlock';
@@ -34,6 +41,7 @@ export default function TrainingForm({
 	onCancel,
 	isSubmitting = false,
 	submitLabel = 'Criar treino',
+	noteLabel = 'Anotações',
 }: {
 	initialValues?: Partial<TrainingFormValues>;
 	initialExercises?: Exercise[];
@@ -41,14 +49,30 @@ export default function TrainingForm({
 	onCancel: () => void;
 	isSubmitting?: boolean;
 	submitLabel?: string;
+	noteLabel?: string;
 }) {
 	const [name, setName] = useState(initialValues?.name ?? '');
-	const [description, setDescription] = useState(initialValues?.description ?? '');
+	const [description, setDescription] = useState(
+		initialValues?.description ?? '',
+	);
 	const [selected, setSelected] = useState<Exercise[]>(initialExercises ?? []);
-	const [activities, setActivities] = useState<Record<number, Activity[]>>(() =>
-		Object.groupBy(initialValues?.activities ?? [], (activity) => activity.exerciseId) as Record<number, Activity[]>,
+	const [activities, setActivities] = useState<Record<number, Activity[]>>(
+		() =>
+			Object.groupBy(
+				initialValues?.activities ?? [],
+				(activity) => activity.exerciseId,
+			) as Record<number, Activity[]>,
 	);
 	const [pickerOpen, setPickerOpen] = useState(false);
+	const [openNotes, setOpenNotes] = useState<Record<number, boolean>>(() =>
+		Object.fromEntries(
+			(initialValues?.activities ?? [])
+				.filter((activity) => !!activity.note?.trim())
+				.map((activity) => [activity.exerciseId, true]),
+		),
+	);
+	const [noteToRemove, setNoteToRemove] = useState<number | null>(null);
+	const [exerciseToRemove, setExerciseToRemove] = useState<number | null>(null);
 	const canSubmit =
 		!!name.trim() &&
 		selected.length > 0 &&
@@ -70,11 +94,14 @@ export default function TrainingForm({
 	};
 
 	const removeExercise = (exerciseId: number) => {
-		setSelected((current) => current.filter((exercise) => exercise.id !== exerciseId));
-		setActivities((current) =>
-			Object.fromEntries(
-				Object.entries(current).filter(([id]) => Number(id) !== exerciseId),
-			) as Record<number, Activity[]>,
+		setSelected((current) =>
+			current.filter((exercise) => exercise.id !== exerciseId),
+		);
+		setActivities(
+			(current) =>
+				Object.fromEntries(
+					Object.entries(current).filter(([id]) => Number(id) !== exerciseId),
+				) as Record<number, Activity[]>,
 		);
 	};
 
@@ -89,6 +116,15 @@ export default function TrainingForm({
 			[exerciseId]: (current[exerciseId] ?? []).map((activity, activityIndex) =>
 				activityIndex === index ? { ...activity, [key]: value } : activity,
 			),
+		}));
+
+	const updateExerciseNote = (exerciseId: number, note: string) =>
+		setActivities((current) => ({
+			...current,
+			[exerciseId]: (current[exerciseId] ?? []).map((activity) => ({
+				...activity,
+				note,
+			})),
 		}));
 
 	const submit = async () => {
@@ -124,7 +160,10 @@ export default function TrainingForm({
 			<section aria-labelledby="training-form-exercises">
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<h3 id="training-form-exercises" className="type-headline-md">
-						Exercícios <span className="ml-2 text-sm font-normal text-on-surface-variant">{selected.length}</span>
+						Exercícios{' '}
+						<span className="ml-2 text-sm font-normal text-on-surface-variant">
+							{selected.length}
+						</span>
 					</h3>
 					<Button variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
 						<RiAddLine /> Adicionar exercício
@@ -132,34 +171,84 @@ export default function TrainingForm({
 				</div>
 				<div className="mt-3 space-y-4">
 					{selected.map((exercise, exerciseIndex) => (
-						<div key={exercise.id} className="rounded border border-outline-variant bg-surface-container-low p-3 sm:p-4">
+						<div
+							key={exercise.id}
+							className="rounded border border-outline-variant bg-surface-container-low p-3 sm:p-4"
+						>
 							<div className="flex items-center justify-between gap-3">
 								<div className="flex min-w-0 items-center gap-3">
-									<span className="w-6 font-mono text-primary-fixed-dim">{exerciseIndex + 1}.</span>
+									<span className="w-6 font-mono text-primary-fixed-dim">
+										{exerciseIndex + 1}.
+									</span>
 									<RiHeartPulseLine className="shrink-0 text-on-surface-variant" />
 									<h4 className="truncate font-semibold">{exercise.name}</h4>
 								</div>
-								<button
-									type="button"
-									onClick={() => removeExercise(exercise.id)}
-									aria-label={`Remover exercício ${exercise.name}`}
-									className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded text-error hover:bg-error-container/20"
-								>
-									<RiDeleteBinLine />
-								</button>
+								<div className="flex shrink-0 items-center gap-1">
+									{openNotes[exercise.id] ||
+									activities[exercise.id]?.[0]?.note?.trim() ? (
+										<button
+											type="button"
+											onClick={() => setNoteToRemove(exercise.id)}
+											aria-label={`Remover nota de ${exercise.name}`}
+											title="Remover nota"
+											className="inline-flex h-9 w-9 items-center justify-center rounded text-error hover:bg-error-container/20"
+										>
+											<RiFileCloseLine />
+										</button>
+									) : (
+										<button
+											type="button"
+											onClick={() =>
+												setOpenNotes((current) => ({
+													...current,
+													[exercise.id]: !current[exercise.id],
+												}))
+											}
+											aria-label={`Adicionar nota a ${exercise.name}`}
+											title="Adicionar nota"
+											className="inline-flex h-9 w-9 items-center justify-center rounded text-on-surface-variant hover:bg-surface-variant hover:text-primary"
+										>
+											<RiFileEditLine />
+										</button>
+									)}
+									<button
+										type="button"
+										onClick={() => setExerciseToRemove(exercise.id)}
+										aria-label={`Remover exercício ${exercise.name}`}
+										className="inline-flex h-9 w-9 items-center justify-center rounded text-error hover:bg-error-container/20"
+									>
+										<RiDeleteBinLine />
+									</button>
+								</div>
 							</div>
-								<div className="mt-3 space-y-3">
+							{openNotes[exercise.id] && (
+								<Textarea
+									label={noteLabel}
+									value={activities[exercise.id]?.[0]?.note ?? ''}
+									maxLength={2000}
+									onChange={(event) =>
+										updateExerciseNote(exercise.id, event.target.value)
+									}
+									placeholder="Ex.: Controle a cadência durante o movimento"
+									rows={2}
+								/>
+							)}
+							<div className="mt-3 space-y-3">
 								{(activities[exercise.id] ?? []).map((activity, index) => (
 									<ActivityBlock
 										key={`${exercise.id}-${index}`}
 										exercise={exercise}
 										activity={activity}
 										index={index}
-										onChange={(key, value) => updateActivity(exercise.id, index, key, value)}
+										onChange={(key, value) =>
+											updateActivity(exercise.id, index, key, value)
+										}
 										onRemove={() =>
 											setActivities((current) => ({
 												...current,
-												[exercise.id]: current[exercise.id].filter((_, itemIndex) => itemIndex !== index),
+												[exercise.id]: current[exercise.id].filter(
+													(_, itemIndex) => itemIndex !== index,
+												),
 											}))
 										}
 									/>
@@ -167,24 +256,90 @@ export default function TrainingForm({
 							</div>
 							<button
 								type="button"
-								onClick={() => setActivities((current) => ({ ...current, [exercise.id]: [...(current[exercise.id] ?? []), { ...(current[exercise.id]?.at(-1) ?? initialActivity(exercise.id)), exerciseId: exercise.id }] }))}
+								onClick={() =>
+									setActivities((current) => ({
+										...current,
+										[exercise.id]: [
+											...(current[exercise.id] ?? []),
+											{
+												...(current[exercise.id]?.at(-1) ?? initialActivity(exercise.id)),
+												exerciseId: exercise.id,
+											},
+										],
+									}))
+								}
 								className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-primary-fixed-dim hover:text-primary"
 							>
 								<RiAddLine /> Adicionar outra série
 							</button>
 						</div>
 					))}
-					{!selected.length && <p className="rounded border border-dashed border-outline-variant p-5 text-center text-sm text-on-surface-variant">Adicione os exercícios na ordem em que serão executados.</p>}
+					{!selected.length && (
+						<p className="rounded border border-dashed border-outline-variant p-5 text-center text-sm text-on-surface-variant">
+							Adicione os exercícios na ordem em que serão executados.
+						</p>
+					)}
 				</div>
 			</section>
 
 			<div className="flex flex-col-reverse gap-3 border-t border-outline-variant pt-5 sm:flex-row sm:justify-end">
-				<Button variant="outline" onClick={onCancel}>Cancelar</Button>
+				<Button variant="outline" onClick={onCancel}>
+					Cancelar
+				</Button>
 				<Button disabled={!canSubmit || isSubmitting} onClick={() => void submit()}>
 					{isSubmitting ? 'Criando...' : submitLabel}
 				</Button>
 			</div>
-			{pickerOpen && <ExercisePicker selected={selected} onChange={changeSelected} onClose={() => setPickerOpen(false)} />}
+			{pickerOpen && (
+				<ExercisePicker
+					selected={selected}
+					onChange={changeSelected}
+					onClose={() => setPickerOpen(false)}
+				/>
+			)}
+			<Modal
+				isOpen={noteToRemove !== null}
+				title="Remover nota?"
+				description="A nota deste exercício será apagada."
+				onClose={() => setNoteToRemove(null)}
+			>
+				<div className="flex justify-end gap-3">
+					<Button variant="outline" onClick={() => setNoteToRemove(null)}>
+						Cancelar
+					</Button>
+					<Button
+						onClick={() => {
+							if (noteToRemove === null) return;
+							updateExerciseNote(noteToRemove, '');
+							setOpenNotes((current) => ({ ...current, [noteToRemove]: false }));
+							setNoteToRemove(null);
+						}}
+					>
+						Remover nota
+					</Button>
+				</div>
+			</Modal>
+			<Modal
+				isOpen={exerciseToRemove !== null}
+				title="Remover exercício?"
+				description="Todas as séries e a nota deste exercício serão removidas."
+				onClose={() => setExerciseToRemove(null)}
+			>
+				<div className="flex justify-end gap-3">
+					<Button variant="outline" onClick={() => setExerciseToRemove(null)}>
+						Cancelar
+					</Button>
+					<Button
+						onClick={() => {
+							if (exerciseToRemove === null) return;
+							removeExercise(exerciseToRemove);
+							setExerciseToRemove(null);
+						}}
+					>
+						Remover exercício
+					</Button>
+				</div>
+			</Modal>
 		</div>
 	);
 }

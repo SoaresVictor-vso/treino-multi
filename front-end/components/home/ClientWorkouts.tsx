@@ -290,6 +290,7 @@ export default function ClientWorkouts() {
 					onCancel={() => setCreateOpen(false)}
 					isSubmitting={creating}
 					submitLabel="Criar treino"
+					noteLabel="Minha nota (opcional)"
 				/>
 			</Modal>
 			<Modal
