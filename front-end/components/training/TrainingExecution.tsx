@@ -15,6 +15,7 @@ import ExercisePicker from '@/components/shared/ExercisePicker';
 import PersonalRecordRequiredModal from '@/components/shared/PersonalRecordRequiredModal';
 import ExerciseReorderModal from '@/components/shared/ExerciseReorderModal';
 import ExerciseExecutionCard from './ExerciseExecutionCard';
+import WorkoutComparison from './WorkoutComparison';
 import { getSessionUser } from '@/lib/auth';
 import {
 	workoutsService,
@@ -347,35 +348,39 @@ export default function TrainingExecution({ id }: { id: string }) {
 						<RiPlayLine /> Iniciar treino
 					</Button>
 				)}
-			<div className="space-y-5">
-				{executionGroups.map(([exerciseId, sets]) => {
-					if (!sets.length) return null;
-					return (
-						<ExerciseExecutionCard
-							key={exerciseId}
-							sets={sets}
-							editable={editable}
-							onChange={(executionId, key, value) =>
-								updateExecution(executionId, {
-									[key]: value,
-								} as Partial<WorkoutExecution>)
-							}
-							onSkipSet={(executionId) =>
-								updateExecution(executionId, { status: 'skipped' })
-							}
-							onSkipExercise={() =>
-								sets.forEach((item) => {
-									if (item.status === 'in_progress')
-										updateExecution(item.id, { status: 'skipped' });
-								})
-							}
-							onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
-							onAddSeries={() => addSeries(sets[0].exercise, 'after')}
-							onTitleLongPress={() => setReorderOpen(true)}
-						/>
-					);
-				})}
-			</div>
+			{workout.status === 'completed' ? (
+				<WorkoutComparison executions={workout.executions} />
+			) : (
+				<div className="space-y-5">
+					{executionGroups.map(([exerciseId, sets]) => {
+						if (!sets.length) return null;
+						return (
+							<ExerciseExecutionCard
+								key={exerciseId}
+								sets={sets}
+								editable={editable}
+								onChange={(executionId, key, value) =>
+									updateExecution(executionId, {
+										[key]: value,
+									} as Partial<WorkoutExecution>)
+								}
+								onSkipSet={(executionId) =>
+									updateExecution(executionId, { status: 'skipped' })
+								}
+								onSkipExercise={() =>
+									sets.forEach((item) => {
+										if (item.status === 'in_progress')
+											updateExecution(item.id, { status: 'skipped' });
+									})
+								}
+								onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
+								onAddSeries={() => addSeries(sets[0].exercise, 'after')}
+								onTitleLongPress={() => setReorderOpen(true)}
+							/>
+						);
+					})}
+				</div>
+			)}
 			{editable && (
 				<div className="flex flex-wrap justify-end gap-3 border-t border-outline-variant pt-5">
 					<Button
