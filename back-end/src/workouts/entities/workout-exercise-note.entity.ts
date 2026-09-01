@@ -24,8 +24,11 @@ export class WorkoutExerciseNote {
 	@Column({ name: 'exercise_id', type: 'integer' })
 	exerciseId!: number;
 
-	@Column({ type: 'text' })
-	note!: string;
+	@Column({ type: 'text', nullable: true })
+	note!: string | null;
+
+	@Column({ name: 'athlete_note', type: 'text', nullable: true })
+	athleteNote!: string | null;
 
 	@Column({ name: 'created_by', type: 'uuid' })
 	createdBy!: string;

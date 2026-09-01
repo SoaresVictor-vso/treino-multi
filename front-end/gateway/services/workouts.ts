@@ -34,6 +34,12 @@ export type WorkoutExecution = {
 	} | null;
 };
 
+export type WorkoutExerciseNote = {
+	exerciseId: number;
+	note: string | null;
+	athleteNote: string | null;
+};
+
 export type WorkoutDetail = {
 	id: string;
 	athleteId: string;
@@ -42,6 +48,7 @@ export type WorkoutDetail = {
 	scheduledDate: string | null;
 	status: WorkoutStatus;
 	executions: WorkoutExecution[];
+	exerciseNotes: WorkoutExerciseNote[];
 };
 
 export type MyWorkout = {
@@ -114,10 +121,14 @@ export const workoutsService = {
 		authenticatedRequest<WorkoutDetail>(`workouts/${id}/start`, {
 			method: 'PATCH',
 		}),
-	updateExecutions: (id: string, executions: UpdateWorkoutExecution[]) =>
+	updateExecutions: (
+		id: string,
+		executions: UpdateWorkoutExecution[],
+		exerciseNotes: Pick<WorkoutExerciseNote, 'exerciseId' | 'athleteNote'>[],
+	) =>
 		authenticatedRequest<WorkoutDetail>(`workouts/${id}/executions`, {
 			method: 'PATCH',
-			body: JSON.stringify({ executions }),
+			body: JSON.stringify({ executions, exerciseNotes }),
 		}),
 	complete: (id: string) =>
 		authenticatedRequest<WorkoutDetail>(`workouts/${id}/complete`, {

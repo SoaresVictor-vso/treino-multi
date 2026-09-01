@@ -1,30 +1,62 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { RiEyeLine, RiEyeOffLine } from 'react-icons/ri';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
+import Checkbox from '@/components/ui/Checkbox';
 import ErrorBox from '@/components/ui/ErrorBox';
 import validateCPF from '@/utilities/validators/cpf';
 import validateEmail from '@/utilities/validators/email';
+import {
+	refreshAccessToken,
+	storeSessionTokens,
+	tokenHasEnoughLifetime,
+} from '@/gateway/client';
 import { LoginService } from '@/gateway/services/login';
-import { setAuthCookie } from '@/lib/auth';
-import usePersistedState from '@/hooks/usePersistedState';
+import { getAuthToken } from '@/lib/auth';
+
+const REMEMBER_ME_KEY = 'rememberMe';
+const REFRESH_TOKEN_KEY = 'refreshToken';
+const ACCESS_TOKEN_KEY = 'accessToken';
 
 export default function Login() {
-	const [accessToken, setAccessToken] = usePersistedState<string | null>(
-		'accessToken',
-		null,
-	);
-	const [__, setRefreshToken] = usePersistedState<string | null>(
-		'refreshToken',
-		null,
-	);
 	const router = useRouter();
 	const [login, setLogin] = useState('');
 	const [password, setPassword] = useState('');
+	const [showPassword, setShowPassword] = useState(false);
+	const [rememberMe, setRememberMe] = useState(
+		() =>
+			typeof window !== 'undefined' &&
+			localStorage.getItem(REMEMBER_ME_KEY) === 'true',
+	);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (!rememberMe) return;
+
+		let isActive = true;
+
+		async function restoreRememberedSession() {
+			if (tokenHasEnoughLifetime(getAuthToken())) {
+				router.replace('/home');
+				return;
+			}
+
+			const response = await refreshAccessToken();
+			if (isActive && response.success && response.data?.accessToken) {
+				router.replace('/home');
+			}
+		}
+
+		void restoreRememberedSession();
+
+		return () => {
+			isActive = false;
+		};
+	}, [rememberMe, router]);
 
 	const validateAndCleanLogin = (value: string) => {
 		value = value.trim();
@@ -52,17 +84,21 @@ export default function Login() {
 
 			const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
 				res.data!;
-			setAccessToken(newAccessToken);
-			setRefreshToken(newRefreshToken);
+			storeSessionTokens(newAccessToken, newRefreshToken);
+			if (rememberMe) {
+				localStorage.setItem(REMEMBER_ME_KEY, 'true');
+				localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+			} else {
+				localStorage.setItem(REMEMBER_ME_KEY, 'false');
+				localStorage.removeItem(REFRESH_TOKEN_KEY);
+			}
+			localStorage.removeItem(ACCESS_TOKEN_KEY);
 
-			console.log('Login bem-sucedido!');
-			console.log(res.success);
-			setAuthCookie(newAccessToken);
 			setLoading(false);
 			router.push('/home');
-		} catch (error) {
+		} catch {
 			setLoading(false);
-			setError('Não foi possívelrealizar o login.');
+			setError('Não foi possível realizar o login.');
 		}
 	}
 
@@ -85,13 +121,32 @@ export default function Login() {
 						value={login}
 						onChange={(e) => setLogin(e.target.value)}
 						onBlur={(e) => setError(validateAndCleanLogin(e.target.value))}
+						selectOnClick={false}
 					/>
 					<Input
 						label="Senha"
-						type="password"
+						type={showPassword ? 'text' : 'password'}
 						// placeholder="••••••••"
 						value={password}
 						onChange={(e) => setPassword(e.target.value)}
+						selectOnClick={false}
+						trailingContent={
+							<button
+								type="button"
+								onClick={() => setShowPassword((visible) => !visible)}
+								className="rounded p-1 text-on-surface-variant transition-colors hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/30"
+								aria-label={showPassword ? 'Ocultar senha' : 'Visualizar senha'}
+								aria-pressed={showPassword}
+							>
+								{showPassword ? <RiEyeOffLine size={20} /> : <RiEyeLine size={20} />}
+							</button>
+						}
+					/>
+					<Checkbox
+						id="remember-me"
+						label="Lembrar de mim"
+						checked={rememberMe}
+						onChange={(event) => setRememberMe(event.target.checked)}
 					/>
 
 					<ErrorBox message={error} />

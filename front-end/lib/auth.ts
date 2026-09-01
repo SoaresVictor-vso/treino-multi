@@ -13,16 +13,21 @@ export interface SessionUser {
 	tenantId: string | null;
 }
 
+let inMemoryAccessToken: string | null = null;
+
 /** Token fixo utilizado durante o desenvolvimento até o fluxo real de auth estar pronto. */
 export function setAuthCookie(token: string): void {
+	inMemoryAccessToken = token;
 	document.cookie = `accessToken=${encodeURIComponent(token)}; path=/; SameSite=Strict`;
 }
 
 export function clearAuthCookie(): void {
+	inMemoryAccessToken = null;
 	document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Strict';
 }
 
 export function getAuthToken(): string | null {
+	if (inMemoryAccessToken) return inMemoryAccessToken;
 	if (typeof document === 'undefined') return null;
 	const match = document.cookie.match(/(?:^|;\s*)accessToken=([^;]*)/);
 	return match ? decodeURIComponent(match[1]) : null;
