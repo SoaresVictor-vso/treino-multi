@@ -299,7 +299,7 @@ function InProgressCard({
 					className="mt-7 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary-container px-5 text-sm font-extrabold text-on-primary-fixed transition hover:bg-primary-fixed focus:outline-none focus:ring-2 focus:ring-primary-fixed focus:ring-offset-2 focus:ring-offset-surface-container-low"
 				>
 					<RiPlayFill size={18} />
-					Continuar treino
+					Retomar treino
 				</button>
 			</div>
 		</article>

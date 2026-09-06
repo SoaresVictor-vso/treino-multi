@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
 	RiAddLine,
 	RiArrowLeftLine,
+	RiCheckLine,
 	RiEditLine,
 	RiPlayLine,
-	RiSaveLine,
 } from 'react-icons/ri';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
@@ -79,6 +79,8 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const [error, setError] = useState<string | null>(null);
 	const [starting, setStarting] = useState(false);
 	const [saving, setSaving] = useState(false);
+	const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+	const [completionOpen, setCompletionOpen] = useState(false);
 	const [startOpen, setStartOpen] = useState(false);
 	const [pickerOpen, setPickerOpen] = useState(false);
 	const [pickerSelection, setPickerSelection] = useState<Exercise[]>([]);
@@ -90,6 +92,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const workoutRef = useRef<WorkoutDetail | null>(null);
 	const saveQueueRef = useRef<WorkoutDetail | null>(null);
 	const savingRef = useRef(false);
+	const dirtyRef = useRef(false);
 
 	const load = async () => {
 		setLoading(true);
@@ -159,18 +162,33 @@ export default function TrainingExecution({ id }: { id: string }) {
 			if (workoutRef.current === workoutToSave) {
 				workoutRef.current = savedWorkout;
 				setWorkout(savedWorkout);
+				dirtyRef.current = false;
+				setHasUnsavedChanges(false);
 			}
 		}
 		savingRef.current = false;
 		setSaving(false);
 	}, []);
-	const updateWorkout = (updater: (current: WorkoutDetail) => WorkoutDetail) => {
+	useEffect(() => {
+		const autosave = window.setInterval(() => {
+			if (dirtyRef.current) void save();
+		}, 60_000);
+		return () => window.clearInterval(autosave);
+	}, [save]);
+
+	const updateWorkout = (
+		updater: (current: WorkoutDetail) => WorkoutDetail,
+		options: { saveImmediately?: boolean } = {},
+	) => {
 		const current = workoutRef.current;
 		if (!current) return;
 		const updatedWorkout = updater(current);
 		workoutRef.current = updatedWorkout;
 		setWorkout(updatedWorkout);
+		dirtyRef.current = true;
+		setHasUnsavedChanges(true);
 		if (
+			options.saveImmediately &&
 			updatedWorkout.status === 'in_progress' &&
 			getSessionUser()?.sub === updatedWorkout.athleteId
 		)
@@ -186,7 +204,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 			executions: current.executions.map((item) =>
 				item.id === executionId ? { ...item, ...patch } : item,
 			),
-		}));
+		}), { saveImmediately: patch.status === 'completed' });
 	const updateAthleteNote = (exerciseId: number, athleteNote: string) =>
 		updateWorkout((current) => {
 			const existing = current.exerciseNotes.find(
@@ -363,6 +381,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 	};
 	const complete = async () => {
 		if (!workout) return;
+		setCompletionOpen(false);
 		setSaving(true);
 		setError(null);
 		const saveResult = await workoutsService.updateExecutions(
@@ -378,6 +397,8 @@ export default function TrainingExecution({ id }: { id: string }) {
 			setSaving(false);
 			return;
 		}
+		dirtyRef.current = false;
+		setHasUnsavedChanges(false);
 		const result = await workoutsService.complete(workout.id);
 		if (!result.success || !result.data)
 			setError(result.error || 'Não foi possível finalizar o treino.');
@@ -401,19 +422,25 @@ export default function TrainingExecution({ id }: { id: string }) {
 			</section>
 		);
 	return (
-		<section className="mx-auto w-full max-w-5xl space-y-5 pb-10">
-			<div className="flex items-start justify-between gap-4">
-				<div>
+		<section className="mx-auto w-full max-w-5xl space-y-4 pb-10">
+			<div className="border-b border-outline-variant/60 pb-3">
+				<div className="flex items-center justify-between gap-3">
 					<button
 						type="button"
 						onClick={() => router.back()}
-						className="mb-3 inline-flex items-center gap-1 text-sm text-primary-fixed"
+						className="inline-flex min-h-8 items-center gap-1 text-sm text-primary-fixed"
 					>
 						<RiArrowLeftLine /> Voltar
 					</button>
-					<p className="type-label-caps text-primary-fixed">Execução do treino</p>
-					<div className="mt-1 flex items-center gap-2">
-						<h1 className="text-3xl font-bold">{workout.templateName}</h1>
+					<span className="shrink-0 rounded-full bg-primary-container px-2.5 py-1 text-[11px] font-bold text-on-primary-container">
+						{statusLabel(workout.status)}
+					</span>
+				</div>
+				<p className="mt-1 type-label-caps text-primary-fixed">Execução do treino</p>
+				<div className="mt-0.5 flex w-full min-w-0 items-center gap-1">
+					<h1 className="line-clamp-2 min-w-0 flex-1 text-base font-bold leading-snug sm:text-lg">
+							{workout.templateName}
+						</h1>
 						{isAthlete && workout.status !== 'cancelled' && (
 							<button
 								type="button"
@@ -421,23 +448,19 @@ export default function TrainingExecution({ id }: { id: string }) {
 									setWorkoutName(workout.templateName);
 									setRenameOpen(true);
 								}}
-								className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-lg text-on-surface-variant transition hover:bg-surface-variant hover:text-primary-fixed focus:outline-none focus:ring-2 focus:ring-primary-fixed"
+							className="inline-grid h-8 w-8 shrink-0 place-items-center rounded-lg text-on-surface-variant transition hover:bg-surface-variant hover:text-primary-fixed focus:outline-none focus:ring-2 focus:ring-primary-fixed"
 								aria-label="Editar nome do treino"
 							>
-								<RiEditLine size={18} aria-hidden />
+							<RiEditLine size={16} aria-hidden />
 							</button>
 						)}
 					</div>
-					{workout.templateDescription && (
-						<p className="mt-2 text-on-surface-variant">
-							{workout.templateDescription}
-						</p>
-					)}
+				{workout.templateDescription && (
+					<p className="mt-1 line-clamp-2 text-sm text-on-surface-variant">
+						{workout.templateDescription}
+					</p>
+				)}
 				</div>
-				<span className="shrink-0 rounded-full bg-primary-container px-3 py-1 text-xs font-bold text-on-primary-container">
-					{statusLabel(workout.status)}
-				</span>
-			</div>
 			{error && <ErrorBox message={error} />}
 			{!isAthlete && (
 				<div className="rounded-lg border border-outline-variant bg-surface-container-high p-3 text-sm text-on-surface-variant">
@@ -451,7 +474,33 @@ export default function TrainingExecution({ id }: { id: string }) {
 						<RiPlayLine /> Iniciar treino
 					</Button>
 				)}
-			<div className="space-y-5">
+			{editable && (
+				<p className="-mt-1 text-right text-xs text-on-surface-variant" role="status">
+					{saving
+						? 'Salvando...'
+						: hasUnsavedChanges
+							? 'Alterações serão salvas em até 1 min'
+							: '✓ Alterações salvas'}
+				</p>
+			)}
+			<div className="space-y-4">
+				{executionGroups.length === 0 && editable && (
+					<div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-6 text-center">
+						<h2 className="text-lg font-bold">Nenhum exercício</h2>
+						<p className="mt-1 text-sm text-on-surface-variant">
+							Este treino ainda não possui exercícios.
+						</p>
+						<Button
+							className="mt-5"
+							onClick={() => {
+								setPickerSelection([]);
+								setPickerOpen(true);
+							}}
+						>
+							<RiAddLine /> Adicionar exercício
+						</Button>
+					</div>
+				)}
 				{executionGroups.map(([exerciseId, sets]) => {
 					if (!sets.length) return null;
 					return (
@@ -482,24 +531,45 @@ export default function TrainingExecution({ id }: { id: string }) {
 				})}
 			</div>
 			{editable && (
-				<div className="flex flex-wrap justify-end gap-3 border-t border-outline-variant pt-5">
-					<Button
-						variant="outline"
+				<>
+					{executionGroups.length > 0 && (
+						<Button
+							variant="outline"
+							className="w-full border-primary-container/40 bg-primary-container/5 text-primary-fixed"
 						onClick={() => {
 							setPickerSelection([]);
 							setPickerOpen(true);
 						}}
-					>
-						<RiAddLine /> Adicionar exercício
+						>
+							<RiAddLine /> Adicionar exercício
+						</Button>
+					)}
+					<div className="flex justify-end border-t border-outline-variant pt-4">
+						<Button
+							variant="outline"
+							disabled={saving || unresolved || executionGroups.length === 0}
+							onClick={() => setCompletionOpen(true)}
+						>
+							Finalizar treino
+						</Button>
+					</div>
+				</>
+			)}
+			<Modal
+				isOpen={completionOpen}
+				title="Finalizar treino?"
+				description="Confira as séries concluídas antes de encerrar. Esta ação finalizará a sessão atual."
+				onClose={() => !saving && setCompletionOpen(false)}
+			>
+				<div className="flex justify-end gap-3">
+					<Button variant="ghost" disabled={saving} onClick={() => setCompletionOpen(false)}>
+						Cancelar
 					</Button>
-					<Button variant="outline" disabled={saving} onClick={() => void save()}>
-						<RiSaveLine /> Salvar alterações
-					</Button>
-					<Button disabled={saving || unresolved} onClick={() => void complete()}>
-						{saving ? 'Salvando...' : 'Finalizar treino'}
+					<Button disabled={saving} onClick={() => void complete()}>
+						<RiCheckLine /> {saving ? 'Finalizando...' : 'Confirmar finalização'}
 					</Button>
 				</div>
-			)}
+			</Modal>
 			<Modal
 				isOpen={renameOpen}
 				title="Editar nome do treino"

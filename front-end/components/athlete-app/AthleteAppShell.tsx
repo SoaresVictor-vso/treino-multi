@@ -71,7 +71,11 @@ function Navigation({
 							aria-label={newWorkoutLabel}
 							className="relative -mt-7 grid h-16 w-16 place-self-center place-items-center rounded-full border-[5px] border-surface-container-low bg-primary-container text-on-primary-fixed shadow-[0_10px_30px_rgba(195,244,0,0.35)] transition hover:-translate-y-1 hover:shadow-[0_14px_38px_rgba(195,244,0,0.48)] focus:outline-none focus:ring-2 focus:ring-primary-fixed"
 						>
-							{resumableWorkoutId ? <RiPlayFill size={27} aria-hidden /> : <RiAddLine size={29} aria-hidden />}
+							{resumableWorkoutId ? (
+								<RiPlayFill size={27} aria-hidden />
+							) : (
+								<RiAddLine size={29} aria-hidden />
+							)}
 						</Link>
 					) : (
 						<button
@@ -99,7 +103,11 @@ function Navigation({
 								: 'flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-on-surface-variant transition-colors hover:bg-surface-variant/70 hover:text-primary'
 						}
 					>
-						<Icon className={active ? 'text-primary-fixed' : undefined} size={compact ? 21 : 20} aria-hidden />
+						<Icon
+							className={active ? 'text-primary-fixed' : undefined}
+							size={compact ? 21 : 20}
+							aria-hidden
+						/>
 						<span>{item.label}</span>
 					</Link>
 				);
@@ -108,11 +116,15 @@ function Navigation({
 	);
 }
 
-export default function AthleteAppShell({ children }: { children: React.ReactNode }) {
+export default function AthleteAppShell({
+	children,
+}: {
+	children: React.ReactNode;
+}) {
 	const router = useRouter();
-	const [runningWorkoutId, setRunningWorkoutId] = useState<string | null | undefined>(
-		undefined,
-	);
+	const [runningWorkoutId, setRunningWorkoutId] = useState<
+		string | null | undefined
+	>(undefined);
 	const [creatingWorkout, setCreatingWorkout] = useState(false);
 	const [creationError, setCreationError] = useState<string | null>(null);
 	const createAndStartWorkout = async () => {
@@ -138,7 +150,8 @@ export default function AthleteAppShell({ children }: { children: React.ReactNod
 			void workoutsService.findMine().then((result) => {
 				if (!active || !result.success) return;
 				setRunningWorkoutId(
-					result.data?.find((workout) => workout.status === 'in_progress')?.id ?? null,
+					result.data?.find((workout) => workout.status === 'in_progress')?.id ??
+						null,
 				);
 			});
 		};
@@ -152,7 +165,10 @@ export default function AthleteAppShell({ children }: { children: React.ReactNod
 
 	return (
 		<div className="min-h-screen bg-background text-on-surface">
-			<div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden>
+			<div
+				className="pointer-events-none fixed inset-0 overflow-hidden"
+				aria-hidden
+			>
 				<div className="absolute -left-32 -top-40 h-96 w-96 rounded-full bg-primary-container/10 blur-3xl" />
 				<div className="absolute -right-40 top-1/3 h-80 w-80 rounded-full bg-secondary-container/30 blur-3xl" />
 			</div>
@@ -172,26 +188,37 @@ export default function AthleteAppShell({ children }: { children: React.ReactNod
 						onCreateWorkout={() => void createAndStartWorkout()}
 						creatingWorkout={creatingWorkout}
 					/>
-					{runningWorkoutId ? <Link
-						href={`/training/${runningWorkoutId}`}
-						className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-primary-container/40 bg-primary-container/10 px-4 text-sm font-bold text-primary-fixed transition hover:bg-primary-container hover:text-on-primary-fixed"
-					>
-						<RiPlayFill size={18} aria-hidden /> Retomar treino
-					</Link> : <button
-						type="button"
-						onClick={() => void createAndStartWorkout()}
-						disabled={creatingWorkout}
-						className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-primary-container/40 bg-primary-container/10 px-4 text-sm font-bold text-primary-fixed transition hover:bg-primary-container hover:text-on-primary-fixed disabled:cursor-wait disabled:opacity-60"
-					>
-						<RiAddLine size={20} aria-hidden /> Criar e iniciar
-					</button>}
+					{runningWorkoutId ? (
+						<Link
+							href={`/training/${runningWorkoutId}`}
+							className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-primary-container/40 bg-primary-container/10 px-4 text-sm font-bold text-primary-fixed transition hover:bg-primary-container hover:text-on-primary-fixed"
+						>
+							<RiPlayFill size={18} aria-hidden /> Retomar treino
+						</Link>
+					) : (
+						<button
+							type="button"
+							onClick={() => void createAndStartWorkout()}
+							disabled={creatingWorkout}
+							className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-primary-container/40 bg-primary-container/10 px-4 text-sm font-bold text-primary-fixed transition hover:bg-primary-container hover:text-on-primary-fixed disabled:cursor-wait disabled:opacity-60"
+						>
+							<RiAddLine size={20} aria-hidden /> Criar e iniciar
+						</button>
+					)}
 					<p className="mt-auto px-3 text-xs leading-5 text-on-surface-variant">
 						Seu espaço para treinar com intenção e acompanhar sua evolução.
 					</p>
 				</aside>
 
 				<main className="min-w-0 flex-1 px-4 pb-28 pt-5 sm:px-8 sm:pt-8 lg:px-12 lg:pb-10">
-					{creationError && <p role="alert" className="mb-5 rounded-xl border border-error/40 bg-error-container/20 px-4 py-3 text-sm text-error">{creationError}</p>}
+					{creationError && (
+						<p
+							role="alert"
+							className="mb-5 rounded-xl border border-error/40 bg-error-container/20 px-4 py-3 text-sm text-error"
+						>
+							{creationError}
+						</p>
+					)}
 					{children}
 				</main>
 			</div>

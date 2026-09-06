@@ -69,7 +69,7 @@ export default function ExecutionSet({
 				<RiArrowGoBackLine size={22} />
 			</div>
 			<div
-				className={`relative touch-pan-y rounded-lg border px-2 py-1.5 ${dragStartX === null ? 'transition-transform duration-200' : ''} ${execution.status === 'completed' ? 'border-outline-variant bg-surface-variant' : 'border-outline-variant bg-surface-container-high'}`}
+				className={`relative min-w-0 touch-pan-y rounded-lg border px-1.5 py-1.5 ${dragStartX === null ? 'transition-transform duration-200' : ''} ${execution.status === 'completed' ? 'border-outline-variant bg-surface-variant' : 'border-outline-variant bg-surface-container-high'}`}
 				style={{ transform: `translateX(${dragOffset}px)` }}
 				onPointerDown={(event) => {
 					if (!draggable) return;
@@ -92,7 +92,7 @@ export default function ExecutionSet({
 				}}
 			>
 				<div
-					className={`grid items-end gap-2 ${execution.exercise.metric_2 ? 'grid-cols-[28px_minmax(0,1fr)_minmax(0,1fr)]' : 'grid-cols-[28px_minmax(0,1fr)]'}`}
+					className={`grid min-w-0 items-end gap-1.5 ${execution.exercise.metric_2 ? 'grid-cols-[26px_minmax(0,1fr)_minmax(0,1fr)]' : 'grid-cols-[26px_minmax(0,1fr)]'}`}
 				>
 					<div className="relative flex items-center justify-center self-center">
 						<button
@@ -146,6 +146,8 @@ export default function ExecutionSet({
 						}
 						type="v"
 						disabled={fieldsDisabled}
+						inputClassName="text-on-surface"
+						compact
 						onTypeChange={() => {}}
 						onChange={(item) =>
 							onChange('performedMetric1', item === '' ? null : Number(item))
@@ -161,6 +163,8 @@ export default function ExecutionSet({
 							type={execution.metric2Type ?? 'v'}
 							allowPercent
 							disabled={fieldsDisabled}
+							inputClassName="text-on-surface"
+							compact
 							onTypeChange={() => {}}
 							onChange={(item) =>
 								onChange('performedMetric2', item === '' ? null : Number(item))
