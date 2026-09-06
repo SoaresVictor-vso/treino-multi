@@ -82,6 +82,7 @@ export type CreateMyWorkoutDto = {
 	description?: string;
 	activities?: Activity[];
 	scheduledDate?: string;
+	startImmediately?: boolean;
 };
 
 export type AthleteWorkout = {
@@ -150,6 +151,11 @@ export const workoutsService = {
 		authenticatedRequest<WorkoutDetail>('workouts/me', {
 			method: 'POST',
 			body: JSON.stringify(workout),
+		}),
+	updateName: (id: string, name: string) =>
+		authenticatedRequest<WorkoutDetail>(`workouts/${id}/name`, {
+			method: 'PATCH',
+			body: JSON.stringify({ name }),
 		}),
 	createForAthlete: (athleteId: string, workout: CreateMyWorkoutDto) =>
 		authenticatedRequest<WorkoutDetail>(`workouts/athletes/${athleteId}`, {

@@ -56,7 +56,7 @@ export class AuthService {
 
 		const user = await this.userRepo.findOne({
 			where: { personId: person.id, isActive: true },
-			relations: ['userRoles'],
+			relations: ['userRoles', 'person'],
 		});
 		if (!user) return null;
 
@@ -100,6 +100,7 @@ export class AuthService {
 		const payload: JwtPayload = {
 			sub: user.id,
 			personId: user.personId,
+			name: user.person?.name,
 			context: user.context,
 			tenantId: user.tenantId,
 			roles,
@@ -145,7 +146,7 @@ export class AuthService {
 
 		const stored = await this.refreshTokenRepo.findOne({
 			where: { tokenHash },
-			relations: ['user', 'user.userRoles'],
+			relations: ['user', 'user.userRoles', 'user.person'],
 		});
 
 		if (!stored) throw new UnauthorizedException('Refresh token inválido');
@@ -162,6 +163,7 @@ export class AuthService {
 		const payload: JwtPayload = {
 			sub: user.id,
 			personId: user.personId,
+			name: user.person?.name,
 			context: user.context,
 			tenantId: user.tenantId,
 			roles,
@@ -201,7 +203,7 @@ export class AuthService {
 		if (targetUserId) {
 			targetUser = await this.userRepo.findOne({
 				where: { id: targetUserId, tenantId, isActive: true },
-				relations: ['userRoles'],
+				relations: ['userRoles', 'person'],
 			});
 			if (!targetUser) throw new NotFoundException('Usuário alvo não encontrado');
 		} else {
@@ -209,6 +211,7 @@ export class AuthService {
 			targetUser = await this.userRepo
 				.createQueryBuilder('u')
 				.innerJoin('u.userRoles', 'ur')
+				.leftJoinAndSelect('u.person', 'person')
 				.where('u.tenant_id = :tenantId', { tenantId })
 				.andWhere('u.is_active = true')
 				.andWhere('ur.role = :role', { role: 'tenant:admin' })
@@ -226,6 +229,7 @@ export class AuthService {
 		const payload: JwtPayload = {
 			sub: targetUser.id,
 			personId: targetUser.personId,
+			name: targetUser.person?.name,
 			context: targetUser.context,
 			tenantId: targetUser.tenantId,
 			roles,

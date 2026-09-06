@@ -3,6 +3,7 @@ import { Role } from './roles';
 
 interface JwtPayload {
 	sub: string;
+	name?: string;
 	roles: Role[];
 	tenantId: string | null;
 	exp: number;
@@ -10,6 +11,7 @@ interface JwtPayload {
 
 export interface ServerSessionUser {
 	sub: string;
+	name?: string;
 	roles: Role[];
 	tenantId: string | null;
 }
@@ -25,6 +27,7 @@ export async function getServerSessionUser(): Promise<ServerSessionUser | null> 
 		const payload = JSON.parse(decodedPayload) as JwtPayload;
 		return {
 			sub: payload.sub,
+			name: payload.name,
 			roles: payload.roles ?? [],
 			tenantId: payload.tenantId ?? null,
 		};

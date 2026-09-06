@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
 	IsArray,
+	IsBoolean,
 	IsDateString,
 	IsOptional,
 	IsString,
@@ -23,6 +24,11 @@ export class CreateWorkoutDto {
 	@IsOptional()
 	@IsDateString()
 	scheduledDate?: string;
+
+	/** Cria o treino diretamente em execução; permitido apenas ao próprio atleta. */
+	@IsOptional()
+	@IsBoolean()
+	startImmediately?: boolean;
 
 	@IsOptional()
 	@IsArray()

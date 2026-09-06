@@ -1,14 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
 	RiAddLine,
 	RiArrowLeftLine,
+	RiEditLine,
 	RiPlayLine,
 	RiSaveLine,
 } from 'react-icons/ri';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
 import ErrorBox from '@/components/ui/ErrorBox';
 import Modal from '@/components/ui/Modal';
 import ExercisePicker from '@/components/shared/ExercisePicker';
@@ -82,6 +84,12 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const [pickerSelection, setPickerSelection] = useState<Exercise[]>([]);
 	const [missingRpOpen, setMissingRpOpen] = useState(false);
 	const [reorderOpen, setReorderOpen] = useState(false);
+	const [renameOpen, setRenameOpen] = useState(false);
+	const [workoutName, setWorkoutName] = useState('');
+	const [renaming, setRenaming] = useState(false);
+	const workoutRef = useRef<WorkoutDetail | null>(null);
+	const saveQueueRef = useRef<WorkoutDetail | null>(null);
+	const savingRef = useRef(false);
 
 	const load = async () => {
 		setLoading(true);
@@ -90,6 +98,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 			setError(response.error || 'Não foi possível carregar o treino.');
 		else {
 			const prescribedWorkout = preloadPrescribedValues(response.data);
+			workoutRef.current = prescribedWorkout;
 			setWorkout(prescribedWorkout);
 			setError(null);
 			if (
@@ -122,24 +131,64 @@ export default function TrainingExecution({ id }: { id: string }) {
 				})),
 		[workout],
 	);
+	const save = useCallback(async (snapshot = workoutRef.current) => {
+		if (!snapshot) return;
+		saveQueueRef.current = snapshot;
+		if (savingRef.current) return;
+
+		savingRef.current = true;
+		setSaving(true);
+		setError(null);
+		while (saveQueueRef.current) {
+			const workoutToSave = saveQueueRef.current;
+			saveQueueRef.current = null;
+			const response = await workoutsService.updateExecutions(
+				workoutToSave.id,
+				serializeExecutions(workoutToSave.executions),
+				workoutToSave.exerciseNotes.map(({ exerciseId, athleteNote }) => ({
+					exerciseId,
+					athleteNote,
+				})),
+			);
+			if (!response.success || !response.data) {
+				setError(response.error || 'Não foi possível salvar as séries.');
+				saveQueueRef.current = null;
+				break;
+			}
+			const savedWorkout = preloadPrescribedValues(response.data);
+			if (workoutRef.current === workoutToSave) {
+				workoutRef.current = savedWorkout;
+				setWorkout(savedWorkout);
+			}
+		}
+		savingRef.current = false;
+		setSaving(false);
+	}, []);
+	const updateWorkout = (updater: (current: WorkoutDetail) => WorkoutDetail) => {
+		const current = workoutRef.current;
+		if (!current) return;
+		const updatedWorkout = updater(current);
+		workoutRef.current = updatedWorkout;
+		setWorkout(updatedWorkout);
+		if (
+			updatedWorkout.status === 'in_progress' &&
+			getSessionUser()?.sub === updatedWorkout.athleteId
+		)
+			void save(updatedWorkout);
+	};
 
 	const updateExecution = (
 		executionId: number,
 		patch: Partial<WorkoutExecution>,
 	) =>
-		setWorkout((current) =>
-			current
-				? {
-						...current,
-						executions: current.executions.map((item) =>
-							item.id === executionId ? { ...item, ...patch } : item,
-						),
-					}
-				: current,
-		);
+		updateWorkout((current) => ({
+			...current,
+			executions: current.executions.map((item) =>
+				item.id === executionId ? { ...item, ...patch } : item,
+			),
+		}));
 	const updateAthleteNote = (exerciseId: number, athleteNote: string) =>
-		setWorkout((current) => {
-			if (!current) return current;
+		updateWorkout((current) => {
 			const existing = current.exerciseNotes.find(
 				(note) => note.exerciseId === exerciseId,
 			);
@@ -159,8 +208,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 		exercise: WorkoutExecution['exercise'],
 		placement: 'before' | 'after',
 	) =>
-		setWorkout((current) => {
-			if (!current) return current;
+		updateWorkout((current) => {
 			const position =
 				Math.max(0, ...current.executions.map((item) => item.position)) + 1;
 			const exerciseSetIndexes = current.executions
@@ -207,8 +255,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 			};
 		});
 	const addExercises = (selected: Exercise[]) => {
-		setWorkout((current) => {
-			if (!current) return current;
+		updateWorkout((current) => {
 			const firstNewPosition = current.executions.length + 1;
 			return {
 				...current,
@@ -240,8 +287,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 		setPickerOpen(false);
 	};
 	const reorderExercises = (exerciseIds: number[]) =>
-		setWorkout((current) => {
-			if (!current) return current;
+		updateWorkout((current) => {
 			const executionsByExercise = new Map<number, WorkoutExecution[]>();
 			current.executions.forEach((execution) => {
 				const executions = executionsByExercise.get(execution.exerciseId) ?? [];
@@ -259,6 +305,15 @@ export default function TrainingExecution({ id }: { id: string }) {
 				})),
 			};
 		});
+	const skipExercise = (executionIds: number[]) =>
+		updateWorkout((current) => ({
+			...current,
+			executions: current.executions.map((item) =>
+				executionIds.includes(item.id) && item.status === 'in_progress'
+					? { ...item, status: 'skipped' }
+					: item,
+			),
+		}));
 	const reorderableExercises = Array.from(
 		new Map(
 			(workout?.executions ?? []).map((execution) => [
@@ -277,31 +332,34 @@ export default function TrainingExecution({ id }: { id: string }) {
 		return Array.from(groups.entries());
 	}, [workout?.executions]);
 
-	const save = async () => {
-		if (!workout) return;
-		setSaving(true);
-		setError(null);
-		const response = await workoutsService.updateExecutions(
-			workout.id,
-			serializeExecutions(workout.executions),
-			workout.exerciseNotes.map(({ exerciseId, athleteNote }) => ({
-				exerciseId,
-				athleteNote,
-			})),
-		);
-		if (!response.success || !response.data)
-			setError(response.error || 'Não foi possível salvar as séries.');
-		else setWorkout(preloadPrescribedValues(response.data));
-		setSaving(false);
-	};
 	const start = async () => {
 		setStarting(true);
 		const response = await workoutsService.start(id);
 		if (!response.success || !response.data)
 			setError(response.error || 'Não foi possível iniciar o treino.');
-		else setWorkout(preloadPrescribedValues(response.data));
+		else {
+			const startedWorkout = preloadPrescribedValues(response.data);
+			workoutRef.current = startedWorkout;
+			setWorkout(startedWorkout);
+			window.dispatchEvent(new Event('workout-status-changed'));
+		}
 		setStarting(false);
 		setStartOpen(false);
+	};
+	const renameWorkout = async () => {
+		if (!workout || !workoutName.trim()) return;
+		setRenaming(true);
+		setError(null);
+		const response = await workoutsService.updateName(workout.id, workoutName.trim());
+		if (!response.success || !response.data) {
+			setError(response.error || 'Não foi possível alterar o nome do treino.');
+		} else {
+			const renamedWorkout = preloadPrescribedValues(response.data);
+			workoutRef.current = renamedWorkout;
+			setWorkout(renamedWorkout);
+			setRenameOpen(false);
+		}
+		setRenaming(false);
 	};
 	const complete = async () => {
 		if (!workout) return;
@@ -323,7 +381,12 @@ export default function TrainingExecution({ id }: { id: string }) {
 		const result = await workoutsService.complete(workout.id);
 		if (!result.success || !result.data)
 			setError(result.error || 'Não foi possível finalizar o treino.');
-		else setWorkout(preloadPrescribedValues(result.data));
+		else {
+			const completedWorkout = preloadPrescribedValues(result.data);
+			workoutRef.current = completedWorkout;
+			setWorkout(completedWorkout);
+			window.dispatchEvent(new Event('workout-status-changed'));
+		}
 		setSaving(false);
 	};
 
@@ -349,7 +412,22 @@ export default function TrainingExecution({ id }: { id: string }) {
 						<RiArrowLeftLine /> Voltar
 					</button>
 					<p className="type-label-caps text-primary-fixed">Execução do treino</p>
-					<h1 className="mt-1 text-3xl font-bold">{workout.templateName}</h1>
+					<div className="mt-1 flex items-center gap-2">
+						<h1 className="text-3xl font-bold">{workout.templateName}</h1>
+						{isAthlete && workout.status !== 'cancelled' && (
+							<button
+								type="button"
+								onClick={() => {
+									setWorkoutName(workout.templateName);
+									setRenameOpen(true);
+								}}
+								className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-lg text-on-surface-variant transition hover:bg-surface-variant hover:text-primary-fixed focus:outline-none focus:ring-2 focus:ring-primary-fixed"
+								aria-label="Editar nome do treino"
+							>
+								<RiEditLine size={18} aria-hidden />
+							</button>
+						)}
+					</div>
 					{workout.templateDescription && (
 						<p className="mt-2 text-on-surface-variant">
 							{workout.templateDescription}
@@ -395,12 +473,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 							onSkipSet={(executionId) =>
 								updateExecution(executionId, { status: 'skipped' })
 							}
-							onSkipExercise={() =>
-								sets.forEach((item) => {
-									if (item.status === 'in_progress')
-										updateExecution(item.id, { status: 'skipped' });
-								})
-							}
+							onSkipExercise={() => skipExercise(sets.map((item) => item.id))}
 							onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
 							onAddSeries={() => addSeries(sets[0].exercise, 'after')}
 							onTitleLongPress={() => setReorderOpen(true)}
@@ -427,6 +500,36 @@ export default function TrainingExecution({ id }: { id: string }) {
 					</Button>
 				</div>
 			)}
+			<Modal
+				isOpen={renameOpen}
+				title="Editar nome do treino"
+				description="Escolha um nome que facilite encontrar esta sessão depois."
+				onClose={() => !renaming && setRenameOpen(false)}
+			>
+				<form
+					className="space-y-5"
+					onSubmit={(event) => {
+						event.preventDefault();
+						void renameWorkout();
+					}}
+				>
+					<Input
+						label="Nome do treino"
+						value={workoutName}
+						maxLength={100}
+						autoFocus
+						onChange={(event) => setWorkoutName(event.target.value)}
+					/>
+					<div className="flex justify-end gap-3">
+						<Button variant="ghost" disabled={renaming} onClick={() => setRenameOpen(false)}>
+							Cancelar
+						</Button>
+						<Button type="submit" disabled={renaming || !workoutName.trim()}>
+							{renaming ? 'Salvando...' : 'Salvar nome'}
+						</Button>
+					</div>
+				</form>
+			</Modal>
 			<Modal
 				isOpen={startOpen}
 				title="Iniciar treino?"

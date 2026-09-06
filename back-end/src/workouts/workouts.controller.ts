@@ -18,6 +18,7 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { GenerateWorkoutsFromTemplateDto } from './dto/generate-workouts-from-template.dto';
 import { CreateWorkoutDto } from './dto/create-workout.dto';
 import { UpdateWorkoutExecutionsDto } from './dto/update-workout-executions.dto';
+import { UpdateWorkoutNameDto } from './dto/update-workout-name.dto';
 import { WorkoutsService } from './workouts.service';
 
 @ApiTags('workouts')
@@ -87,6 +88,16 @@ export class WorkoutsController {
 		@CurrentUser() actor: JwtPayload,
 	) {
 		return this.service.updateExecutions(id, dto, actor);
+	}
+
+	@Patch(':id/name')
+	@ApiOperation({ summary: 'Altera o nome de um treino do próprio atleta' })
+	updateWorkoutName(
+		@Param('id', new ParseUUIDPipe()) id: string,
+		@Body() dto: UpdateWorkoutNameDto,
+		@CurrentUser() actor: JwtPayload,
+	) {
+		return this.service.updateWorkoutName(id, dto.name, actor);
 	}
 
 	@Patch(':id/complete')

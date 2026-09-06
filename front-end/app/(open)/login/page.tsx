@@ -16,6 +16,8 @@ import {
 } from '@/gateway/client';
 import { LoginService } from '@/gateway/services/login';
 import { getAuthToken } from '@/lib/auth';
+import { getLandingPathForRoles } from '@/lib/landing';
+import { getSessionUser } from '@/lib/auth';
 
 const REMEMBER_ME_KEY = 'rememberMe';
 const REFRESH_TOKEN_KEY = 'refreshToken';
@@ -41,13 +43,13 @@ export default function Login() {
 
 		async function restoreRememberedSession() {
 			if (tokenHasEnoughLifetime(getAuthToken())) {
-				router.replace('/home');
+				router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
 				return;
 			}
 
 			const response = await refreshAccessToken();
 			if (isActive && response.success && response.data?.accessToken) {
-				router.replace('/home');
+				router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
 			}
 		}
 
@@ -95,7 +97,7 @@ export default function Login() {
 			localStorage.removeItem(ACCESS_TOKEN_KEY);
 
 			setLoading(false);
-			router.push('/home');
+			router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
 		} catch {
 			setLoading(false);
 			setError('Não foi possível realizar o login.');

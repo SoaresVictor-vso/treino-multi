@@ -671,6 +671,7 @@ export class WorkoutsService {
 				'O atleta precisa estar vinculado a um tenant.',
 			);
 
+		const startImmediately = dto.startImmediately === true;
 		const activities = (dto.activities ?? []).map((activity, index) => ({
 			...activity,
 			position: index + 1,
@@ -690,7 +691,9 @@ export class WorkoutsService {
 					templateDescription: dto.description?.trim() ?? '',
 					scheduledDate: null,
 					performedAt: null,
-					status: WorkoutStatus.PENDING,
+					status: startImmediately
+						? WorkoutStatus.IN_PROGRESS
+						: WorkoutStatus.PENDING,
 					createdBy: actor.sub,
 					updatedBy: actor.sub,
 				}),
@@ -712,6 +715,20 @@ export class WorkoutsService {
 			return created;
 		});
 		return this.findWorkout(workout.id, actor);
+	}
+
+	async updateWorkoutName(id: string, name: string, actor: JwtPayload) {
+		const workout = await this.findWritableWorkout(id, actor);
+		const normalizedName = name.trim();
+		if (!normalizedName)
+			throw new BadRequestException('Informe o nome do treino.');
+		if (workout.status === WorkoutStatus.CANCELLED)
+			throw new BadRequestException('Treinos cancelados não podem ser renomeados.');
+
+		workout.templateName = normalizedName;
+		workout.updatedBy = actor.sub;
+		await this.dataSource.getRepository(Workout).save(workout);
+		return this.findWorkout(id, actor);
 	}
 
 	async findAthleteWorkouts(athleteId: string, actor: JwtPayload) {

@@ -12,6 +12,9 @@ export interface JwtPayload {
 	/** ID da Person física */
 	personId: string;
 
+	/** Nome da pessoa, usado para personalizar experiências autenticadas. */
+	name?: string;
+
 	/** Contexto de autenticação: 'organization' | 'tenant' | 'standalone' */
 	context: UserContext;
 
