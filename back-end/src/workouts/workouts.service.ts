@@ -202,7 +202,7 @@ export class WorkoutsService {
 					templateName: string;
 					templateDescription: string;
 					scheduledDate: string | null;
-					status: WorkoutStatus.PENDING;
+					status: WorkoutStatus.PENDING | WorkoutStatus.SCHEDULED;
 				}[];
 				total: string;
 				inProgress: {
@@ -221,14 +221,14 @@ export class WorkoutsService {
 					workout.template_description AS "templateDescription",
 					workout.scheduled_date AS "scheduledDate",
 					workout.status,
-					COUNT(*) FILTER (WHERE workout.status = 'pending') OVER() AS total
+					COUNT(*) FILTER (WHERE workout.status IN ('pending', 'scheduled')) OVER() AS total
 				FROM workouts workout
 				WHERE workout.athlete_id = $1
 					AND workout.tenant_id = $2
-					AND workout.status IN ('pending', 'in_progress')
+					AND workout.status IN ('pending', 'scheduled', 'in_progress')
 			), page AS (
 				SELECT * FROM matched
-				WHERE status = 'pending'
+				WHERE status IN ('pending', 'scheduled')
 					AND (
 						($3::date IS NULL AND $4::uuid IS NULL)
 						OR ($3::date IS NULL AND $4::uuid IS NOT NULL AND "scheduledDate" IS NULL AND id > $4::uuid)
@@ -448,8 +448,15 @@ export class WorkoutsService {
 							},
 						)
 						.orWhere(
-							`workout.status = :completedStatus AND to_char(workout.performedAt AT TIME ZONE :timeZone, 'YYYY-MM') = :referenceMonth`,
-							{ completedStatus: WorkoutStatus.COMPLETED, timeZone, referenceMonth },
+							`workout.status IN (:...performedStatuses) AND to_char(workout.performedAt AT TIME ZONE :timeZone, 'YYYY-MM') = :referenceMonth`,
+							{
+								performedStatuses: [
+									WorkoutStatus.COMPLETED,
+									WorkoutStatus.CANCELLED,
+								],
+								timeZone,
+								referenceMonth,
+							},
 						)
 						.orWhere(
 							`workout.status = :inProgressStatus AND to_char(NOW() AT TIME ZONE :timeZone, 'YYYY-MM') = :referenceMonth`,
@@ -929,6 +936,33 @@ export class WorkoutsService {
 		return this.findWorkout(id, actor);
 	}
 
+	async skipWorkout(id: string, actor: JwtPayload) {
+		const workout = await this.findWritableWorkout(id, actor);
+		if (
+			![
+				WorkoutStatus.PENDING,
+				WorkoutStatus.SCHEDULED,
+				WorkoutStatus.IN_PROGRESS,
+			].includes(workout.status)
+		)
+			throw new BadRequestException('Este treino não pode mais ser pulado.');
+
+		await this.dataSource.transaction(async (manager) => {
+			const finishedAt = new Date();
+			await manager
+				.createQueryBuilder()
+				.update(Execution)
+				.set({ status: ExecutionStatus.SKIPPED, finishedAt })
+				.where('workout_id = :id', { id })
+				.execute();
+			workout.status = WorkoutStatus.CANCELLED;
+			workout.performedAt = finishedAt;
+			workout.updatedBy = actor.sub;
+			await manager.save(workout);
+		});
+		return this.findWorkout(id, actor);
+	}
+
 	async generateWorkoutsFromTemplate(
 		dto: GenerateWorkoutsFromTemplateDto,
 		actor: JwtPayload,
@@ -1158,6 +1192,7 @@ export class WorkoutsService {
 				'Apenas treinos pendentes ou agendados podem ser cancelados.',
 			);
 		workout.status = WorkoutStatus.CANCELLED;
+		workout.performedAt = new Date();
 		workout.updatedBy = actor.sub;
 		await this.dataSource.getRepository(Workout).save(workout);
 		return this.findWorkout(id, actor);

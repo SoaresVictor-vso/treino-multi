@@ -190,6 +190,10 @@ export const workoutsService = {
 		authenticatedRequest<WorkoutDetail>(`workouts/${id}/complete`, {
 			method: 'PATCH',
 		}),
+	skip: (id: string) =>
+		authenticatedRequest<WorkoutDetail>(`workouts/${id}/skip`, {
+			method: 'PATCH',
+		}),
 	generateFromTemplate: (
 		athleteIds: string[],
 		templateId: string,

@@ -165,6 +165,17 @@ export class WorkoutsController {
 		return this.service.completeWorkout(id, actor);
 	}
 
+	@Patch(':id/skip')
+	@ApiOperation({
+		summary: 'Pula todas as séries e cancela o treino do próprio atleta',
+	})
+	skipWorkout(
+		@Param('id', new ParseUUIDPipe()) id: string,
+		@CurrentUser() actor: JwtPayload,
+	) {
+		return this.service.skipWorkout(id, actor);
+	}
+
 	@Post('from-template')
 	@ApiOperation({ summary: 'Gera treinos de um template para vários atletas' })
 	@RequirePermissions(Permission.WORKOUT_ASSIGN)

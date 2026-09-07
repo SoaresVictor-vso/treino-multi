@@ -35,6 +35,7 @@ describe('WorkoutsService', () => {
 		transaction: jest.fn((callback: (manager: typeof manager) => unknown) =>
 			callback(manager),
 		),
+		query: jest.fn(),
 	};
 	const associations = { findBy: jest.fn() };
 
@@ -121,6 +122,25 @@ describe('WorkoutsService', () => {
 				scheduledDate: '2026-08-10',
 				status: WorkoutStatus.SCHEDULED,
 			}),
+		);
+	});
+
+	it('inclui treinos pendentes e agendados na agenda do atleta', async () => {
+		dataSource.query.mockResolvedValueOnce([
+			{ workouts: [], total: '0', inProgress: null },
+		]);
+
+		await service.findMyAgendaWorkouts({
+			sub: input.athleteId,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_CLIENT],
+		});
+
+		const query = dataSource.query.mock.calls[0][0] as string;
+		expect(query).toContain("workout.status IN ('pending', 'scheduled', 'in_progress')");
+		expect(query).toContain("WHERE status IN ('pending', 'scheduled')");
+		expect(query).toContain(
+			"COUNT(*) FILTER (WHERE workout.status IN ('pending', 'scheduled')) OVER() AS total",
 		);
 	});
 
@@ -261,5 +281,85 @@ describe('WorkoutsService', () => {
 
 		expect(workoutRepository.existsBy).not.toHaveBeenCalled();
 		expect(manager.save).not.toHaveBeenCalled();
+	});
+
+	it('pula todas as séries e cancela o treino do próprio atleta', async () => {
+		const workout = {
+			id: 'workout-id',
+			status: WorkoutStatus.IN_PROGRESS,
+		} as Workout;
+		const execute = jest.fn();
+		const queryBuilder = {
+			update: jest.fn().mockReturnThis(),
+			set: jest.fn().mockReturnThis(),
+			where: jest.fn().mockReturnThis(),
+			execute,
+		};
+		Object.assign(manager, {
+			createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
+		});
+		jest.spyOn(service as any, 'findWritableWorkout').mockResolvedValue(workout);
+		jest
+			.spyOn(service, 'findWorkout')
+			.mockResolvedValue({ id: workout.id } as never);
+
+		await service.skipWorkout(workout.id, {
+			sub: input.athleteId,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_CLIENT],
+		});
+
+		expect(queryBuilder.set).toHaveBeenCalledWith(
+			expect.objectContaining({ status: ExecutionStatus.SKIPPED }),
+		);
+		expect(queryBuilder.where).toHaveBeenCalledWith('workout_id = :id', {
+			id: workout.id,
+		});
+		expect(execute).toHaveBeenCalled();
+		expect(workout.status).toBe(WorkoutStatus.CANCELLED);
+		expect(workout.performedAt).toBeInstanceOf(Date);
+		expect(manager.save).toHaveBeenCalledWith(
+			expect.objectContaining({
+			updatedBy: input.athleteId,
+			performedAt: expect.any(Date),
+		}),
+		);
+	});
+
+	it('registra a data de execução ao cancelar um treino agendado', async () => {
+		const workout = {
+			id: 'workout-id',
+			athleteId: input.athleteId,
+			status: WorkoutStatus.SCHEDULED,
+			performedAt: null,
+		} as Workout;
+		const repository = {
+			findOne: jest.fn().mockResolvedValue(workout),
+			save: jest.fn().mockResolvedValue(workout),
+		};
+		Object.assign(dataSource, {
+			getRepository: jest.fn().mockReturnValue(repository),
+		});
+		jest
+			.spyOn(service as any, 'ensureCanManageAthleteWorkout')
+			.mockResolvedValue(undefined);
+		jest
+			.spyOn(service, 'findWorkout')
+			.mockResolvedValue({ id: workout.id } as never);
+
+		await service.cancelWorkout(workout.id, {
+			sub: input.createdBy,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_TRAINER],
+		});
+
+		expect(workout.status).toBe(WorkoutStatus.CANCELLED);
+		expect(workout.performedAt).toBeInstanceOf(Date);
+		expect(repository.save).toHaveBeenCalledWith(
+			expect.objectContaining({
+				performedAt: expect.any(Date),
+				updatedBy: input.createdBy,
+			}),
+		);
 	});
 });

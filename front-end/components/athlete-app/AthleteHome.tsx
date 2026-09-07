@@ -58,6 +58,12 @@ function sortUpcoming(workouts: MyWorkout[]) {
 function workoutCalendarDate(workout: CalendarWorkout) {
 	if (workout.status === 'completed')
 		return workout.performedAt ? localDateKey(workout.performedAt) : null;
+	if (workout.status === 'cancelled')
+		return workout.performedAt
+			? localDateKey(workout.performedAt)
+			: workout.scheduledDate
+				? localDateKey(workout.scheduledDate)
+				: null;
 	if (workout.status === 'in_progress') return localDateKey(new Date());
 	return workout.scheduledDate ? localDateKey(workout.scheduledDate) : null;
 }

@@ -82,6 +82,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 	const [completionOpen, setCompletionOpen] = useState(false);
 	const [startOpen, setStartOpen] = useState(false);
+	const [skipOpen, setSkipOpen] = useState(false);
 	const [pickerOpen, setPickerOpen] = useState(false);
 	const [pickerSelection, setPickerSelection] = useState<Exercise[]>([]);
 	const [missingRpOpen, setMissingRpOpen] = useState(false);
@@ -410,6 +411,24 @@ export default function TrainingExecution({ id }: { id: string }) {
 		}
 		setSaving(false);
 	};
+	const skipWorkout = async () => {
+		if (!workout) return;
+		setSaving(true);
+		setError(null);
+		const result = await workoutsService.skip(workout.id);
+		if (!result.success || !result.data) {
+			setError(result.error || 'Não foi possível pular o treino.');
+		} else {
+			const skippedWorkout = preloadPrescribedValues(result.data);
+			workoutRef.current = skippedWorkout;
+			setWorkout(skippedWorkout);
+			dirtyRef.current = false;
+			setHasUnsavedChanges(false);
+			setSkipOpen(false);
+			window.dispatchEvent(new Event('workout-status-changed'));
+		}
+		setSaving(false);
+	};
 
 	if (loading)
 		return (
@@ -469,9 +488,21 @@ export default function TrainingExecution({ id }: { id: string }) {
 			)}
 			{workout.status !== 'in_progress' &&
 				workout.status !== 'completed' &&
+				workout.status !== 'cancelled' &&
 				isAthlete && (
 					<Button onClick={() => setStartOpen(true)}>
 						<RiPlayLine /> Iniciar treino
+					</Button>
+				)}
+			{isAthlete &&
+				['pending', 'scheduled', 'in_progress'].includes(workout.status) && (
+					<Button
+						variant="outline"
+						className="border-error/50 text-error hover:border-error hover:text-error"
+						disabled={saving}
+						onClick={() => setSkipOpen(true)}
+					>
+						Pular treino
 					</Button>
 				)}
 			{editable && (
@@ -612,6 +643,26 @@ export default function TrainingExecution({ id }: { id: string }) {
 					</Button>
 					<Button disabled={starting} onClick={() => void start()}>
 						{starting ? 'Iniciando...' : 'Confirmar início'}
+					</Button>
+				</div>
+			</Modal>
+			<Modal
+				isOpen={skipOpen}
+				title="Pular treino?"
+				description="Todos os exercícios serão marcados como pulados e o treino será cancelado. Esta ação não pode ser desfeita."
+				onClose={() => !saving && setSkipOpen(false)}
+			>
+				<div className="flex justify-end gap-3">
+					<Button variant="ghost" disabled={saving} onClick={() => setSkipOpen(false)}>
+						Voltar
+					</Button>
+					<Button
+						variant="outline"
+						className="border-error/50 text-error hover:border-error hover:text-error"
+						disabled={saving}
+						onClick={() => void skipWorkout()}
+					>
+						{saving ? 'Pulando...' : 'Confirmar pulo'}
 					</Button>
 				</div>
 			</Modal>
