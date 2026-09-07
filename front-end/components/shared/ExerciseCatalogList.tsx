@@ -1,8 +1,14 @@
 'use client';
 
-import { useMemo, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { RiCheckLine, RiHeartPulseLine } from 'react-icons/ri';
 import type { Exercise } from '@/gateway/services/parametro';
+import {
+	exercisesService,
+	type ExerciseSearchResult,
+} from '@/gateway/services/parametro/exercises';
+
+const searchCatalogExercises = (query: string) => exercisesService.search(query);
 
 export default function ExerciseCatalogList({
 	exercises,
@@ -13,6 +19,7 @@ export default function ExerciseCatalogList({
 	filterExercise,
 	requiredMetrics,
 	matchMetricsOfFirstSelection = false,
+	searchExercises = searchCatalogExercises,
 }: {
 	exercises: Exercise[];
 	descriptions?: Record<number, string>;
@@ -22,11 +29,43 @@ export default function ExerciseCatalogList({
 	filterExercise?: (exercise: Exercise) => boolean;
 	requiredMetrics?: { metric1Id: number; metric2Id: number | null };
 	matchMetricsOfFirstSelection?: boolean;
+	searchExercises?: (query: string) => Promise<ExerciseSearchResult[]>;
 }) {
 	const [query, setQuery] = useState('');
+	const [indexedSearch, setIndexedSearch] = useState<{
+		query: string;
+		results: ExerciseSearchResult[];
+	} | null>(null);
 	const firstSelected = selected[0];
+	const normalizedQuery = query.trim();
+
+	useEffect(() => {
+		if (!normalizedQuery) {
+			return;
+		}
+
+		let active = true;
+		const timeout = window.setTimeout(() => {
+			searchExercises(normalizedQuery)
+				.then((results) => {
+					if (!active) return;
+					setIndexedSearch({
+						query: normalizedQuery,
+						results,
+					});
+				})
+				.catch(() => {
+					if (active) setIndexedSearch({ query: normalizedQuery, results: [] });
+				});
+		}, 200);
+
+		return () => {
+			active = false;
+			window.clearTimeout(timeout);
+		};
+	}, [normalizedQuery, searchExercises]);
+
 	const visibleExercises = useMemo(() => {
-		const normalizedQuery = query.trim().toLocaleLowerCase();
 		const metricReference =
 			requiredMetrics ??
 			(matchMetricsOfFirstSelection && firstSelected
@@ -35,12 +74,19 @@ export default function ExerciseCatalogList({
 						metric2Id: firstSelected.metric_2?.id ?? null,
 					}
 				: null);
-		return exercises?.filter((exercise) => {
-			const matchesQuery =
-				!normalizedQuery ||
-				`${exercise.name} ${descriptions?.[exercise.id] ?? exercise.description ?? ''}`
-					.toLocaleLowerCase()
-					.includes(normalizedQuery);
+		const searchIsCurrent = indexedSearch?.query === normalizedQuery;
+		const exercisesWithScore = searchIsCurrent
+			? indexedSearch.results.flatMap((result) => {
+					const exercise = exercises.find(
+						(item) => item.id === Number(result.id),
+					);
+					return exercise
+						? [{ ...exercise, scorePonderado: result.scorePonderado }]
+						: [];
+				})
+			: exercises.map((exercise) => ({ ...exercise, scorePonderado: 0 }));
+		const filteredExercises = exercisesWithScore.filter((exercise) => {
+			const matchesQuery = !normalizedQuery || searchIsCurrent;
 			const matchesMetrics =
 				!metricReference ||
 				(exercise.metric_1.id === metricReference.metric1Id &&
@@ -51,13 +97,18 @@ export default function ExerciseCatalogList({
 				(!filterExercise || filterExercise(exercise))
 			);
 		});
+		if (!searchIsCurrent) return filteredExercises;
+
+		return [...filteredExercises].sort(
+			(left, right) => right.scorePonderado - left.scorePonderado,
+		);
 	}, [
-		descriptions,
 		exercises,
 		filterExercise,
 		firstSelected,
+		indexedSearch,
 		matchMetricsOfFirstSelection,
-		query,
+		normalizedQuery,
 		requiredMetrics,
 	]);
 
