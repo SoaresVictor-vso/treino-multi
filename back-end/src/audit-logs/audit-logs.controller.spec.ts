@@ -19,18 +19,17 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
 
-const makeAuthLog = (): AuthenticationLog =>
-	({
-		id: 'auth-log-uuid-1',
-		tenantId: null,
-		contextTypeId: 1,
-		success: true,
-		loginUsed: 'admin@org.com',
-		ipAddress: '127.0.0.1',
-		createdAt: new Date(),
-		tenant: null,
-		contextType: { id: 1, name: 'organization' } as any,
-	}) as AuthenticationLog;
+const makeAuthLog = (): AuthenticationLog => ({
+	id: 'auth-log-uuid-1',
+	tenantId: null,
+	contextTypeId: 1,
+	success: true,
+	loginUsed: 'admin@org.com',
+	ipAddress: '127.0.0.1',
+	createdAt: new Date(),
+	tenant: null,
+	contextType: { id: 1, name: 'organization' } as any,
+});
 
 const makeCriticalLog = (): CriticalOperationLog =>
 	({

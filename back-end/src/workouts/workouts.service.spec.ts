@@ -166,7 +166,9 @@ describe('WorkoutsService', () => {
 			});
 
 			expect(query).toHaveBeenCalledWith(
-				expect.stringContaining('$3::boolean OR association.athlete_id IS NOT NULL'),
+				expect.stringContaining(
+					'$3::boolean OR association.athlete_id IS NOT NULL',
+				),
 				[input.createdBy, input.template.tenantId, true],
 			);
 		},
@@ -196,7 +198,9 @@ describe('WorkoutsService', () => {
 					roles: [Role.TENANT_TRAINER],
 				},
 			),
-		).rejects.toThrow('Você só pode atribuir treinos aos seus atletas vinculados.');
+		).rejects.toThrow(
+			'Você só pode atribuir treinos aos seus atletas vinculados.',
+		);
 	});
 
 	it('impede iniciar um treino quando o atleta já tem outro em andamento', async () => {

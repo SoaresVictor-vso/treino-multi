@@ -52,7 +52,7 @@ describe('LocalStrategy', () => {
 		}).compile();
 
 		strategy = moduleRef.get(LocalStrategy);
-		authService = moduleRef.get(AuthService) as any;
+		authService = moduleRef.get(AuthService);
 	});
 
 	describe('validate()', () => {

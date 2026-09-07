@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
 	RiAddLine,
@@ -11,15 +11,18 @@ import {
 	RiPlayFill,
 	RiRunLine,
 } from 'react-icons/ri';
+import Calendar, { localDateKey } from '@/components/ui/Calendar';
 import ErrorBox from '@/components/ui/ErrorBox';
+import Modal from '@/components/ui/Modal';
 import {
 	workoutsService,
 	type CompletedWorkout,
+	type CalendarWorkout,
 	type MyWorkout,
 	type WorkoutDetail,
 } from '@/gateway/services/workouts';
 
-type Tab = 'agenda' | 'history';
+type Tab = 'agenda' | 'history' | 'calendar';
 
 function firstName(name?: string) {
 	return name?.trim().split(/\s+/)[0] || 'atleta';
@@ -52,35 +55,62 @@ function sortUpcoming(workouts: MyWorkout[]) {
 	);
 }
 
+function workoutCalendarDate(workout: CalendarWorkout) {
+	if (workout.status === 'completed')
+		return workout.performedAt ? localDateKey(workout.performedAt) : null;
+	if (workout.status === 'in_progress') return localDateKey(new Date());
+	return workout.scheduledDate ? localDateKey(workout.scheduledDate) : null;
+}
+
 export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 	const router = useRouter();
 	const [tab, setTab] = useState<Tab>('agenda');
 	const [workouts, setWorkouts] = useState<MyWorkout[]>([]);
+	const [agendaTotal, setAgendaTotal] = useState(0);
+	const [nextAgendaCursor, setNextAgendaCursor] = useState<string | null>(null);
 	const [completed, setCompleted] = useState<CompletedWorkout[]>([]);
+	const [completedTotal, setCompletedTotal] = useState(0);
+	const [nextCompletedCursor, setNextCompletedCursor] = useState<string | null>(
+		null,
+	);
+	const [calendarMonth, setCalendarMonth] = useState(
+		() => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+	);
+	const [calendarWorkouts, setCalendarWorkouts] = useState<CalendarWorkout[]>([]);
+	const [calendarLoading, setCalendarLoading] = useState(true);
 	const [focusDetail, setFocusDetail] = useState<WorkoutDetail | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [loadingMoreAgenda, setLoadingMoreAgenda] = useState(false);
+	const [loadingMoreHistory, setLoadingMoreHistory] = useState(false);
 	const [starting, setStarting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		let active = true;
 		void Promise.all([
-			workoutsService.findMine(),
+			workoutsService.findMyAgenda(),
 			workoutsService.findMyCompleted(),
-		]).then(([activeResult, completedResult]) => {
+		]).then(([agendaResult, completedResult]) => {
 			if (!active) return;
-			if (!activeResult.success || !completedResult.success) {
+			if (!agendaResult.success || !completedResult.success) {
 				setError(
-					activeResult.error ||
+					agendaResult.error ||
 						completedResult.error ||
 						'Não foi possível carregar seus treinos.',
 				);
 				setLoading(false);
 				return;
 			}
-			const activeWorkouts = activeResult.data ?? [];
+			const activeWorkouts = [
+				...(agendaResult.data?.inProgress ? [agendaResult.data.inProgress] : []),
+				...(agendaResult.data?.workouts ?? []),
+			];
 			setWorkouts(activeWorkouts);
-			setCompleted(completedResult.data ?? []);
+			setAgendaTotal(agendaResult.data?.total ?? 0);
+			setNextAgendaCursor(agendaResult.data?.nextCursor ?? null);
+			setCompleted(completedResult.data?.workouts ?? []);
+			setCompletedTotal(completedResult.data?.total ?? 0);
+			setNextCompletedCursor(completedResult.data?.nextCursor ?? null);
 			setLoading(false);
 			const priority =
 				activeWorkouts.find((workout) => workout.status === 'in_progress') ??
@@ -95,6 +125,83 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 		};
 	}, []);
 
+	useEffect(() => {
+		let active = true;
+		const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+		void workoutsService
+			.findMyCalendar(localDateKey(calendarMonth), timeZone)
+			.then((result) => {
+				if (!active) return;
+				if (!result.success) setError(result.error || 'Não foi possível carregar o calendário.');
+				else setCalendarWorkouts(result.data?.workouts ?? []);
+				setCalendarLoading(false);
+			});
+		return () => {
+			active = false;
+		};
+	}, [calendarMonth]);
+
+	const changeCalendarMonth = (month: Date) => {
+		setCalendarLoading(true);
+		setCalendarMonth(month);
+	};
+
+	const loadMoreAgenda = useCallback(async () => {
+		if (!nextAgendaCursor || loadingMoreAgenda) return;
+		setLoadingMoreAgenda(true);
+		const result = await workoutsService.findMyAgenda(nextAgendaCursor);
+		setLoadingMoreAgenda(false);
+		if (!result.success || !result.data) {
+			setError(result.error || 'Não foi possível carregar mais treinos.');
+			return;
+		}
+		setWorkouts((current) => [...current, ...result.data!.workouts]);
+		setAgendaTotal(result.data.total);
+		setNextAgendaCursor(result.data.nextCursor);
+	}, [loadingMoreAgenda, nextAgendaCursor]);
+
+	const loadMoreHistory = useCallback(async () => {
+		if (!nextCompletedCursor || loadingMoreHistory) return;
+		setLoadingMoreHistory(true);
+		const result = await workoutsService.findMyCompleted(nextCompletedCursor);
+		setLoadingMoreHistory(false);
+		if (!result.success || !result.data) {
+			setError(result.error || 'Não foi possível carregar mais treinos.');
+			return;
+		}
+		setCompleted((current) => [...current, ...result.data!.workouts]);
+		setCompletedTotal(result.data.total);
+		setNextCompletedCursor(result.data.nextCursor);
+	}, [loadingMoreHistory, nextCompletedCursor]);
+
+	const historyEndRef = useRef<HTMLDivElement | null>(null);
+	useEffect(() => {
+		const target = historyEndRef.current;
+		if (tab !== 'history' || !target || !nextCompletedCursor) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting) void loadMoreHistory();
+			},
+			{ rootMargin: '160px' },
+		);
+		observer.observe(target);
+		return () => observer.disconnect();
+	}, [loadMoreHistory, nextCompletedCursor, tab]);
+
+	const agendaEndRef = useRef<HTMLDivElement | null>(null);
+	useEffect(() => {
+		const target = agendaEndRef.current;
+		if (tab !== 'agenda' || !target || !nextAgendaCursor) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0]?.isIntersecting) void loadMoreAgenda();
+			},
+			{ rootMargin: '160px' },
+		);
+		observer.observe(target);
+		return () => observer.disconnect();
+	}, [loadMoreAgenda, nextAgendaCursor, tab]);
+
 	const inProgress = workouts.find(
 		(workout) => workout.status === 'in_progress',
 	);
@@ -102,6 +209,14 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 		() =>
 			sortUpcoming(workouts.filter((workout) => workout.status !== 'in_progress')),
 		[workouts],
+	);
+	const calendarEntries = useMemo(
+		() =>
+			calendarWorkouts.flatMap((workout) => {
+				const date = workoutCalendarDate(workout);
+				return date ? [{ ...workout, date }] : [];
+			}),
+		[calendarWorkouts],
 	);
 	const nextWorkout = agenda[0];
 	const featuredWorkout = inProgress ?? nextWorkout;
@@ -204,8 +319,9 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 			>
 				{(
 					[
-						['agenda', 'Agenda', agenda.length],
-						['history', 'Histórico', completed.length],
+						['agenda', 'Agenda', agendaTotal],
+						['history', 'Histórico', completedTotal],
+						['calendar', 'Calendário', calendarEntries.length],
 					] as const
 				).map(([value, label, count]) => (
 					<button
@@ -214,11 +330,11 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 						role="tab"
 						aria-selected={tab === value}
 						onClick={() => setTab(value)}
-						className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold transition ${tab === value ? 'bg-surface-container-high text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+					className={`flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1 text-[clamp(0.68rem,2.6vw,0.875rem)] font-bold transition sm:gap-2 sm:px-3 ${tab === value ? 'bg-surface-container-high text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
 					>
-						{label}{' '}
+						<span className="min-w-0 truncate">{label}</span>
 						<span
-							className={`rounded-full px-2 py-0.5 text-xs ${tab === value ? 'bg-white/8 text-on-surface-variant' : 'bg-surface-variant text-on-surface-variant'}`}
+							className={`shrink-0 rounded-full px-1.5 py-0.5 text-[clamp(0.62rem,2.2vw,0.75rem)] ${tab === value ? 'bg-white/8 text-on-surface-variant' : 'bg-surface-variant text-on-surface-variant'}`}
 						>
 							{count}
 						</span>
@@ -235,12 +351,105 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 						workouts={agenda}
 						onCreate={() => void createFreeWorkout()}
 						starting={starting}
+						loadingMore={loadingMoreAgenda}
+						hasMore={Boolean(nextAgendaCursor)}
+						endRef={agendaEndRef}
 					/>
+				) : tab === 'history' ? (
+					<CompletedList
+						workouts={completed}
+						loadingMore={loadingMoreHistory}
+						hasMore={Boolean(nextCompletedCursor)}
+						endRef={historyEndRef}
+					/>
+				) : calendarLoading ? (
+					<ListSkeleton />
 				) : (
-					<CompletedList workouts={completed} />
+					<WorkoutCalendar
+						month={calendarMonth}
+						workouts={calendarEntries}
+						onMonthChange={changeCalendarMonth}
+					/>
 				)}
 			</div>
 		</section>
+	);
+}
+
+function WorkoutCalendar({
+	month,
+	workouts,
+	onMonthChange,
+}: {
+	month: Date;
+	workouts: Array<CalendarWorkout & { date: string }>;
+	onMonthChange: (month: Date) => void;
+}) {
+	const [selectedDay, setSelectedDay] = useState<{
+		date: string;
+		workouts: Array<CalendarWorkout & { date: string }>;
+	} | null>(null);
+	return (
+		<div className="space-y-3">
+			<div className="flex flex-wrap gap-x-4 gap-y-2 px-1 text-xs font-semibold text-on-surface-variant" aria-label="Legenda do calendário">
+				<span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-primary-container" />Realizado</span>
+				<span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-error-container" />Cancelado</span>
+				<span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm border border-primary-fixed" />Agendado</span>
+			</div>
+			<Calendar
+				month={month}
+				entries={workouts}
+				onMonthChange={onMonthChange}
+				ariaLabel="Calendário de treinos"
+				onDayClick={(dayWorkouts, date) => setSelectedDay({ date, workouts: dayWorkouts })}
+				renderDaySummary={(dayWorkouts) => <CalendarDaySummary workouts={dayWorkouts} />}
+				renderEntry={(workout) => <CalendarWorkoutCard workout={workout} />}
+			/>
+			<Modal
+				isOpen={Boolean(selectedDay)}
+				title={selectedDay ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(new Date(`${selectedDay.date}T12:00:00`)) : 'Treinos'}
+				description={selectedDay ? `${selectedDay.workouts.length} treino${selectedDay.workouts.length === 1 ? '' : 's'} neste dia.` : undefined}
+				onClose={() => setSelectedDay(null)}
+			>
+				<div className="space-y-3">
+					{selectedDay?.workouts.map((workout) => <CalendarWorkoutCard key={workout.id} workout={workout} expanded />)}
+				</div>
+			</Modal>
+		</div>
+	);
+}
+
+function CalendarDaySummary({ workouts }: { workouts: CalendarWorkout[] }) {
+	const colors = {
+		completed: 'bg-primary-container',
+		cancelled: 'bg-error-container',
+		skipped: 'bg-error-container',
+		scheduled: 'border border-primary-fixed',
+		in_progress: 'bg-primary-fixed-dim',
+		pending: 'bg-outline-variant',
+	};
+	return (
+		<div className="flex h-full flex-col items-center justify-center gap-2">
+			<div className="flex flex-wrap justify-center gap-1">{workouts.slice(0, 6).map((workout) => <i key={workout.id} className={`h-2 w-2 rounded-full ${colors[workout.status]}`} />)}</div>
+			<span className="text-sm font-extrabold leading-none text-primary-fixed sm:text-base">{workouts.length}</span>
+		</div>
+	);
+}
+
+function CalendarWorkoutCard({ workout, expanded = false }: { workout: CalendarWorkout; expanded?: boolean }) {
+	const presentation = {
+		completed: { label: 'Realizado', className: expanded ? 'border border-primary-fixed bg-primary-container/20 text-primary-fixed' : 'bg-primary-container text-on-primary-fixed' },
+		cancelled: { label: 'Cancelado', className: expanded ? 'border border-error bg-error-container/20 text-error' : 'bg-error-container text-on-error-container' },
+		skipped: { label: 'Cancelado', className: expanded ? 'border border-error bg-error-container/20 text-error' : 'bg-error-container text-on-error-container' },
+		scheduled: { label: 'Agendado', className: 'border border-primary-fixed bg-transparent text-primary-fixed' },
+		in_progress: { label: 'Em andamento', className: expanded ? 'border border-primary-fixed-dim bg-primary-container/10 text-primary-fixed-dim' : 'bg-primary-fixed-dim text-on-primary-fixed' },
+		pending: { label: 'Pendente', className: expanded ? 'border border-on-surface-variant bg-surface-container-high text-on-surface-variant' : 'border border-outline-variant bg-surface-container-high text-on-surface-variant' },
+	}[workout.status];
+	return (
+		<Link href={`/training/${workout.id}`} title={`${workout.templateName} — ${presentation.label}`} className={`block rounded-xl px-4 py-3 text-sm font-bold transition hover:brightness-110 ${presentation.className}`}>
+			<span className="block">{workout.templateName}</span>
+			<span className="mt-1 block text-xs opacity-80">{presentation.label}{expanded && workout.templateDescription ? ` · ${workout.templateDescription}` : ''}</span>
+		</Link>
 	);
 }
 
@@ -385,10 +594,16 @@ function UpcomingList({
 	workouts,
 	onCreate,
 	starting,
+	loadingMore,
+	hasMore,
+	endRef,
 }: {
 	workouts: MyWorkout[];
 	onCreate: () => void;
 	starting: boolean;
+	loadingMore: boolean;
+	hasMore: boolean;
+	endRef: React.RefObject<HTMLDivElement | null>;
 }) {
 	if (!workouts.length)
 		return (
@@ -413,14 +628,32 @@ function UpcomingList({
 			</div>
 		);
 	return (
-		<div className="grid gap-3 sm:grid-cols-2">
-			{workouts.map((workout) => (
-				<WorkoutCard key={workout.id} workout={workout} />
-			))}
+		<div>
+			<div className="grid gap-3 sm:grid-cols-2">
+				{workouts.map((workout) => (
+					<WorkoutCard key={workout.id} workout={workout} />
+				))}
+			</div>
+			{hasMore && <div ref={endRef} className="h-px" aria-hidden />}
+			{loadingMore && (
+				<p className="mt-4 text-center text-sm text-on-surface-variant">
+					Carregando mais treinos...
+				</p>
+			)}
 		</div>
 	);
 }
-function CompletedList({ workouts }: { workouts: CompletedWorkout[] }) {
+function CompletedList({
+	workouts,
+	loadingMore,
+	hasMore,
+	endRef,
+}: {
+	workouts: CompletedWorkout[];
+	loadingMore: boolean;
+	hasMore: boolean;
+	endRef: React.RefObject<HTMLDivElement | null>;
+}) {
 	if (!workouts.length)
 		return (
 			<div className="grid min-h-56 place-items-center rounded-[1.75rem] border border-dashed border-outline-variant bg-surface-container-low px-6 text-center">
@@ -438,10 +671,18 @@ function CompletedList({ workouts }: { workouts: CompletedWorkout[] }) {
 			</div>
 		);
 	return (
-		<div className="grid gap-3 sm:grid-cols-2">
-			{workouts.map((workout) => (
-				<WorkoutCard key={workout.id} workout={workout} completed />
-			))}
+		<div>
+			<div className="grid gap-3 sm:grid-cols-2">
+				{workouts.map((workout) => (
+					<WorkoutCard key={workout.id} workout={workout} completed />
+				))}
+			</div>
+			{hasMore && <div ref={endRef} className="h-px" aria-hidden />}
+			{loadingMore && (
+				<p className="mt-4 text-center text-sm text-on-surface-variant">
+					Carregando mais treinos...
+				</p>
+			)}
 		</div>
 	);
 }

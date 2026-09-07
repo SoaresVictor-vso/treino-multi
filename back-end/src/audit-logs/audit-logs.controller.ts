@@ -63,9 +63,7 @@ export class AuditLogsController {
 		description: 'Lista paginada de logs de autenticação',
 	})
 	@Get('authentication')
-	async getAuthenticationLogs(
-		@Query() q: LogQueryDto,
-	): Promise<{
+	async getAuthenticationLogs(@Query() q: LogQueryDto): Promise<{
 		data: AuthenticationLog[];
 		total: number;
 		page: number;
@@ -73,7 +71,7 @@ export class AuditLogsController {
 	}> {
 		const filter = this.parseFilter(q);
 		const result = await this.auditLogService.findAuthenticationLogs(filter);
-		return { ...result, page: filter.page!, limit: filter.limit! };
+		return { ...result, page: filter.page, limit: filter.limit };
 	}
 
 	/** GET /audit-logs/critical-operations */
@@ -86,9 +84,7 @@ export class AuditLogsController {
 	@ApiQuery({ name: 'limit', required: false, type: Number })
 	@ApiResponse({ status: 200, description: 'Lista paginada de logs críticos' })
 	@Get('critical-operations')
-	async getCriticalOperationLogs(
-		@Query() q: LogQueryDto,
-	): Promise<{
+	async getCriticalOperationLogs(@Query() q: LogQueryDto): Promise<{
 		data: CriticalOperationLog[];
 		total: number;
 		page: number;
@@ -96,7 +92,7 @@ export class AuditLogsController {
 	}> {
 		const filter = this.parseFilter(q);
 		const result = await this.auditLogService.findCriticalOperationLogs(filter);
-		return { ...result, page: filter.page!, limit: filter.limit! };
+		return { ...result, page: filter.page, limit: filter.limit };
 	}
 
 	/** GET /audit-logs/password-changes */
@@ -107,9 +103,7 @@ export class AuditLogsController {
 	@ApiQuery({ name: 'limit', required: false, type: Number })
 	@ApiResponse({ status: 200, description: 'Lista paginada de logs de senha' })
 	@Get('password-changes')
-	async getPasswordChangeLogs(
-		@Query() q: LogQueryDto,
-	): Promise<{
+	async getPasswordChangeLogs(@Query() q: LogQueryDto): Promise<{
 		data: PasswordChangeLog[];
 		total: number;
 		page: number;
@@ -117,7 +111,7 @@ export class AuditLogsController {
 	}> {
 		const filter = this.parseFilter(q);
 		const result = await this.auditLogService.findPasswordChangeLogs(filter);
-		return { ...result, page: filter.page!, limit: filter.limit! };
+		return { ...result, page: filter.page, limit: filter.limit };
 	}
 
 	private parseFilter(

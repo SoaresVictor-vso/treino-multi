@@ -64,6 +64,39 @@ export type CompletedWorkout = Omit<MyWorkout, 'status'> & {
 	performedAt: string | null;
 };
 
+export type CompletedWorkoutsPage = {
+	workouts: CompletedWorkout[];
+	total: number;
+	nextCursor: string | null;
+};
+
+export type AgendaWorkoutsPage = {
+	workouts: MyWorkout[];
+	total: number;
+	inProgress: MyWorkout | null;
+	nextCursor: string | null;
+};
+
+export type CompletedWorkoutsCalendar = {
+	period: 'week' | 'month';
+	referenceDate: string;
+	workouts: CompletedWorkout[];
+};
+
+export type CalendarWorkout = {
+	id: string;
+	templateName: string;
+	templateDescription: string;
+	scheduledDate: string | null;
+	performedAt: string | null;
+	status: WorkoutStatus;
+};
+
+export type WorkoutsCalendar = {
+	referenceDate: string;
+	workouts: CalendarWorkout[];
+};
+
 export type TrainerWorkout = {
 	id: string;
 	athleteId: string;
@@ -111,8 +144,30 @@ export type UpdateWorkoutExecution = Omit<
 
 export const workoutsService = {
 	findMine: () => authenticatedRequest<MyWorkout[]>('workouts/me'),
-	findMyCompleted: () =>
-		authenticatedRequest<CompletedWorkout[]>('workouts/me/completed'),
+	findMyAgenda: (cursor?: string) =>
+		authenticatedRequest<AgendaWorkoutsPage>(
+			`workouts/me/agenda${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+		),
+	findMyCompleted: (cursor?: string) =>
+		authenticatedRequest<CompletedWorkoutsPage>(
+			`workouts/me/completed${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+		),
+	findMyCompletedForCalendar: (
+		period: 'week' | 'month',
+		date?: string,
+	) => {
+		const params = new URLSearchParams({ period });
+		if (date) params.set('date', date);
+		return authenticatedRequest<CompletedWorkoutsCalendar>(
+			`workouts/me/completed/calendar?${params.toString()}`,
+		);
+	},
+	findMyCalendar: (date: string, timeZone: string) => {
+		const params = new URLSearchParams({ date, timeZone });
+		return authenticatedRequest<WorkoutsCalendar>(
+			`workouts/me/calendar?${params.toString()}`,
+		);
+	},
 	findTrainerWorkouts: () =>
 		authenticatedRequest<TrainerWorkout[]>('workouts/trainer'),
 	findByAthlete: (athleteId: string) =>

@@ -85,7 +85,7 @@ export class AuthService {
 		// Registra tentativa de login (sucesso ou falha)
 		await this.auditLogService.logAuthentication({
 			tenantId: loginTenantId,
-			context: loginContext as 'organization' | 'tenant' | 'standalone',
+			context: loginContext,
 			success: !!user,
 			loginUsed: dto.login,
 			ipAddress: ipAddress ?? null,
@@ -95,7 +95,7 @@ export class AuthService {
 
 		const roles = (user.userRoles ?? [])
 			.filter((ur) => !ur.deletedAt)
-			.map((ur) => ur.role as Role);
+			.map((ur) => ur.role);
 
 		const payload: JwtPayload = {
 			sub: user.id,
@@ -158,7 +158,7 @@ export class AuthService {
 		const { user } = stored;
 		const roles = (user.userRoles ?? [])
 			.filter((ur) => !ur.deletedAt)
-			.map((ur) => ur.role as Role);
+			.map((ur) => ur.role);
 
 		const payload: JwtPayload = {
 			sub: user.id,
@@ -224,7 +224,7 @@ export class AuthService {
 
 		const roles = (targetUser.userRoles ?? [])
 			.filter((ur) => !ur.deletedAt)
-			.map((ur) => ur.role as Role);
+			.map((ur) => ur.role);
 
 		const payload: JwtPayload = {
 			sub: targetUser.id,

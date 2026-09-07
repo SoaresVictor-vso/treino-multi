@@ -395,7 +395,7 @@ export class UsersService {
 			throw new UnauthorizedException('Token de redefinição já utilizado.');
 		}
 
-		const user = await this.findOne(payload.sub as string);
+		const user = await this.findOne(payload.sub);
 
 		await this.updatePassword(user.id, newPassword, {
 			isSession: false,

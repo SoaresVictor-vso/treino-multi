@@ -4,7 +4,14 @@ import {
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager, In, IsNull, Repository } from 'typeorm';
+import {
+	Brackets,
+	DataSource,
+	EntityManager,
+	In,
+	IsNull,
+	Repository,
+} from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { Role } from '../common/enums/role.enum';
@@ -83,6 +90,58 @@ type WorkoutActivityInput = {
 	note?: string | null;
 };
 
+type CompletedWorkoutCursor = {
+	performedAt: string | null;
+	id: string;
+};
+
+type AgendaWorkoutCursor = {
+	scheduledDate: string | null;
+	id: string;
+};
+
+const WORKOUTS_PAGE_SIZE = 5;
+
+function encodeCompletedWorkoutCursor(cursor: CompletedWorkoutCursor) {
+	return Buffer.from(JSON.stringify(cursor)).toString('base64url');
+}
+
+function decodeCompletedWorkoutCursor(value: string): CompletedWorkoutCursor {
+	try {
+		const cursor = JSON.parse(
+			Buffer.from(value, 'base64url').toString('utf8'),
+		) as Partial<CompletedWorkoutCursor>;
+		if (
+			typeof cursor.id !== 'string' ||
+			(cursor.performedAt !== null && typeof cursor.performedAt !== 'string')
+		)
+			throw new Error('Invalid cursor');
+		return { id: cursor.id, performedAt: cursor.performedAt };
+	} catch {
+		throw new BadRequestException('Cursor de histórico inválido.');
+	}
+}
+
+function encodeAgendaWorkoutCursor(cursor: AgendaWorkoutCursor) {
+	return Buffer.from(JSON.stringify(cursor)).toString('base64url');
+}
+
+function decodeAgendaWorkoutCursor(value: string): AgendaWorkoutCursor {
+	try {
+		const cursor = JSON.parse(
+			Buffer.from(value, 'base64url').toString('utf8'),
+		) as Partial<AgendaWorkoutCursor>;
+		if (
+			typeof cursor.id !== 'string' ||
+			(cursor.scheduledDate !== null && typeof cursor.scheduledDate !== 'string')
+		)
+			throw new Error('Invalid cursor');
+		return { id: cursor.id, scheduledDate: cursor.scheduledDate };
+	} catch {
+		throw new BadRequestException('Cursor da agenda inválido.');
+	}
+}
+
 function numberOrNull(value: string | number | null): number | null {
 	return value === null ? null : Number(value);
 }
@@ -130,18 +189,212 @@ export class WorkoutsService {
 			.getRawMany();
 	}
 
-	async findMyCompletedWorkouts(actor: JwtPayload) {
+	async findMyAgendaWorkouts(actor: JwtPayload, cursorValue?: string) {
 		if (!actor.roles.includes(Role.TENANT_CLIENT))
 			throw new ForbiddenException('Esta consulta é exclusiva para atletas.');
-		return this.dataSource
+		const cursor = cursorValue
+			? decodeAgendaWorkoutCursor(cursorValue)
+			: undefined;
+		const rows = await this.dataSource.query<
+			{
+				workouts: {
+					id: string;
+					templateName: string;
+					templateDescription: string;
+					scheduledDate: string | null;
+					status: WorkoutStatus.PENDING;
+				}[];
+				total: string;
+				inProgress: {
+					id: string;
+					templateName: string;
+					templateDescription: string;
+					scheduledDate: string | null;
+					status: WorkoutStatus.IN_PROGRESS;
+				} | null;
+			}[]
+		>(
+			`WITH matched AS (
+				SELECT
+					workout.id,
+					workout.template_name AS "templateName",
+					workout.template_description AS "templateDescription",
+					workout.scheduled_date AS "scheduledDate",
+					workout.status,
+					COUNT(*) FILTER (WHERE workout.status = 'pending') OVER() AS total
+				FROM workouts workout
+				WHERE workout.athlete_id = $1
+					AND workout.tenant_id = $2
+					AND workout.status IN ('pending', 'in_progress')
+			), page AS (
+				SELECT * FROM matched
+				WHERE status = 'pending'
+					AND (
+						($3::date IS NULL AND $4::uuid IS NULL)
+						OR ($3::date IS NULL AND $4::uuid IS NOT NULL AND "scheduledDate" IS NULL AND id > $4::uuid)
+						OR ($3::date IS NOT NULL AND (
+							"scheduledDate" > $3::date
+							OR ("scheduledDate" = $3::date AND id > $4::uuid)
+							OR "scheduledDate" IS NULL
+						))
+					)
+				ORDER BY "scheduledDate" ASC NULLS LAST, id ASC
+				LIMIT $5
+			)
+			SELECT
+				COALESCE(json_agg(json_build_object(
+					'id', page.id,
+					'templateName', page."templateName",
+					'templateDescription', page."templateDescription",
+					'scheduledDate', page."scheduledDate",
+					'status', page.status
+				) ORDER BY page."scheduledDate" ASC NULLS LAST, page.id ASC), '[]'::json) AS workouts,
+				COALESCE(MAX(page.total), 0) AS total,
+				(SELECT json_build_object(
+					'id', matched.id,
+					'templateName', matched."templateName",
+					'templateDescription', matched."templateDescription",
+					'scheduledDate', matched."scheduledDate",
+					'status', matched.status
+				) FROM matched WHERE matched.status = 'in_progress' LIMIT 1) AS "inProgress"
+			FROM page`,
+			[
+				actor.sub,
+				actor.tenantId,
+				cursor?.scheduledDate ?? null,
+				cursor?.id ?? null,
+				WORKOUTS_PAGE_SIZE + 1,
+			],
+		);
+		const row = rows[0];
+		const page = row?.workouts ?? [];
+		const workouts = page.slice(0, WORKOUTS_PAGE_SIZE);
+		const lastWorkout = workouts.at(-1);
+
+		return {
+			workouts,
+			total: Number(row?.total ?? 0),
+			inProgress: row?.inProgress ?? null,
+			nextCursor:
+				page.length > WORKOUTS_PAGE_SIZE && lastWorkout
+					? encodeAgendaWorkoutCursor({
+							id: lastWorkout.id,
+							scheduledDate: lastWorkout.scheduledDate,
+						})
+					: null,
+		};
+	}
+
+	async findMyCompletedWorkouts(actor: JwtPayload, cursorValue?: string) {
+		if (!actor.roles.includes(Role.TENANT_CLIENT))
+			throw new ForbiddenException('Esta consulta é exclusiva para atletas.');
+		const cursor = cursorValue
+			? decodeCompletedWorkoutCursor(cursorValue)
+			: undefined;
+		const baseQuery = this.dataSource
 			.getRepository(Workout)
 			.createQueryBuilder('workout')
 			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
 			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
 			.andWhere('workout.status = :status', { status: WorkoutStatus.COMPLETED })
-			.orderBy('workout.performedAt', 'DESC', 'NULLS LAST')
-			.addOrderBy('workout.updatedAt', 'DESC')
-			.take(5)
+			.select([
+				'workout.id AS id',
+				'workout.template_name AS "templateName"',
+				'workout.template_description AS "templateDescription"',
+				'workout.scheduled_date AS "scheduledDate"',
+				'workout.performed_at AS "performedAt"',
+				'workout.status AS status',
+				'COUNT(*) OVER() AS total',
+			]);
+		const query = this.dataSource
+			.createQueryBuilder()
+			.select('*')
+			.from(`(${baseQuery.getQuery()})`, 'workout')
+			.setParameters(baseQuery.getParameters());
+
+		if (cursor?.performedAt === null) {
+			query
+				.andWhere('workout."performedAt" IS NULL')
+				.andWhere('workout.id < :cursorId', {
+					cursorId: cursor.id,
+				});
+		} else if (cursor) {
+			query.andWhere(
+				new Brackets((where) =>
+					where
+						.where('workout."performedAt" < :cursorPerformedAt', {
+							cursorPerformedAt: cursor.performedAt,
+						})
+						.orWhere(
+							'workout."performedAt" = :cursorPerformedAt AND workout.id < :cursorId',
+							{ cursorPerformedAt: cursor.performedAt, cursorId: cursor.id },
+						)
+						.orWhere('workout."performedAt" IS NULL'),
+				),
+			);
+		}
+
+		const rows = await query
+			.orderBy('workout."performedAt"', 'DESC', 'NULLS LAST')
+			.addOrderBy('workout.id', 'DESC')
+			.take(WORKOUTS_PAGE_SIZE + 1)
+			.getRawMany<{
+				id: string;
+				templateName: string;
+				templateDescription: string;
+				scheduledDate: string | null;
+				performedAt: string | null;
+				status: WorkoutStatus.COMPLETED;
+				total: string;
+			}>();
+		const total = Number(rows[0]?.total ?? 0);
+		const workouts = rows
+			.slice(0, WORKOUTS_PAGE_SIZE)
+			.map(({ total: _, ...workout }) => workout);
+		const lastWorkout = workouts.at(-1);
+
+		return {
+			workouts,
+			total,
+			nextCursor:
+				rows.length > WORKOUTS_PAGE_SIZE && lastWorkout
+					? encodeCompletedWorkoutCursor({
+							id: lastWorkout.id,
+							performedAt: lastWorkout.performedAt,
+						})
+					: null,
+		};
+	}
+
+	async findMyCompletedWorkoutsForCalendar(
+		actor: JwtPayload,
+		period: 'week' | 'month',
+		date?: string,
+	) {
+		if (!actor.roles.includes(Role.TENANT_CLIENT))
+			throw new ForbiddenException('Esta consulta é exclusiva para atletas.');
+
+		const referenceDate = date ?? new Date().toISOString().slice(0, 10);
+		const intervalStart =
+			period === 'week'
+				? "date_trunc('week', :referenceDate::date)"
+				: "date_trunc('month', :referenceDate::date)";
+		const intervalEnd =
+			period === 'week'
+				? "date_trunc('week', :referenceDate::date) + interval '1 week'"
+				: "date_trunc('month', :referenceDate::date) + interval '1 month'";
+
+		const workouts = await this.dataSource
+			.getRepository(Workout)
+			.createQueryBuilder('workout')
+			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
+			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
+			.andWhere('workout.status = :status', { status: WorkoutStatus.COMPLETED })
+			.andWhere(`workout.performedAt >= ${intervalStart}`)
+			.andWhere(`workout.performedAt < ${intervalEnd}`)
+			.setParameter('referenceDate', referenceDate)
+			.orderBy('workout.performedAt', 'ASC')
+			.addOrderBy('workout.id', 'ASC')
 			.select([
 				'workout.id AS id',
 				'workout.template_name AS "templateName"',
@@ -151,6 +404,76 @@ export class WorkoutsService {
 				'workout.status AS status',
 			])
 			.getRawMany();
+
+		return { period, referenceDate, workouts };
+	}
+
+	async findMyWorkoutsForCalendar(
+		actor: JwtPayload,
+		date?: string,
+		timeZone = 'UTC',
+	) {
+		if (!actor.roles.includes(Role.TENANT_CLIENT))
+			throw new ForbiddenException('Esta consulta é exclusiva para atletas.');
+		const referenceDate = date ?? new Date().toISOString().slice(0, 10);
+		const referenceMonth = referenceDate.slice(0, 7);
+		const isValidTimeZone = (() => {
+			try {
+				Intl.DateTimeFormat('en-US', { timeZone });
+				return true;
+			} catch {
+				return false;
+			}
+		})();
+		if (!isValidTimeZone) throw new BadRequestException('Fuso horário inválido.');
+
+		const workouts = await this.dataSource
+			.getRepository(Workout)
+			.createQueryBuilder('workout')
+			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
+			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
+			.andWhere(
+				new Brackets((where) =>
+					where
+						.where(
+							`workout.status IN (:...scheduledStatuses) AND to_char(workout.scheduledDate, 'YYYY-MM') = :referenceMonth`,
+							{
+								scheduledStatuses: [
+									WorkoutStatus.PENDING,
+									WorkoutStatus.SCHEDULED,
+									WorkoutStatus.CANCELLED,
+									WorkoutStatus.SKIPPED,
+								],
+								referenceMonth,
+							},
+						)
+						.orWhere(
+							`workout.status = :completedStatus AND to_char(workout.performedAt AT TIME ZONE :timeZone, 'YYYY-MM') = :referenceMonth`,
+							{ completedStatus: WorkoutStatus.COMPLETED, timeZone, referenceMonth },
+						)
+						.orWhere(
+							`workout.status = :inProgressStatus AND to_char(NOW() AT TIME ZONE :timeZone, 'YYYY-MM') = :referenceMonth`,
+							{
+								inProgressStatus: WorkoutStatus.IN_PROGRESS,
+								timeZone,
+								referenceMonth,
+							},
+						),
+				),
+			)
+			.orderBy('workout.scheduledDate', 'ASC', 'NULLS LAST')
+			.addOrderBy('workout.performedAt', 'ASC', 'NULLS LAST')
+			.select([
+				'workout.id AS id',
+				'workout.template_name AS "templateName"',
+				'workout.template_description AS "templateDescription"',
+				'workout.scheduled_date AS "scheduledDate"',
+				'workout.performed_at AS "performedAt"',
+				'workout.status AS status',
+			])
+			.getRawMany();
+
+		return { referenceDate, workouts };
 	}
 
 	async findTrainerWorkouts(actor: JwtPayload) {
@@ -723,7 +1046,9 @@ export class WorkoutsService {
 		if (!normalizedName)
 			throw new BadRequestException('Informe o nome do treino.');
 		if (workout.status === WorkoutStatus.CANCELLED)
-			throw new BadRequestException('Treinos cancelados não podem ser renomeados.');
+			throw new BadRequestException(
+				'Treinos cancelados não podem ser renomeados.',
+			);
 
 		workout.templateName = normalizedName;
 		workout.updatedBy = actor.sub;

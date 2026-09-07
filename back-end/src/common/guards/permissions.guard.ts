@@ -67,7 +67,7 @@ export class PermissionsGuard implements CanActivate {
 		}
 
 		// Calcula as permissões efetivas em runtime (não vêm do JWT)
-		const effectivePermissions = resolvePermissions(user.roles as Role[]);
+		const effectivePermissions = resolvePermissions(user.roles);
 
 		if (requiredPermissionGroups) {
 			const hasPermissionGroup = requiredPermissionGroups.some((group) =>
@@ -83,7 +83,7 @@ export class PermissionsGuard implements CanActivate {
 			return true;
 		}
 
-		const missingPermissions = requiredPermissions!.filter(
+		const missingPermissions = requiredPermissions.filter(
 			(p) => !effectivePermissions.includes(p),
 		);
 
