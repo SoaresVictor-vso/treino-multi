@@ -47,10 +47,15 @@ export class AuthService {
 	 * forem inválidas ou o usuário estiver inativo / deletado.
 	 */
 	async validateUser(login: string, password: string): Promise<User | null> {
+		const normalizedLogin = this.normalizeLogin(login);
 		// Tenta localizar a person pelo e-mail; se não encontrar, tenta pelo document
-		let person = await this.personRepo.findOne({ where: { email: login } });
+		let person = await this.personRepo.findOne({
+			where: { email: normalizedLogin },
+		});
 		if (!person) {
-			person = await this.personRepo.findOne({ where: { document: login } });
+			person = await this.personRepo.findOne({
+				where: { document: normalizedLogin },
+			});
 		}
 		if (!person) return null;
 
@@ -76,7 +81,8 @@ export class AuthService {
 		ipAddress?: string,
 		userAgent?: string,
 	): Promise<AuthTokens> {
-		const user = await this.validateUser(dto.login, dto.password);
+		const normalizedLogin = this.normalizeLogin(dto.login);
+		const user = await this.validateUser(normalizedLogin, dto.password);
 
 		// Resolve o contexto para o log antes de lançar exceção
 		const loginContext = user?.context ?? 'standalone';
@@ -87,7 +93,7 @@ export class AuthService {
 			tenantId: loginTenantId,
 			context: loginContext,
 			success: !!user,
-			loginUsed: dto.login,
+			loginUsed: normalizedLogin,
 			ipAddress: ipAddress ?? null,
 		});
 
@@ -156,6 +162,9 @@ export class AuthService {
 			throw new UnauthorizedException('Refresh token expirado');
 
 		const { user } = stored;
+		if (!user?.isActive)
+			throw new UnauthorizedException('Usuário inativo');
+
 		const roles = (user.userRoles ?? [])
 			.filter((ur) => !ur.deletedAt)
 			.map((ur) => ur.role);
@@ -257,5 +266,12 @@ export class AuthService {
 		const value = parseInt(duration.slice(0, -1), 10);
 		const MS = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
 		return value * (MS[unit] ?? 1000);
+	}
+
+	private normalizeLogin(login: string): string {
+		const trimmedLogin = login.trim();
+		return trimmedLogin.includes('@')
+			? trimmedLogin.toLocaleLowerCase('en-US')
+			: trimmedLogin;
 	}
 }

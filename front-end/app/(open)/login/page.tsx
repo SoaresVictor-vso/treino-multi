@@ -10,6 +10,7 @@ import ErrorBox from '@/components/ui/ErrorBox';
 import validateCPF from '@/utilities/validators/cpf';
 import validateEmail from '@/utilities/validators/email';
 import {
+	clearSessionTokens,
 	refreshAccessToken,
 	storeSessionTokens,
 	tokenHasEnoughLifetime,
@@ -50,6 +51,10 @@ export default function Login() {
 			const response = await refreshAccessToken();
 			if (isActive && response.success && response.data?.accessToken) {
 				router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
+			} else if (isActive) {
+				// Um refresh que falhou não deve ser tentado indefinidamente nem
+				// manter credenciais de sessão inválidas no navegador.
+				clearSessionTokens();
 			}
 		}
 
@@ -77,7 +82,13 @@ export default function Login() {
 
 		try {
 			const loginService = new LoginService();
-			const res = await loginService.login(login, password);
+			const normalizedLogin = login.trim();
+			const res = await loginService.login(
+				normalizedLogin.includes('@')
+					? normalizedLogin.toLocaleLowerCase('en-US')
+					: normalizedLogin,
+				password,
+			);
 			if (!res.success) {
 				setLoading(false);
 				setError(res.error || 'Não foi possível realizar o login.');
