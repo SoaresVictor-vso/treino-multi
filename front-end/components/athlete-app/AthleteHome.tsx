@@ -22,7 +22,7 @@ import {
 	type WorkoutDetail,
 } from '@/gateway/services/workouts';
 
-type Tab = 'agenda' | 'history' | 'calendar';
+type Tab = 'calendar' | 'agenda' | 'history';
 
 function firstName(name?: string) {
 	return name?.trim().split(/\s+/)[0] || 'atleta';
@@ -70,7 +70,7 @@ function workoutCalendarDate(workout: CalendarWorkout) {
 
 export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 	const router = useRouter();
-	const [tab, setTab] = useState<Tab>('agenda');
+	const [tab, setTab] = useState<Tab>('calendar');
 	const [workouts, setWorkouts] = useState<MyWorkout[]>([]);
 	const [agendaTotal, setAgendaTotal] = useState(0);
 	const [nextAgendaCursor, setNextAgendaCursor] = useState<string | null>(null);
@@ -325,9 +325,9 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 			>
 				{(
 					[
+						['calendar', 'Calendário', calendarEntries.length],
 						['agenda', 'Agenda', agendaTotal],
 						['history', 'Histórico', completedTotal],
-						['calendar', 'Calendário', calendarEntries.length],
 					] as const
 				).map(([value, label, count]) => (
 					<button

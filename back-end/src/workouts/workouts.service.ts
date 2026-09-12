@@ -94,7 +94,7 @@ type WorkoutActivityInput = {
 };
 
 type CompletedWorkoutCursor = {
-	performedAt: string | null;
+	sortAt: string;
 	id: string;
 };
 
@@ -114,12 +114,9 @@ function decodeCompletedWorkoutCursor(value: string): CompletedWorkoutCursor {
 		const cursor = JSON.parse(
 			Buffer.from(value, 'base64url').toString('utf8'),
 		) as Partial<CompletedWorkoutCursor>;
-		if (
-			typeof cursor.id !== 'string' ||
-			(cursor.performedAt !== null && typeof cursor.performedAt !== 'string')
-		)
+		if (typeof cursor.id !== 'string' || typeof cursor.sortAt !== 'string')
 			throw new Error('Invalid cursor');
-		return { id: cursor.id, performedAt: cursor.performedAt };
+		return { id: cursor.id, sortAt: cursor.sortAt };
 	} catch {
 		throw new BadRequestException('Cursor de histórico inválido.');
 	}
@@ -305,7 +302,8 @@ export class WorkoutsService {
 				'workout.template_name AS "templateName"',
 				'workout.template_description AS "templateDescription"',
 				'workout.scheduled_date AS "scheduledDate"',
-				'workout.performed_at AS "performedAt"',
+				'COALESCE(workout.performed_at, workout.updated_at) AS "performedAt"',
+				'COALESCE(workout.performed_at, workout.updated_at) AS "sortAt"',
 				'workout.status AS status',
 				'COUNT(*) OVER() AS total',
 			]);
@@ -315,30 +313,23 @@ export class WorkoutsService {
 			.from(`(${baseQuery.getQuery()})`, 'workout')
 			.setParameters(baseQuery.getParameters());
 
-		if (cursor?.performedAt === null) {
-			query
-				.andWhere('workout."performedAt" IS NULL')
-				.andWhere('workout.id < :cursorId', {
-					cursorId: cursor.id,
-				});
-		} else if (cursor) {
+		if (cursor) {
 			query.andWhere(
 				new Brackets((where) =>
 					where
-						.where('workout."performedAt" < :cursorPerformedAt', {
-							cursorPerformedAt: cursor.performedAt,
+						.where('workout."sortAt" < :cursorSortAt', {
+							cursorSortAt: cursor.sortAt,
 						})
-						.orWhere(
-							'workout."performedAt" = :cursorPerformedAt AND workout.id < :cursorId',
-							{ cursorPerformedAt: cursor.performedAt, cursorId: cursor.id },
-						)
-						.orWhere('workout."performedAt" IS NULL'),
+						.orWhere('workout."sortAt" = :cursorSortAt AND workout.id < :cursorId', {
+							cursorSortAt: cursor.sortAt,
+							cursorId: cursor.id,
+						}),
 				),
 			);
 		}
 
 		const rows = await query
-			.orderBy('workout."performedAt"', 'DESC', 'NULLS LAST')
+			.orderBy('workout."sortAt"', 'DESC')
 			.addOrderBy('workout.id', 'DESC')
 			.take(WORKOUTS_PAGE_SIZE + 1)
 			.getRawMany<{
@@ -347,13 +338,14 @@ export class WorkoutsService {
 				templateDescription: string;
 				scheduledDate: string | null;
 				performedAt: string | null;
+				sortAt: string;
 				status: WorkoutStatus.COMPLETED;
 				total: string;
 			}>();
 		const total = Number(rows[0]?.total ?? 0);
 		const workouts = rows
 			.slice(0, WORKOUTS_PAGE_SIZE)
-			.map(({ total: _, ...workout }) => workout);
+			.map(({ total: _, sortAt: __, ...workout }) => workout);
 		const lastWorkout = workouts.at(-1);
 
 		return {
@@ -363,7 +355,7 @@ export class WorkoutsService {
 				rows.length > WORKOUTS_PAGE_SIZE && lastWorkout
 					? encodeCompletedWorkoutCursor({
 							id: lastWorkout.id,
-							performedAt: lastWorkout.performedAt,
+							sortAt: rows[WORKOUTS_PAGE_SIZE - 1].sortAt,
 						})
 					: null,
 		};
@@ -393,17 +385,21 @@ export class WorkoutsService {
 			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
 			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
 			.andWhere('workout.status = :status', { status: WorkoutStatus.COMPLETED })
-			.andWhere(`workout.performedAt >= ${intervalStart}`)
-			.andWhere(`workout.performedAt < ${intervalEnd}`)
+			.andWhere(
+				`COALESCE(workout.performed_at, workout.updated_at) >= ${intervalStart}`,
+			)
+			.andWhere(
+				`COALESCE(workout.performed_at, workout.updated_at) < ${intervalEnd}`,
+			)
 			.setParameter('referenceDate', referenceDate)
-			.orderBy('workout.performedAt', 'ASC')
+			.orderBy('COALESCE(workout.performed_at, workout.updated_at)', 'ASC')
 			.addOrderBy('workout.id', 'ASC')
 			.select([
 				'workout.id AS id',
 				'workout.template_name AS "templateName"',
 				'workout.template_description AS "templateDescription"',
 				'workout.scheduled_date AS "scheduledDate"',
-				'workout.performed_at AS "performedAt"',
+				'COALESCE(workout.performed_at, workout.updated_at) AS "performedAt"',
 				'workout.status AS status',
 			])
 			.getRawMany();
@@ -439,24 +435,20 @@ export class WorkoutsService {
 				new Brackets((where) =>
 					where
 						.where(
-							`workout.status IN (:...scheduledStatuses) AND to_char(workout.scheduledDate, 'YYYY-MM') = :referenceMonth`,
+							`workout.status IN (:...scheduledStatuses) AND to_char(workout.scheduled_date, 'YYYY-MM') = :referenceMonth`,
 							{
 								scheduledStatuses: [
 									WorkoutStatus.PENDING,
 									WorkoutStatus.SCHEDULED,
-									WorkoutStatus.CANCELLED,
 									WorkoutStatus.SKIPPED,
 								],
 								referenceMonth,
 							},
 						)
 						.orWhere(
-							`workout.status IN (:...performedStatuses) AND to_char(workout.performedAt AT TIME ZONE :timeZone, 'YYYY-MM') = :referenceMonth`,
+							`workout.status IN (:...performedStatuses) AND to_char(COALESCE(workout.performed_at AT TIME ZONE :timeZone, workout.updated_at AT TIME ZONE :timeZone, workout.scheduled_date::timestamp), 'YYYY-MM') = :referenceMonth`,
 							{
-								performedStatuses: [
-									WorkoutStatus.COMPLETED,
-									WorkoutStatus.CANCELLED,
-								],
+								performedStatuses: [WorkoutStatus.COMPLETED, WorkoutStatus.CANCELLED],
 								timeZone,
 								referenceMonth,
 							},
@@ -471,14 +463,17 @@ export class WorkoutsService {
 						),
 				),
 			)
-			.orderBy('workout.scheduledDate', 'ASC', 'NULLS LAST')
-			.addOrderBy('workout.performedAt', 'ASC', 'NULLS LAST')
+			.orderBy(
+				`CASE WHEN workout.status IN ('completed', 'cancelled') THEN COALESCE(workout.performed_at AT TIME ZONE :timeZone, workout.updated_at AT TIME ZONE :timeZone, workout.scheduled_date::timestamp) ELSE workout.scheduled_date::timestamp END`,
+				'ASC',
+				'NULLS LAST',
+			)
 			.select([
 				'workout.id AS id',
 				'workout.template_name AS "templateName"',
 				'workout.template_description AS "templateDescription"',
 				'workout.scheduled_date AS "scheduledDate"',
-				'workout.performed_at AS "performedAt"',
+				'COALESCE(workout.performed_at, workout.updated_at) AS "performedAt"',
 				'workout.status AS status',
 			])
 			.getRawMany();
@@ -879,13 +874,9 @@ export class WorkoutsService {
 					entity.status === ExecutionStatus.COMPLETED ||
 					entity.status === ExecutionStatus.SKIPPED
 				) {
-					if (
-						previousStatus !== entity.status ||
-						!entity.finishedAt
-					)
+					if (previousStatus !== entity.status || !entity.finishedAt)
 						entity.finishedAt = new Date();
-				}
-				else if (entity.status === ExecutionStatus.IN_PROGRESS)
+				} else if (entity.status === ExecutionStatus.IN_PROGRESS)
 					entity.finishedAt = null;
 				await manager.save(entity);
 			}
@@ -1062,7 +1053,7 @@ export class WorkoutsService {
 					templateName: dto.name?.trim() || defaultName,
 					templateDescription: dto.description?.trim() ?? '',
 					scheduledDate: null,
-					performedAt: null,
+					performedAt: startImmediately ? new Date() : null,
 					status: startImmediately
 						? WorkoutStatus.IN_PROGRESS
 						: WorkoutStatus.PENDING,

@@ -125,6 +125,33 @@ describe('WorkoutsService', () => {
 		);
 	});
 
+	it('registra a data de início ao criar e iniciar um treino próprio', async () => {
+		Object.assign((service as any).usersService, {
+			findOne: jest.fn().mockResolvedValue({ person: { name: 'Atleta' } }),
+		});
+		manager.save.mockResolvedValueOnce({ id: 'workout-id' });
+		jest
+			.spyOn(service, 'findWorkout')
+			.mockResolvedValue({ id: 'workout-id' } as never);
+
+		await service.createMyWorkout(
+			{ startImmediately: true },
+			{
+				sub: input.athleteId,
+				tenantId: input.template.tenantId,
+				roles: [Role.TENANT_CLIENT],
+			},
+		);
+
+		expect(manager.save).toHaveBeenCalledWith(
+			Workout,
+			expect.objectContaining({
+				status: WorkoutStatus.IN_PROGRESS,
+				performedAt: expect.any(Date),
+			}),
+		);
+	});
+
 	it('inclui treinos pendentes e agendados na agenda do atleta', async () => {
 		dataSource.query.mockResolvedValueOnce([
 			{ workouts: [], total: '0', inProgress: null },
@@ -137,7 +164,9 @@ describe('WorkoutsService', () => {
 		});
 
 		const query = dataSource.query.mock.calls[0][0] as string;
-		expect(query).toContain("workout.status IN ('pending', 'scheduled', 'in_progress')");
+		expect(query).toContain(
+			"workout.status IN ('pending', 'scheduled', 'in_progress')",
+		);
 		expect(query).toContain("WHERE status IN ('pending', 'scheduled')");
 		expect(query).toContain(
 			"COUNT(*) FILTER (WHERE workout.status IN ('pending', 'scheduled')) OVER() AS total",
@@ -320,9 +349,46 @@ describe('WorkoutsService', () => {
 		expect(workout.performedAt).toBeInstanceOf(Date);
 		expect(manager.save).toHaveBeenCalledWith(
 			expect.objectContaining({
-			updatedBy: input.athleteId,
-			performedAt: expect.any(Date),
-		}),
+				updatedBy: input.athleteId,
+				performedAt: expect.any(Date),
+			}),
+		);
+	});
+
+	it('preserva a data de início ao concluir o treino', async () => {
+		const startedAt = new Date('2026-09-12T10:00:00.000Z');
+		const workout = {
+			id: 'workout-id',
+			status: WorkoutStatus.IN_PROGRESS,
+			performedAt: startedAt,
+		} as Workout;
+		const executionRepository = { count: jest.fn().mockResolvedValue(0) };
+		const workoutRepository = { save: jest.fn().mockResolvedValue(workout) };
+		Object.assign(dataSource, {
+			getRepository: jest
+				.fn()
+				.mockReturnValueOnce(executionRepository)
+				.mockReturnValueOnce(workoutRepository),
+		});
+		jest.spyOn(service as any, 'findWritableWorkout').mockResolvedValue(workout);
+		jest
+			.spyOn(service, 'findWorkout')
+			.mockResolvedValue({ id: workout.id } as never);
+
+		await service.completeWorkout(workout.id, {
+			sub: input.athleteId,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_CLIENT],
+		});
+
+		expect(executionRepository.count).toHaveBeenCalled();
+		expect(workout.status).toBe(WorkoutStatus.COMPLETED);
+		expect(workout.performedAt).toBe(startedAt);
+		expect(workoutRepository.save).toHaveBeenCalledWith(
+			expect.objectContaining({
+				performedAt: expect.any(Date),
+				updatedBy: input.athleteId,
+			}),
 		);
 	});
 
