@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RiAddLine, RiCloseLine } from 'react-icons/ri';
 import {
 	ParametersService,
 	type ExerciseParameter,
 } from '@/gateway/services/parametro';
 import type { ExerciseParameter as ExerciseParameterResponse } from '@/gateway/services/parametro/exercises';
+import { exercisesService } from '@/gateway/services/parametro/exercises';
 import Button from '@/components/ui/Button';
 import ExerciseForm from '@/components/exercises/ExerciseForm';
 import ExerciseCatalogList from './ExerciseCatalogList';
@@ -72,6 +73,10 @@ export default function ExercisePicker({
 	const [createExerciseOpen, setCreateExerciseOpen] = useState(false);
 	const [newlyCreatedExerciseId, setNewlyCreatedExerciseId] = useState<number | null>(null);
 	const exerciseListRef = useRef<HTMLDivElement>(null);
+	const searchExercises = useCallback(
+		(query: string) => exercisesService.search(query),
+		[],
+	);
 
 	useEffect(() => {
 		let active = true;
@@ -113,10 +118,12 @@ export default function ExercisePicker({
 	}, [newlyCreatedExerciseId, exercises]);
 
 	const toggle = (exercise: Exercise) => {
-		const isSelected = selected.some((item) => item.id === exercise.id);
+		const isSelected = selected.some(
+			(item) => Number(item.id) === Number(exercise.id),
+		);
 		onChange(
 			isSelected
-				? selected.filter((item) => item.id !== exercise.id)
+				? selected.filter((item) => Number(item.id) !== Number(exercise.id))
 				: [...selected, exercise],
 		);
 	};
@@ -139,7 +146,7 @@ export default function ExercisePicker({
 			...current,
 			[exercise.id]: exercise.description ?? '',
 		}));
-		if (!selected.some((item) => item.id === exercise.id)) {
+		if (!selected.some((item) => Number(item.id) === Number(exercise.id))) {
 			setNewlyCreatedExerciseId(exercise.id);
 			onChange([...selected, exercise]);
 		}
@@ -169,6 +176,7 @@ export default function ExercisePicker({
 					filterExercise={filterExercise}
 					requiredMetrics={requiredMetrics}
 					matchMetricsOfFirstSelection={matchMetricsOfFirstSelection}
+					searchExercises={searchExercises}
 				/>
 				{/*
 				<div

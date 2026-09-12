@@ -35,6 +35,7 @@ describe('WorkoutsService', () => {
 		transaction: jest.fn((callback: (manager: typeof manager) => unknown) =>
 			callback(manager),
 		),
+		query: jest.fn(),
 	};
 	const associations = { findBy: jest.fn() };
 
@@ -124,6 +125,54 @@ describe('WorkoutsService', () => {
 		);
 	});
 
+	it('registra a data de início ao criar e iniciar um treino próprio', async () => {
+		Object.assign((service as any).usersService, {
+			findOne: jest.fn().mockResolvedValue({ person: { name: 'Atleta' } }),
+		});
+		manager.save.mockResolvedValueOnce({ id: 'workout-id' });
+		jest
+			.spyOn(service, 'findWorkout')
+			.mockResolvedValue({ id: 'workout-id' } as never);
+
+		await service.createMyWorkout(
+			{ startImmediately: true },
+			{
+				sub: input.athleteId,
+				tenantId: input.template.tenantId,
+				roles: [Role.TENANT_CLIENT],
+			},
+		);
+
+		expect(manager.save).toHaveBeenCalledWith(
+			Workout,
+			expect.objectContaining({
+				status: WorkoutStatus.IN_PROGRESS,
+				performedAt: expect.any(Date),
+			}),
+		);
+	});
+
+	it('inclui treinos pendentes e agendados na agenda do atleta', async () => {
+		dataSource.query.mockResolvedValueOnce([
+			{ workouts: [], total: '0', inProgress: null },
+		]);
+
+		await service.findMyAgendaWorkouts({
+			sub: input.athleteId,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_CLIENT],
+		});
+
+		const query = dataSource.query.mock.calls[0][0] as string;
+		expect(query).toContain(
+			"workout.status IN ('pending', 'scheduled', 'in_progress')",
+		);
+		expect(query).toContain("WHERE status IN ('pending', 'scheduled')");
+		expect(query).toContain(
+			"COUNT(*) FILTER (WHERE workout.status IN ('pending', 'scheduled')) OVER() AS total",
+		);
+	});
+
 	it('lista para o treinador apenas os treinos dos seus atletas vinculados', async () => {
 		const rows = [
 			{
@@ -166,7 +215,9 @@ describe('WorkoutsService', () => {
 			});
 
 			expect(query).toHaveBeenCalledWith(
-				expect.stringContaining('$3::boolean OR association.athlete_id IS NOT NULL'),
+				expect.stringContaining(
+					'$3::boolean OR association.athlete_id IS NOT NULL',
+				),
 				[input.createdBy, input.template.tenantId, true],
 			);
 		},
@@ -196,7 +247,9 @@ describe('WorkoutsService', () => {
 					roles: [Role.TENANT_TRAINER],
 				},
 			),
-		).rejects.toThrow('Você só pode atribuir treinos aos seus atletas vinculados.');
+		).rejects.toThrow(
+			'Você só pode atribuir treinos aos seus atletas vinculados.',
+		);
 	});
 
 	it('impede iniciar um treino quando o atleta já tem outro em andamento', async () => {
@@ -257,5 +310,122 @@ describe('WorkoutsService', () => {
 
 		expect(workoutRepository.existsBy).not.toHaveBeenCalled();
 		expect(manager.save).not.toHaveBeenCalled();
+	});
+
+	it('pula todas as séries e cancela o treino do próprio atleta', async () => {
+		const workout = {
+			id: 'workout-id',
+			status: WorkoutStatus.IN_PROGRESS,
+		} as Workout;
+		const execute = jest.fn();
+		const queryBuilder = {
+			update: jest.fn().mockReturnThis(),
+			set: jest.fn().mockReturnThis(),
+			where: jest.fn().mockReturnThis(),
+			execute,
+		};
+		Object.assign(manager, {
+			createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
+		});
+		jest.spyOn(service as any, 'findWritableWorkout').mockResolvedValue(workout);
+		jest
+			.spyOn(service, 'findWorkout')
+			.mockResolvedValue({ id: workout.id } as never);
+
+		await service.skipWorkout(workout.id, {
+			sub: input.athleteId,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_CLIENT],
+		});
+
+		expect(queryBuilder.set).toHaveBeenCalledWith(
+			expect.objectContaining({ status: ExecutionStatus.SKIPPED }),
+		);
+		expect(queryBuilder.where).toHaveBeenCalledWith('workout_id = :id', {
+			id: workout.id,
+		});
+		expect(execute).toHaveBeenCalled();
+		expect(workout.status).toBe(WorkoutStatus.CANCELLED);
+		expect(workout.performedAt).toBeInstanceOf(Date);
+		expect(manager.save).toHaveBeenCalledWith(
+			expect.objectContaining({
+				updatedBy: input.athleteId,
+				performedAt: expect.any(Date),
+			}),
+		);
+	});
+
+	it('preserva a data de início ao concluir o treino', async () => {
+		const startedAt = new Date('2026-09-12T10:00:00.000Z');
+		const workout = {
+			id: 'workout-id',
+			status: WorkoutStatus.IN_PROGRESS,
+			performedAt: startedAt,
+		} as Workout;
+		const executionRepository = { count: jest.fn().mockResolvedValue(0) };
+		const workoutRepository = { save: jest.fn().mockResolvedValue(workout) };
+		Object.assign(dataSource, {
+			getRepository: jest
+				.fn()
+				.mockReturnValueOnce(executionRepository)
+				.mockReturnValueOnce(workoutRepository),
+		});
+		jest.spyOn(service as any, 'findWritableWorkout').mockResolvedValue(workout);
+		jest
+			.spyOn(service, 'findWorkout')
+			.mockResolvedValue({ id: workout.id } as never);
+
+		await service.completeWorkout(workout.id, {
+			sub: input.athleteId,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_CLIENT],
+		});
+
+		expect(executionRepository.count).toHaveBeenCalled();
+		expect(workout.status).toBe(WorkoutStatus.COMPLETED);
+		expect(workout.performedAt).toBe(startedAt);
+		expect(workoutRepository.save).toHaveBeenCalledWith(
+			expect.objectContaining({
+				performedAt: expect.any(Date),
+				updatedBy: input.athleteId,
+			}),
+		);
+	});
+
+	it('registra a data de execução ao cancelar um treino agendado', async () => {
+		const workout = {
+			id: 'workout-id',
+			athleteId: input.athleteId,
+			status: WorkoutStatus.SCHEDULED,
+			performedAt: null,
+		} as Workout;
+		const repository = {
+			findOne: jest.fn().mockResolvedValue(workout),
+			save: jest.fn().mockResolvedValue(workout),
+		};
+		Object.assign(dataSource, {
+			getRepository: jest.fn().mockReturnValue(repository),
+		});
+		jest
+			.spyOn(service as any, 'ensureCanManageAthleteWorkout')
+			.mockResolvedValue(undefined);
+		jest
+			.spyOn(service, 'findWorkout')
+			.mockResolvedValue({ id: workout.id } as never);
+
+		await service.cancelWorkout(workout.id, {
+			sub: input.createdBy,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_TRAINER],
+		});
+
+		expect(workout.status).toBe(WorkoutStatus.CANCELLED);
+		expect(workout.performedAt).toBeInstanceOf(Date);
+		expect(repository.save).toHaveBeenCalledWith(
+			expect.objectContaining({
+				performedAt: expect.any(Date),
+				updatedBy: input.createdBy,
+			}),
+		);
 	});
 });

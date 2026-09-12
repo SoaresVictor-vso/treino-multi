@@ -100,7 +100,7 @@ describe('AuthController', () => {
 			.compile();
 
 		controller = module.get(AuthController);
-		authService = module.get(AuthService) as jest.Mocked<AuthService>;
+		authService = module.get(AuthService);
 	});
 
 	// ── POST /auth/login ──────────────────────────────────────────────────────

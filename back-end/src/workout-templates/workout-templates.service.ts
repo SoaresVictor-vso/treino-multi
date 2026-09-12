@@ -91,13 +91,13 @@ export class WorkoutTemplatesService {
 	): Promise<
 		Array<{ id: string; name: string; description: string; exercises: string[] }>
 	> {
-		const permissions = resolvePermissions(actor.roles as Role[]);
+		const permissions = resolvePermissions(actor.roles);
 		const exercisesSubquery = this.templateRepo
 			.createQueryBuilder('t')
 			.leftJoin('t.activities', 'a')
 			.leftJoin('a.exercise', 'e')
 			.select(
-				"COALESCE(ARRAY_AGG(DISTINCT e.name) FILTER (WHERE e.name IS NOT NULL), ARRAY[]::text[])",
+				'COALESCE(ARRAY_AGG(DISTINCT e.name) FILTER (WHERE e.name IS NOT NULL), ARRAY[]::text[])',
 				'exercises',
 			)
 			.where('t.id = template.id');
@@ -214,7 +214,7 @@ export class WorkoutTemplatesService {
 		operation: TemplateOperation,
 	): void {
 		const [own, tenant, all] = OPERATION_PERMISSIONS[operation];
-		const permissions = resolvePermissions(actor.roles as Role[]);
+		const permissions = resolvePermissions(actor.roles);
 		if (
 			!permissions.includes(all) &&
 			!(permissions.includes(tenant) && actor.tenantId === template.tenantId) &&
@@ -227,7 +227,7 @@ export class WorkoutTemplatesService {
 	}
 
 	private ensurePermission(actor: JwtPayload, permission: Permission): void {
-		if (!resolvePermissions(actor.roles as Role[]).includes(permission)) {
+		if (!resolvePermissions(actor.roles).includes(permission)) {
 			throw new ForbiddenException(
 				`Acesso negado: permissão ausente: ${permission}`,
 			);

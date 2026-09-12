@@ -2,10 +2,13 @@ import {
 	Body,
 	Controller,
 	Get,
+	HttpCode,
+	HttpStatus,
 	Param,
 	ParseUUIDPipe,
 	Patch,
 	Post,
+	Query,
 	UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -18,6 +21,13 @@ import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { GenerateWorkoutsFromTemplateDto } from './dto/generate-workouts-from-template.dto';
 import { CreateWorkoutDto } from './dto/create-workout.dto';
 import { UpdateWorkoutExecutionsDto } from './dto/update-workout-executions.dto';
+import { UpdateWorkoutNameDto } from './dto/update-workout-name.dto';
+import {
+	ListCompletedWorkoutsCalendarDto,
+	ListCompletedWorkoutsDto,
+	ListAgendaWorkoutsDto,
+	ListWorkoutsCalendarDto,
+} from './dto/list-completed-workouts.dto';
 import { WorkoutsService } from './workouts.service';
 
 @ApiTags('workouts')
@@ -35,12 +45,57 @@ export class WorkoutsController {
 		return this.service.findMyWorkouts(actor);
 	}
 
+	@Get('me/agenda')
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({
+		summary: 'Lista a agenda paginada e o treino em andamento do atleta',
+	})
+	findMyAgendaWorkouts(
+		@CurrentUser() actor: JwtPayload,
+		@Query() query: ListAgendaWorkoutsDto,
+	) {
+		return this.service.findMyAgendaWorkouts(actor, query.cursor);
+	}
+
 	@Get('me/completed')
 	@ApiOperation({
 		summary: 'Lista os últimos cinco treinos finalizados do atleta autenticado',
 	})
-	findMyCompletedWorkouts(@CurrentUser() actor: JwtPayload) {
-		return this.service.findMyCompletedWorkouts(actor);
+	findMyCompletedWorkouts(
+		@CurrentUser() actor: JwtPayload,
+		@Query() query: ListCompletedWorkoutsDto,
+	) {
+		return this.service.findMyCompletedWorkouts(actor, query.cursor);
+	}
+
+	@Get('me/completed/calendar')
+	@ApiOperation({
+		summary: 'Lista os treinos finalizados da semana ou do mês para calendário',
+	})
+	findMyCompletedWorkoutsForCalendar(
+		@CurrentUser() actor: JwtPayload,
+		@Query() query: ListCompletedWorkoutsCalendarDto,
+	) {
+		return this.service.findMyCompletedWorkoutsForCalendar(
+			actor,
+			query.period ?? 'week',
+			query.date,
+		);
+	}
+
+	@Get('me/calendar')
+	@ApiOperation({
+		summary: 'Lista os treinos do mês para o calendário do atleta',
+	})
+	findMyWorkoutsForCalendar(
+		@CurrentUser() actor: JwtPayload,
+		@Query() query: ListWorkoutsCalendarDto,
+	) {
+		return this.service.findMyWorkoutsForCalendar(
+			actor,
+			query.date,
+			query.timeZone,
+		);
 	}
 
 	@Get('trainer')
@@ -89,6 +144,16 @@ export class WorkoutsController {
 		return this.service.updateExecutions(id, dto, actor);
 	}
 
+	@Patch(':id/name')
+	@ApiOperation({ summary: 'Altera o nome de um treino do próprio atleta' })
+	updateWorkoutName(
+		@Param('id', new ParseUUIDPipe()) id: string,
+		@Body() dto: UpdateWorkoutNameDto,
+		@CurrentUser() actor: JwtPayload,
+	) {
+		return this.service.updateWorkoutName(id, dto.name, actor);
+	}
+
 	@Patch(':id/complete')
 	@ApiOperation({
 		summary: 'Finaliza um treino quando todas as séries foram resolvidas',
@@ -98,6 +163,17 @@ export class WorkoutsController {
 		@CurrentUser() actor: JwtPayload,
 	) {
 		return this.service.completeWorkout(id, actor);
+	}
+
+	@Patch(':id/skip')
+	@ApiOperation({
+		summary: 'Pula todas as séries e cancela o treino do próprio atleta',
+	})
+	skipWorkout(
+		@Param('id', new ParseUUIDPipe()) id: string,
+		@CurrentUser() actor: JwtPayload,
+	) {
+		return this.service.skipWorkout(id, actor);
 	}
 
 	@Post('from-template')

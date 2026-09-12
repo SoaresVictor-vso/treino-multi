@@ -24,6 +24,7 @@ type ExerciseExecutionCardProps = {
 	onTitleLongPress?: () => void;
 	exerciseNote?: WorkoutExerciseNote;
 	onAthleteNoteChange: (note: string) => void;
+	onRestClick: (execution: WorkoutExecution) => void;
 };
 
 export default function ExerciseExecutionCard({
@@ -37,6 +38,7 @@ export default function ExerciseExecutionCard({
 	onTitleLongPress,
 	exerciseNote,
 	onAthleteNoteChange,
+	onRestClick,
 }: ExerciseExecutionCardProps) {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [noteOpen, setNoteOpen] = useState(false);
@@ -65,11 +67,11 @@ export default function ExerciseExecutionCard({
 	const athleteNote = exerciseNote?.athleteNote;
 
 	return (
-		<article className="rounded-xl border border-outline-variant bg-surface-container-low p-4 sm:p-5">
-			<div className="mb-4 flex items-start justify-between gap-3">
+		<article className="rounded-xl border border-outline-variant bg-surface-container-low p-3 sm:p-4">
+			<div className="mb-3 flex items-start justify-between gap-3">
 				<div>
 					<h2
-						className={`text-xl font-bold ${editable ? 'cursor-pointer select-none touch-manipulation' : ''}`}
+						className={`text-base font-bold leading-tight sm:text-lg ${editable ? 'cursor-pointer select-none touch-manipulation' : ''}`}
 						onPointerDown={startReorderPress}
 						onPointerUp={cancelReorderPress}
 						onPointerLeave={cancelReorderPress}
@@ -151,7 +153,7 @@ export default function ExerciseExecutionCard({
 					<p className="mt-1 whitespace-pre-wrap">{athleteNote}</p>
 				</div>
 			) : null}
-			<div className="space-y-3">
+			<div className="space-y-2">
 				{editable && (
 					<button
 						type="button"
@@ -170,6 +172,7 @@ export default function ExerciseExecutionCard({
 						onChange={(key, value) => onChange(execution.id, key, value)}
 						onSkip={() => onSkipSet(execution.id)}
 						onStatusChange={(status) => onChange(execution.id, 'status', status)}
+						onRestClick={() => onRestClick(execution)}
 					/>
 				))}
 			</div>

@@ -122,7 +122,7 @@ export default function ClientWorkouts() {
 				setError(activeResponse.error || completedResponse.error || null);
 			else {
 				setWorkouts(activeResponse.data ?? []);
-				setCompletedWorkouts(completedResponse.data ?? []);
+				setCompletedWorkouts(completedResponse.data?.workouts ?? []);
 			}
 			setIsLoading(false);
 		});

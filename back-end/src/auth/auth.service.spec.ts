@@ -183,6 +183,18 @@ describe('AuthService', () => {
 			expect(result).toEqual(user);
 		});
 
+		it('deve normalizar e-mail para minúsculas antes da consulta', async () => {
+			const hash = await bcrypt.hash('12345678', 12);
+			personRepo.findOne.mockResolvedValue(makePerson());
+			userRepo.findOne.mockResolvedValue(makeUser({ passwordHash: hash }));
+
+			await service.validateUser('Admin@ORG.COM', '12345678');
+
+			expect(personRepo.findOne).toHaveBeenCalledWith({
+				where: { email: 'admin@org.com' },
+			});
+		});
+
 		/**
 		 * Cenário: e-mail não encontrado no banco.
 		 * Deve retornar null — não lança exceção (responsabilidade do caller).
@@ -387,6 +399,16 @@ describe('AuthService', () => {
 			await expect(service.refreshAccessToken(RAW_TOKEN)).rejects.toThrow(
 				UnauthorizedException,
 			);
+		});
+
+		it('deve lançar UnauthorizedException quando o usuário do token está inativo', async () => {
+			const stored = makeStoredToken({ user: makeUser({ isActive: false }) });
+			refreshTokenRepo.findOne.mockResolvedValue(stored);
+
+			await expect(service.refreshAccessToken(RAW_TOKEN)).rejects.toThrow(
+				UnauthorizedException,
+			);
+			expect(jwtService.sign).not.toHaveBeenCalled();
 		});
 	});
 

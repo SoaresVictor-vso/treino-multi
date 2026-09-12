@@ -16,55 +16,52 @@ import { CreateTenantFullDto } from './dto/create-tenant-full.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { AuditLogService } from '../audit-logs/audit-logs.service';
 
-const makeTenant = (overrides: Partial<Tenant> = {}): Tenant =>
-	({
-		id: 'tenant-uuid-1',
-		name: 'Acme Corp',
-		tradeName: 'Acme Corp',
-		registeredName: 'Acme Corp LTDA',
-		slug: 'acme-corp',
-		cnpj: '12345678000199',
-		phone: '1133334444',
-		email: 'contato@acme.com',
-		isActive: true,
-		deletedAt: null,
-		createdAt: new Date('2024-01-01'),
-		updatedAt: new Date('2024-01-01'),
-		users: [],
-		...overrides,
-	}) as Tenant;
+const makeTenant = (overrides: Partial<Tenant> = {}): Tenant => ({
+	id: 'tenant-uuid-1',
+	name: 'Acme Corp',
+	tradeName: 'Acme Corp',
+	registeredName: 'Acme Corp LTDA',
+	slug: 'acme-corp',
+	cnpj: '12345678000199',
+	phone: '1133334444',
+	email: 'contato@acme.com',
+	isActive: true,
+	deletedAt: null,
+	createdAt: new Date('2024-01-01'),
+	updatedAt: new Date('2024-01-01'),
+	users: [],
+	...overrides,
+});
 
-const makePerson = (overrides: Partial<Person> = {}): Person =>
-	({
-		id: 'person-uuid-1',
-		name: 'Admin Acme',
-		email: 'admin@acme.com',
-		document: '12345678901',
-		phone: '11999990000',
-		createdAt: new Date('2024-01-01'),
-		updatedAt: new Date('2024-01-01'),
-		users: [],
-		...overrides,
-	}) as Person;
+const makePerson = (overrides: Partial<Person> = {}): Person => ({
+	id: 'person-uuid-1',
+	name: 'Admin Acme',
+	email: 'admin@acme.com',
+	document: '12345678901',
+	phone: '11999990000',
+	createdAt: new Date('2024-01-01'),
+	updatedAt: new Date('2024-01-01'),
+	users: [],
+	...overrides,
+});
 
-const makeUser = (overrides: Partial<User> = {}): User =>
-	({
-		id: 'user-uuid-1',
-		personId: 'person-uuid-1',
-		tenantId: 'tenant-uuid-1',
-		context: 'tenant',
-		passwordHash: 'hashed-password',
-		isActive: true,
-		lastLoginAt: null,
-		deletedAt: null,
-		createdAt: new Date('2024-01-01'),
-		updatedAt: new Date('2024-01-01'),
-		person: makePerson(),
-		tenant: makeTenant(),
-		userRoles: [],
-		refreshTokens: [],
-		...overrides,
-	}) as User;
+const makeUser = (overrides: Partial<User> = {}): User => ({
+	id: 'user-uuid-1',
+	personId: 'person-uuid-1',
+	tenantId: 'tenant-uuid-1',
+	context: 'tenant',
+	passwordHash: 'hashed-password',
+	isActive: true,
+	lastLoginAt: null,
+	deletedAt: null,
+	createdAt: new Date('2024-01-01'),
+	updatedAt: new Date('2024-01-01'),
+	person: makePerson(),
+	tenant: makeTenant(),
+	userRoles: [],
+	refreshTokens: [],
+	...overrides,
+});
 
 const makeQb = (result: Tenant[]): Partial<SelectQueryBuilder<Tenant>> => ({
 	orderBy: jest.fn().mockReturnThis(),
@@ -410,7 +407,7 @@ describe('TenantsService', () => {
 				phone: '11999990000',
 				email: 'novo@acme.com',
 				isActive: false,
-			} as Tenant);
+			});
 
 			const dto: UpdateTenantDto = {
 				trade_name: 'Novo Nome',

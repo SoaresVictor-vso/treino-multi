@@ -10,12 +10,15 @@ import ErrorBox from '@/components/ui/ErrorBox';
 import validateCPF from '@/utilities/validators/cpf';
 import validateEmail from '@/utilities/validators/email';
 import {
+	clearSessionTokens,
 	refreshAccessToken,
 	storeSessionTokens,
 	tokenHasEnoughLifetime,
 } from '@/gateway/client';
 import { LoginService } from '@/gateway/services/login';
 import { getAuthToken } from '@/lib/auth';
+import { getLandingPathForRoles } from '@/lib/landing';
+import { getSessionUser } from '@/lib/auth';
 
 const REMEMBER_ME_KEY = 'rememberMe';
 const REFRESH_TOKEN_KEY = 'refreshToken';
@@ -41,13 +44,17 @@ export default function Login() {
 
 		async function restoreRememberedSession() {
 			if (tokenHasEnoughLifetime(getAuthToken())) {
-				router.replace('/home');
+				router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
 				return;
 			}
 
 			const response = await refreshAccessToken();
 			if (isActive && response.success && response.data?.accessToken) {
-				router.replace('/home');
+				router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
+			} else if (isActive) {
+				// Um refresh que falhou não deve ser tentado indefinidamente nem
+				// manter credenciais de sessão inválidas no navegador.
+				clearSessionTokens();
 			}
 		}
 
@@ -75,7 +82,13 @@ export default function Login() {
 
 		try {
 			const loginService = new LoginService();
-			const res = await loginService.login(login, password);
+			const normalizedLogin = login.trim();
+			const res = await loginService.login(
+				normalizedLogin.includes('@')
+					? normalizedLogin.toLocaleLowerCase('en-US')
+					: normalizedLogin,
+				password,
+			);
 			if (!res.success) {
 				setLoading(false);
 				setError(res.error || 'Não foi possível realizar o login.');
@@ -95,7 +108,7 @@ export default function Login() {
 			localStorage.removeItem(ACCESS_TOKEN_KEY);
 
 			setLoading(false);
-			router.push('/home');
+			router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
 		} catch {
 			setLoading(false);
 			setError('Não foi possível realizar o login.');

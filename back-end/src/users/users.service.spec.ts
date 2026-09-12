@@ -25,24 +25,23 @@ import { UserOrderBy } from './dto/find-users-query.dto';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
-const makeUser = (overrides: Partial<User> = {}): User =>
-	({
-		id: 'user-uuid-1',
-		personId: 'person-uuid-1',
-		tenantId: null,
-		context: 'organization',
-		passwordHash: '$2b$12$hashedpassword',
-		isActive: true,
-		deletedAt: null,
-		lastLoginAt: null,
-		createdAt: new Date(),
-		updatedAt: new Date(),
-		userRoles: [{ role: Role.ORG_ADMIN, deletedAt: null } as UserRole],
-		person: { id: 'person-uuid-1', name: 'Admin', email: 'admin@org.com' } as any,
-		tenant: null,
-		refreshTokens: [],
-		...overrides,
-	}) as User;
+const makeUser = (overrides: Partial<User> = {}): User => ({
+	id: 'user-uuid-1',
+	personId: 'person-uuid-1',
+	tenantId: null,
+	context: 'organization',
+	passwordHash: '$2b$12$hashedpassword',
+	isActive: true,
+	deletedAt: null,
+	lastLoginAt: null,
+	createdAt: new Date(),
+	updatedAt: new Date(),
+	userRoles: [{ role: Role.ORG_ADMIN, deletedAt: null } as UserRole],
+	person: { id: 'person-uuid-1', name: 'Admin', email: 'admin@org.com' } as any,
+	tenant: null,
+	refreshTokens: [],
+	...overrides,
+});
 
 // ── testes ───────────────────────────────────────────────────────────────────
 
@@ -278,7 +277,7 @@ describe('UsersService', () => {
 				.mockResolvedValueOnce(user)
 				.mockResolvedValueOnce(updatedUser);
 			personRepo.findOne.mockResolvedValue(null);
-			personRepo.save.mockResolvedValue(updatedUser.person as Person);
+			personRepo.save.mockResolvedValue(updatedUser.person);
 
 			const result = await service.updateManagedUser('user-uuid-1', {
 				name: 'Nome Novo',

@@ -32,6 +32,8 @@ import { CreateManagedUserDto } from './dto/create-managed-user.dto';
 import { UpdateManagedUserDto } from './dto/update-managed-user.dto';
 import { FindUsersQueryDto, UserOrderBy } from './dto/find-users-query.dto';
 import { Role } from '../common/enums/role.enum';
+import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
+import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
 
 /**
  * CRUD organizacional de User (User + Person).
@@ -43,6 +45,36 @@ import { Role } from '../common/enums/role.enum';
 @Controller('users')
 export class UsersController {
 	constructor(private readonly usersService: UsersService) {}
+
+	/** Dados do usuário autenticado, sem exigir permissões administrativas. */
+	@ApiOperation({ summary: 'Busca o perfil do usuário autenticado' })
+	@Get('me')
+	me(@CurrentUser() actor: jwtPayloadInterface.JwtPayload) {
+		return this.usersService.findOwnProfile(actor.sub);
+	}
+
+	/** Atualiza somente os dados pessoais da própria conta. */
+	@ApiOperation({ summary: 'Atualiza o perfil do usuário autenticado' })
+	@Patch('me')
+	updateMe(
+		@Body() dto: UpdateOwnProfileDto,
+		@Ip() ip: string,
+		@CurrentUser() actor: jwtPayloadInterface.JwtPayload,
+	) {
+		return this.usersService.updateOwnProfile(actor.sub, dto, ip);
+	}
+
+	/** Altera a senha da própria conta após confirmar a senha atual. */
+	@ApiOperation({ summary: 'Altera a senha do usuário autenticado' })
+	@Patch('me/password')
+	@HttpCode(HttpStatus.NO_CONTENT)
+	changeMyPassword(
+		@Body() dto: ChangeOwnPasswordDto,
+		@Ip() ip: string,
+		@CurrentUser() actor: jwtPayloadInterface.JwtPayload,
+	) {
+		return this.usersService.changeOwnPassword(actor.sub, dto, ip);
+	}
 
 	/** POST /users — cria User + Person */
 	@ApiOperation({ summary: 'Cria um novo usuário com Person associada' })

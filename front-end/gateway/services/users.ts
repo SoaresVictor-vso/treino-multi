@@ -3,7 +3,6 @@ import { UsersListResponseDto } from '../dto/user/list-user.dto';
 import { Role } from '@/lib/roles';
 import { CreateUserDto } from '../dto/user/create-user.dto';
 import { UserListItemDto } from '../dto/user/list-user.dto';
-import { CPF_REGEX, EMAIL_REGEX, PHONE_REGEX } from '@/lib/constants';
 
 export type UpdateUserDto = {
 	name: string;
@@ -11,6 +10,21 @@ export type UpdateUserDto = {
 	document?: string | null;
 	fone?: string | null;
 	isActive: boolean;
+};
+
+export type OwnProfileDto = {
+	id: string;
+	name: string;
+	email: string | null;
+	phone: string | null;
+	document: string | null;
+};
+
+export type UpdateOwnProfileDto = {
+	name: string;
+	email: string | null;
+	phone: string | null;
+	document?: string | null;
 };
 
 export type ParamsFindUsers = {
@@ -53,5 +67,28 @@ export class UsersService {
 			queryString ? `${this.apiUrl}?${queryString}` : this.apiUrl,
 			{ method: 'GET' },
 		);
+	}
+
+	async getMe() {
+		return authenticatedRequest<OwnProfileDto>(`${this.apiUrl}/me`, {
+			method: 'GET',
+		});
+	}
+
+	async updateMe(payload: UpdateOwnProfileDto) {
+		return authenticatedRequest<OwnProfileDto>(`${this.apiUrl}/me`, {
+			method: 'PATCH',
+			body: JSON.stringify(payload),
+		});
+	}
+
+	async changeMyPassword(payload: {
+		currentPassword: string;
+		newPassword: string;
+	}) {
+		return authenticatedRequest<void>(`${this.apiUrl}/me/password`, {
+			method: 'PATCH',
+			body: JSON.stringify(payload),
+		});
 	}
 }
