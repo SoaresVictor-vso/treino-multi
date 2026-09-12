@@ -20,6 +20,8 @@ import { CreateManagedUserDto } from './dto/create-managed-user.dto';
 import { UpdateManagedUserDto } from './dto/update-managed-user.dto';
 import { FindUsersQueryDto, UserOrderBy } from './dto/find-users-query.dto';
 import { Role } from '../common/enums/role.enum';
+import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
+import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
 
 const USER_ORDERING = {
 	[UserOrderBy.ID]: {
@@ -257,6 +259,72 @@ export class UsersService {
 		return user;
 	}
 
+	async updateOwnProfile(
+		userId: string,
+		dto: UpdateOwnProfileDto,
+		ipAddress?: string | null,
+	) {
+		const user = await this.findOne(userId);
+		const person = user.person;
+
+		if (dto.email !== undefined || dto.document !== undefined) {
+			await this.ensurePersonUniqueness(
+				this.personRepo,
+				dto.email !== undefined ? dto.email : (person.email ?? null),
+				dto.document !== undefined ? dto.document : (person.document ?? null),
+				person.id,
+			);
+		}
+		if (dto.email !== undefined) person.email = dto.email;
+		if (dto.name !== undefined) person.name = dto.name;
+		if (dto.phone !== undefined) person.phone = dto.phone;
+		if (dto.document !== undefined) {
+			if (person.document) {
+				throw new ForbiddenException(
+					'O documento cadastrado não pode ser alterado.',
+				);
+			}
+			person.document = dto.document;
+		}
+
+		await this.personRepo.save(person);
+		await this.auditLogService.logCriticalOperation({
+			tenantId: user.tenantId,
+			tableName: 'persons',
+			operation: 'UPDATE',
+			recordId: person.id,
+			userId,
+			ipAddress: ipAddress ?? null,
+		});
+
+		return this.toOwnProfile(user);
+	}
+
+	async findOwnProfile(userId: string) {
+		return this.toOwnProfile(await this.findOne(userId));
+	}
+
+	async changeOwnPassword(
+		userId: string,
+		dto: ChangeOwnPasswordDto,
+		ipAddress?: string | null,
+	): Promise<void> {
+		const user = await this.findOne(userId);
+		const validPassword = await bcrypt.compare(
+			dto.currentPassword,
+			user.passwordHash,
+		);
+		if (!validPassword) {
+			throw new UnauthorizedException('A senha atual está incorreta.');
+		}
+
+		await this.updatePassword(userId, dto.newPassword, {
+			isSession: true,
+			tenantId: user.tenantId,
+			ipAddress: ipAddress ?? null,
+		});
+	}
+
 	async updateManagedUser(
 		id: string,
 		dto: UpdateManagedUserDto,
@@ -438,6 +506,16 @@ export class UsersService {
 				throw new ConflictException(`Documento ${document} já está em uso.`);
 			}
 		}
+	}
+
+	private toOwnProfile(user: User) {
+		return {
+			id: user.id,
+			name: user.person.name,
+			email: user.person.email ?? null,
+			phone: user.person.phone ?? null,
+			document: user.person.document ?? null,
+		};
 	}
 
 	private normalizeTenantId(tenantId?: string): string | null | undefined {
