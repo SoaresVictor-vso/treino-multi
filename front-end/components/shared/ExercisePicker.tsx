@@ -118,10 +118,12 @@ export default function ExercisePicker({
 	}, [newlyCreatedExerciseId, exercises]);
 
 	const toggle = (exercise: Exercise) => {
-		const isSelected = selected.some((item) => item.id === exercise.id);
+		const isSelected = selected.some(
+			(item) => Number(item.id) === Number(exercise.id),
+		);
 		onChange(
 			isSelected
-				? selected.filter((item) => item.id !== exercise.id)
+				? selected.filter((item) => Number(item.id) !== Number(exercise.id))
 				: [...selected, exercise],
 		);
 	};
@@ -144,7 +146,7 @@ export default function ExercisePicker({
 			...current,
 			[exercise.id]: exercise.description ?? '',
 		}));
-		if (!selected.some((item) => item.id === exercise.id)) {
+		if (!selected.some((item) => Number(item.id) === Number(exercise.id))) {
 			setNewlyCreatedExerciseId(exercise.id);
 			onChange([...selected, exercise]);
 		}

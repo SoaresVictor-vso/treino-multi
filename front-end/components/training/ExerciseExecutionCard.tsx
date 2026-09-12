@@ -24,6 +24,7 @@ type ExerciseExecutionCardProps = {
 	onTitleLongPress?: () => void;
 	exerciseNote?: WorkoutExerciseNote;
 	onAthleteNoteChange: (note: string) => void;
+	onRestClick: (execution: WorkoutExecution) => void;
 };
 
 export default function ExerciseExecutionCard({
@@ -37,6 +38,7 @@ export default function ExerciseExecutionCard({
 	onTitleLongPress,
 	exerciseNote,
 	onAthleteNoteChange,
+	onRestClick,
 }: ExerciseExecutionCardProps) {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [noteOpen, setNoteOpen] = useState(false);
@@ -170,6 +172,7 @@ export default function ExerciseExecutionCard({
 						onChange={(key, value) => onChange(execution.id, key, value)}
 						onSkip={() => onSkipSet(execution.id)}
 						onStatusChange={(status) => onChange(execution.id, 'status', status)}
+						onRestClick={() => onRestClick(execution)}
 					/>
 				))}
 			</div>

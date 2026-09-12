@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
+import Checkbox from '@/components/ui/Checkbox';
 import ErrorBox from '@/components/ui/ErrorBox';
 import Modal from '@/components/ui/Modal';
 import ExercisePicker from '@/components/shared/ExercisePicker';
@@ -24,6 +25,8 @@ import {
 	type WorkoutExecution,
 } from '@/gateway/services/workouts';
 import type { Exercise } from '@/gateway/services/parametro';
+import { secondsToTime, timeToSeconds } from '@/gateway/services/workout-templates';
+import { DEFAULT_REST_DURATION } from '@/lib/constants';
 
 function serializeExecution(execution: WorkoutExecution) {
 	const {
@@ -33,6 +36,7 @@ function serializeExecution(execution: WorkoutExecution) {
 		referencePersonalRecord: _referencePersonalRecord,
 		metric1Type: _metric1Type,
 		metric2Type: _metric2Type,
+		finishedAt: _finishedAt,
 		...payload
 	} = execution;
 	return { ...payload, ...(id > 0 ? { id } : {}) };
@@ -59,7 +63,6 @@ function preloadPrescribedValues(workout: WorkoutDetail): WorkoutDetail {
 				position: index + 1,
 				performedMetric1: execution.performedMetric1 ?? execution.prescribedMetric1,
 				performedMetric2: execution.performedMetric2 ?? execution.prescribedMetric2,
-				performedPse: execution.performedPse ?? execution.prescribedPse,
 				performedRestDuration:
 					execution.performedRestDuration ?? execution.prescribedRestDuration,
 			})),
@@ -88,6 +91,13 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const [missingRpOpen, setMissingRpOpen] = useState(false);
 	const [reorderOpen, setReorderOpen] = useState(false);
 	const [renameOpen, setRenameOpen] = useState(false);
+	const [restOpen, setRestOpen] = useState(false);
+	const [restExecution, setRestExecution] = useState<WorkoutExecution | null>(null);
+	const [restSeconds, setRestSeconds] = useState(0);
+	const [applyRestToExercise, setApplyRestToExercise] = useState(false);
+	const [applyRestToWorkout, setApplyRestToWorkout] = useState(false);
+	const [now, setNow] = useState(() => Date.now());
+	const [restDismissed, setRestDismissed] = useState(false);
 	const [workoutName, setWorkoutName] = useState('');
 	const [renaming, setRenaming] = useState(false);
 	const workoutRef = useRef<WorkoutDetail | null>(null);
@@ -176,6 +186,10 @@ export default function TrainingExecution({ id }: { id: string }) {
 		}, 60_000);
 		return () => window.clearInterval(autosave);
 	}, [save]);
+	useEffect(() => {
+		const interval = window.setInterval(() => setNow(Date.now()), 1000);
+		return () => window.clearInterval(interval);
+	}, []);
 
 	const updateWorkout = (
 		updater: (current: WorkoutDetail) => WorkoutDetail,
@@ -199,13 +213,25 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const updateExecution = (
 		executionId: number,
 		patch: Partial<WorkoutExecution>,
-	) =>
+	) => {
+		const currentExecution = workoutRef.current?.executions.find(
+			(item) => item.id === executionId,
+		);
+		if (
+			patch.status === 'in_progress' &&
+			currentExecution?.status === 'completed'
+		)
+			setRestDismissed(true);
+		if (patch.status === 'completed') setRestDismissed(false);
 		updateWorkout((current) => ({
 			...current,
 			executions: current.executions.map((item) =>
-				item.id === executionId ? { ...item, ...patch } : item,
+				item.id === executionId
+					? { ...item, ...patch, ...(patch.status === 'completed' ? { finishedAt: new Date().toISOString() } : {}), ...(patch.status === 'in_progress' ? { finishedAt: null } : {}) }
+					: item,
 			),
 		}), { saveImmediately: patch.status === 'completed' });
+	};
 	const updateAthleteNote = (exerciseId: number, athleteNote: string) =>
 		updateWorkout((current) => {
 			const existing = current.exerciseNotes.find(
@@ -254,12 +280,16 @@ export default function TrainingExecution({ id }: { id: string }) {
 				metric1Type: sourceSet?.metric1Type ?? 'v',
 				metric2Type: sourceSet?.metric2Type ?? 'v',
 				prescribedPse: sourceSet?.prescribedPse ?? null,
-				prescribedRestDuration: sourceSet?.prescribedRestDuration ?? null,
+				prescribedRestDuration:
+					sourceSet?.prescribedRestDuration ?? DEFAULT_REST_DURATION,
 				performedMetric1: sourceSet?.performedMetric1 ?? null,
 				performedMetric2: sourceSet?.performedMetric2 ?? null,
 				performedPse: sourceSet?.performedPse ?? null,
-				performedRestDuration: sourceSet?.performedRestDuration ?? null,
+				performedRestDuration:
+					sourceSet?.performedRestDuration ?? DEFAULT_REST_DURATION,
 				performedNote: null,
+				setType: 'padrao',
+				finishedAt: null,
 				status: 'in_progress',
 				exercise,
 				referenceGroup: null,
@@ -275,12 +305,34 @@ export default function TrainingExecution({ id }: { id: string }) {
 		});
 	const addExercises = (selected: Exercise[]) => {
 		updateWorkout((current) => {
+			const existingExerciseIds = new Set(
+				current.executions.map((execution) => execution.exerciseId),
+			);
+			const newExercises = selected.filter(
+				(exercise) => !existingExerciseIds.has(exercise.id),
+			);
+			if (!newExercises.length) return current;
 			const firstNewPosition = current.executions.length + 1;
+			const activeRestDurations = current.executions
+				.filter((execution) => execution.status !== 'skipped')
+				.map(
+					(execution) =>
+						execution.performedRestDuration ??
+						execution.prescribedRestDuration ??
+						DEFAULT_REST_DURATION,
+				);
+			const restDuration =
+				activeRestDurations.length > 0 &&
+				activeRestDurations.every(
+					(duration) => duration === activeRestDurations[0],
+				)
+					? activeRestDurations[0]
+					: DEFAULT_REST_DURATION;
 			return {
 				...current,
 				executions: [
 					...current.executions,
-					...selected.map((exercise, index) => ({
+					...newExercises.map((exercise, index) => ({
 						id: -(firstNewPosition + index),
 						exerciseId: exercise.id,
 						position: firstNewPosition + index,
@@ -289,12 +341,14 @@ export default function TrainingExecution({ id }: { id: string }) {
 						metric1Type: 'v' as const,
 						metric2Type: 'v' as const,
 						prescribedPse: null,
-						prescribedRestDuration: null,
+						prescribedRestDuration: restDuration,
 						performedMetric1: null,
 						performedMetric2: null,
 						performedPse: null,
-						performedRestDuration: null,
+						performedRestDuration: restDuration,
 						performedNote: null,
+						setType: 'padrao' as const,
+						finishedAt: null,
 						status: 'in_progress' as const,
 						exercise,
 						referenceGroup: null,
@@ -304,6 +358,15 @@ export default function TrainingExecution({ id }: { id: string }) {
 			};
 		});
 		setPickerOpen(false);
+	};
+	const openExercisePicker = () => {
+		const exercisesById = new Map<number, Exercise>();
+		(workoutRef.current?.executions ?? []).forEach((execution) => {
+			if (!exercisesById.has(execution.exerciseId))
+				exercisesById.set(execution.exerciseId, execution.exercise);
+		});
+		setPickerSelection(Array.from(exercisesById.values()));
+		setPickerOpen(true);
 	};
 	const reorderExercises = (exerciseIds: number[]) =>
 		updateWorkout((current) => {
@@ -333,6 +396,45 @@ export default function TrainingExecution({ id }: { id: string }) {
 					: item,
 			),
 		}));
+	const openRest = (execution: WorkoutExecution) => {
+		setRestExecution(execution);
+		setRestSeconds(execution.performedRestDuration ?? execution.prescribedRestDuration ?? 0);
+		setApplyRestToExercise(false);
+		setApplyRestToWorkout(false);
+		setRestOpen(true);
+	};
+	const saveRest = () => {
+		if (!restExecution) return;
+		updateWorkout((current) => ({
+			...current,
+			executions: current.executions.map((item) => {
+				const pending = item.status === 'in_progress';
+				const sameExercise = item.exerciseId === restExecution.exerciseId;
+				const shouldApply = item.id === restExecution.id || (pending && (applyRestToWorkout || (applyRestToExercise && sameExercise)));
+				return shouldApply ? { ...item, performedRestDuration: restSeconds } : item;
+			}),
+		}), { saveImmediately: true });
+		setRestOpen(false);
+	};
+	const activeRest = useMemo(() => {
+		if (restDismissed) return null;
+		const completed = (workout?.executions ?? []).filter((item) => item.status === 'completed' && item.finishedAt);
+		const last = completed.toSorted((a, b) => new Date(b.finishedAt!).getTime() - new Date(a.finishedAt!).getTime())[0];
+		if (!last?.finishedAt) return null;
+		const duration = last.performedRestDuration ?? last.prescribedRestDuration ?? 0;
+		if (!duration) return null;
+		return {
+			duration,
+			remaining: Math.min(
+				duration,
+				duration - (now - new Date(last.finishedAt).getTime()) / 1000,
+			),
+		};
+	}, [workout?.executions, now, restDismissed]);
+	const formatRest = (seconds: number) => {
+		const total = Math.abs(Math.ceil(seconds));
+		return `${seconds < 0 ? '-' : ''}${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+	};
 	const reorderableExercises = Array.from(
 		new Map(
 			(workout?.executions ?? []).map((execution) => [
@@ -442,6 +544,15 @@ export default function TrainingExecution({ id }: { id: string }) {
 		);
 	return (
 		<section className="mx-auto w-full max-w-5xl space-y-4 pb-10">
+			{workout.status === 'in_progress' && activeRest && (
+				<>
+					<div className={`sticky top-2 z-20 rounded-xl border p-3 shadow-lg backdrop-blur ${activeRest.remaining < 0 ? 'border-red-500 bg-red-950/90 text-red-100' : 'border-primary-fixed-dim/50 bg-surface-container/95'}`}>
+						<div className="flex items-center justify-between gap-3"><span className="text-xs font-bold uppercase tracking-wider">Descanso</span><span className="font-mono text-2xl font-bold">{formatRest(activeRest.remaining)}</span></div>
+						<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/25"><div className={`h-full transition-[width] duration-1000 ${activeRest.remaining < 0 ? 'bg-red-500' : 'bg-primary-fixed-dim'}`} style={{ width: `${Math.max(0, Math.min(100, (activeRest.remaining / activeRest.duration) * 100))}%` }} /></div>
+					</div>
+					{activeRest.remaining < 0 && <div className="pointer-events-none fixed inset-0 z-30 border border-red-500/25 shadow-[inset_0_0_28px_4px_rgba(239,68,68,0.1)]" aria-hidden="true" />}
+				</>
+			)}
 			<div className="border-b border-outline-variant/60 pb-3">
 				<div className="flex items-center justify-between gap-3">
 					<button
@@ -496,14 +607,10 @@ export default function TrainingExecution({ id }: { id: string }) {
 				)}
 			{isAthlete &&
 				['pending', 'scheduled', 'in_progress'].includes(workout.status) && (
-					<Button
-						variant="outline"
-						className="border-error/50 text-error hover:border-error hover:text-error"
-						disabled={saving}
-						onClick={() => setSkipOpen(true)}
-					>
-						Pular treino
-					</Button>
+					<div className="flex flex-wrap gap-2">
+						<Button variant="outline" className="border-error/50 text-error hover:border-error hover:text-error" disabled={saving} onClick={() => setSkipOpen(true)}>Pular treino</Button>
+						<Button variant="outline" disabled={saving} onClick={() => setReorderOpen(true)}>Reordenar exercícios</Button>
+					</div>
 				)}
 			{editable && (
 				<p className="-mt-1 text-right text-xs text-on-surface-variant" role="status">
@@ -523,10 +630,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 						</p>
 						<Button
 							className="mt-5"
-							onClick={() => {
-								setPickerSelection([]);
-								setPickerOpen(true);
-							}}
+							onClick={openExercisePicker}
 						>
 							<RiAddLine /> Adicionar exercício
 						</Button>
@@ -557,6 +661,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 							onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
 							onAddSeries={() => addSeries(sets[0].exercise, 'after')}
 							onTitleLongPress={() => setReorderOpen(true)}
+							onRestClick={openRest}
 						/>
 					);
 				})}
@@ -567,10 +672,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 						<Button
 							variant="outline"
 							className="w-full border-primary-container/40 bg-primary-container/5 text-primary-fixed"
-						onClick={() => {
-							setPickerSelection([]);
-							setPickerOpen(true);
-						}}
+						onClick={openExercisePicker}
 						>
 							<RiAddLine /> Adicionar exercício
 						</Button>
@@ -647,6 +749,19 @@ export default function TrainingExecution({ id }: { id: string }) {
 				</div>
 			</Modal>
 			<Modal
+				isOpen={restOpen}
+				title="Configurar descanso"
+				description="Defina o descanso após esta série. Ele inicia automaticamente quando a série for concluída."
+				onClose={() => setRestOpen(false)}
+			>
+				<div className="space-y-5">
+					<Input label="Tempo de descanso" type="time" min="00:00:00" max="00:59:59" step={1} value={secondsToTime(restSeconds)} onChange={(event) => setRestSeconds(Math.min(3599, timeToSeconds(event.target.value)))} />
+					<Checkbox label="Aplicar às séries faltantes deste exercício" checked={applyRestToExercise} onChange={(event) => { setApplyRestToExercise(event.target.checked); if (event.target.checked) setApplyRestToWorkout(false); }} />
+					<Checkbox label="Aplicar a todas as séries faltantes do treino" checked={applyRestToWorkout} onChange={(event) => { setApplyRestToWorkout(event.target.checked); if (event.target.checked) setApplyRestToExercise(false); }} />
+					<div className="flex justify-end gap-3"><Button variant="ghost" onClick={() => setRestOpen(false)}>Cancelar</Button><Button onClick={saveRest}>Salvar descanso</Button></div>
+				</div>
+			</Modal>
+			<Modal
 				isOpen={skipOpen}
 				title="Pular treino?"
 				description="Todos os exercícios serão marcados como pulados e o treino será cancelado. Esta ação não pode ser desfeita."
@@ -672,6 +787,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 					onChange={setPickerSelection}
 					onClose={() => void addExercises(pickerSelection)}
 					filterExercise={(exercise) =>
+						pickerSelection.some((selected) => selected.id === exercise.id) ||
 						!(workout?.executions ?? []).some(
 							(execution) => execution.exerciseId === exercise.id,
 						)

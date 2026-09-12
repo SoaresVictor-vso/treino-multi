@@ -11,6 +11,7 @@ import {
 	ValidateNested,
 } from 'class-validator';
 import { ExecutionStatus } from '../../common/enums/execution-status.enum';
+import { ExecutionSetType } from '../../common/enums/execution-set-type.enum';
 
 export class UpdateWorkoutExecutionDto {
 	@IsOptional() @IsInt() id?: number;
@@ -25,6 +26,7 @@ export class UpdateWorkoutExecutionDto {
 	@IsOptional() @IsNumber() performedPse?: number | null;
 	@IsOptional() @IsInt() performedRestDuration?: number | null;
 	@IsOptional() @IsString() performedNote?: string | null;
+	@IsOptional() @IsEnum(ExecutionSetType) setType?: ExecutionSetType;
 	@IsOptional() @IsEnum(ExecutionStatus) status?: ExecutionStatus;
 }
 

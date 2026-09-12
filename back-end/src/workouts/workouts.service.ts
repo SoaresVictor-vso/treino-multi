@@ -16,6 +16,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { Role } from '../common/enums/role.enum';
 import { ExecutionStatus } from '../common/enums/execution-status.enum';
+import { ExecutionSetType } from '../common/enums/execution-set-type.enum';
 import { WorkoutStatus } from '../common/enums/workout-status.enum';
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
 import { UsersService } from '../users/users.service';
@@ -57,6 +58,8 @@ type WorkoutExecutionRow = {
 	performedPse: string | number | null;
 	performedRestDuration: string | number | null;
 	performedNote: string | null;
+	setType: ExecutionSetType;
+	finishedAt: string | null;
 	note: string | null;
 	athleteNote: string | null;
 	executionStatus: ExecutionStatus | null;
@@ -601,6 +604,8 @@ export class WorkoutsService {
 				execution.performed_pse AS "performedPse",
 				execution.performed_rest_duration AS "performedRestDuration",
 				execution.performed_note AS "performedNote",
+				execution.set_type AS "setType",
+				execution.finished_at AS "finishedAt",
 				workout_exercise_note.note AS "note",
 				workout_exercise_note.athlete_note AS "athleteNote",
 				execution.status AS "executionStatus",
@@ -693,6 +698,8 @@ export class WorkoutsService {
 					performedPse: numberOrNull(execution.performedPse),
 					performedRestDuration: numberOrNull(execution.performedRestDuration),
 					performedNote: execution.performedNote,
+					setType: execution.setType,
+					finishedAt: execution.finishedAt,
 					status: execution.executionStatus,
 					exercise: {
 						id: Number(execution.exerciseIdReference),
@@ -866,12 +873,20 @@ export class WorkoutsService {
 						status: ExecutionStatus.IN_PROGRESS,
 						startedAt: new Date(),
 					});
+				const previousStatus = entity.status;
 				Object.assign(entity, input);
 				if (
 					entity.status === ExecutionStatus.COMPLETED ||
 					entity.status === ExecutionStatus.SKIPPED
-				)
-					entity.finishedAt = new Date();
+				) {
+					if (
+						previousStatus !== entity.status ||
+						!entity.finishedAt
+					)
+						entity.finishedAt = new Date();
+				}
+				else if (entity.status === ExecutionStatus.IN_PROGRESS)
+					entity.finishedAt = null;
 				await manager.save(entity);
 			}
 			if (dto.exerciseNotes?.length) {
@@ -1392,6 +1407,7 @@ export class WorkoutsService {
 			performedPse: null,
 			performedRestDuration: null,
 			performedNote: null,
+			setType: ExecutionSetType.PADRAO,
 			status: ExecutionStatus.PENDING,
 			startedAt: null,
 			finishedAt: null,

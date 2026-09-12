@@ -110,6 +110,7 @@ export default function ExerciseCatalogList({
 		matchMetricsOfFirstSelection,
 		normalizedQuery,
 		requiredMetrics,
+		selected,
 	]);
 
 	return (
@@ -125,7 +126,10 @@ export default function ExerciseCatalogList({
 				className="min-h-0 flex-1 space-y-2 overflow-y-auto sm:max-h-[55vh] sm:flex-none"
 			>
 				{visibleExercises.map((exercise) => {
-					const order = selected.findIndex((item) => item.id === exercise.id) + 1;
+					const order =
+						selected.findIndex(
+							(item) => Number(item.id) === Number(exercise.id),
+						) + 1;
 					const content = (
 						<>
 							<span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded bg-surface-container-highest text-primary sm:h-14 sm:w-14">

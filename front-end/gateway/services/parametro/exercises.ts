@@ -272,23 +272,6 @@ export class ExercisesService implements ExercisesServiceContract {
 				},
 			}),
 		]);
-		console.table([
-			...stemmedResults.hits.map((hit) => ({
-				busca: 'principal',
-				nome: hit.document.name,
-				score: hit.score,
-				peso: STEMMED_SEARCH_WEIGHT,
-				scorePonderado: hit.score * STEMMED_SEARCH_WEIGHT,
-			})),
-			...typoTolerantResults.hits.map((hit) => ({
-				busca: 'tolerância',
-				nome: hit.document.name,
-				score: hit.score,
-				peso: TYPO_TOLERANT_SEARCH_WEIGHT,
-				scorePonderado: hit.score * TYPO_TOLERANT_SEARCH_WEIGHT,
-			})),
-		]);
-
 		const weightedResults = [
 			...stemmedResults.hits.map((hit) => ({
 				...hit,
@@ -307,15 +290,6 @@ export class ExercisesService implements ExercisesServiceContract {
 				score: (current?.score ?? 0) + result.score,
 			});
 		});
-		console.table(
-			Array.from(results.values())
-				.sort((left, right) => right.score - left.score)
-				.map((result) => ({
-					nome: result.document.name,
-					scorePonderado: result.score,
-				})),
-		);
-
 		return Array.from(results.values())
 			.sort((left, right) => right.score - left.score)
 			.map((result) => ({

@@ -8,6 +8,7 @@ export type ExecutionStatus =
 	| 'completed'
 	| 'skipped';
 export type WorkoutStatus = ExecutionStatus | 'scheduled' | 'cancelled';
+export type ExecutionSetType = 'padrao' | 'aquecimento' | 'dropset' | 'falha';
 
 export type WorkoutExecution = {
 	id: number;
@@ -24,6 +25,8 @@ export type WorkoutExecution = {
 	performedPse: number | null;
 	performedRestDuration: number | null;
 	performedNote: string | null;
+	setType: ExecutionSetType;
+	finishedAt: string | null;
 	status: ExecutionStatus;
 	exercise: Exercise & { metric_1: Metric; metric_2?: Metric | null };
 	referenceGroup: { id: number; name: string } | null;
@@ -140,6 +143,7 @@ export type UpdateWorkoutExecution = Omit<
 	| 'referencePersonalRecord'
 	| 'metric1Type'
 	| 'metric2Type'
+	| 'finishedAt'
 > & { id?: number };
 
 export const workoutsService = {
