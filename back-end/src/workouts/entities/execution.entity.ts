@@ -11,6 +11,7 @@ import {
 	type ValueTransformer,
 } from 'typeorm';
 import { ExecutionStatus } from '../../common/enums/execution-status.enum';
+import { ExecutionSetType } from '../../common/enums/execution-set-type.enum';
 import { Exercise } from '../../exercises/entities/exercise.entity';
 import type { RegisterType } from '../../workout-templates/entities/activity.entity';
 import { Workout } from './workout.entity';
@@ -100,6 +101,15 @@ export class Execution {
 
 	@Column({ name: 'performed_note', type: 'text', nullable: true })
 	performedNote!: string | null;
+
+	@Column({
+		name: 'set_type',
+		type: 'enum',
+		enum: ExecutionSetType,
+		enumName: 'execution_set_type_enum',
+		default: ExecutionSetType.PADRAO,
+	})
+	setType!: ExecutionSetType;
 
 	@Column({
 		type: 'enum',

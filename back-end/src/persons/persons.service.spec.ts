@@ -17,18 +17,17 @@ import { AuditLogService } from '../audit-logs/audit-logs.service';
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
-const makePerson = (overrides: Partial<Person> = {}): Person =>
-	({
-		id: 'person-uuid-1',
-		name: 'João Silva',
-		email: 'joao@example.com',
-		document: '12345678901',
-		phone: null,
-		createdAt: new Date('2024-01-01'),
-		updatedAt: new Date('2024-01-01'),
-		users: [],
-		...overrides,
-	}) as Person;
+const makePerson = (overrides: Partial<Person> = {}): Person => ({
+	id: 'person-uuid-1',
+	name: 'João Silva',
+	email: 'joao@example.com',
+	document: '12345678901',
+	phone: null,
+	createdAt: new Date('2024-01-01'),
+	updatedAt: new Date('2024-01-01'),
+	users: [],
+	...overrides,
+});
 
 // ── testes ───────────────────────────────────────────────────────────────────
 
@@ -148,7 +147,7 @@ describe('PersonsService', () => {
 			repo.findOne.mockResolvedValue(person);
 
 			const updatedPerson = { ...person, name: 'João Atualizado' };
-			repo.save.mockResolvedValue(updatedPerson as Person);
+			repo.save.mockResolvedValue(updatedPerson);
 
 			const dto: UpdatePersonDto = { name: 'João Atualizado' };
 			const result = await service.update('person-uuid-1', dto);

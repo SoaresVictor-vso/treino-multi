@@ -63,7 +63,10 @@ function formValues(workout: WorkoutDetail): TrainingFormValues {
 			type2: execution.metric2Type ?? 'v',
 			pse: execution.prescribedPse ?? 0,
 			restDuration: execution.prescribedRestDuration ?? 0,
-			note: '',
+			note:
+				workout.exerciseNotes.find(
+					(note) => note.exerciseId === execution.exerciseId,
+				)?.note ?? '',
 		})),
 	};
 }

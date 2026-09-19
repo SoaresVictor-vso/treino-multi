@@ -23,13 +23,17 @@ export class IndexedDbService {
 				const entities = request.result as T[];
 				const entries = Object.entries(filtros) as [keyof T, unknown][];
 
-				resolve(
+				const results =
 					entities.filter((entity) =>
 						entries.every(([campo, valor]) => entity[campo] === valor),
-					),
-				);
+					);
+				database.close();
+				resolve(results);
 			};
-			request.onerror = () => reject(request.error);
+			request.onerror = () => {
+				database.close();
+				reject(request.error);
+			};
 		});
 	}
 
@@ -55,9 +59,18 @@ export class IndexedDbService {
 
 			entities.forEach((entity) => store.put(entity));
 
-			transaction.oncomplete = () => resolve();
-			transaction.onerror = () => reject(transaction.error);
-			transaction.onabort = () => reject(transaction.error);
+			transaction.oncomplete = () => {
+				database.close();
+				resolve();
+			};
+			transaction.onerror = () => {
+				database.close();
+				reject(transaction.error);
+			};
+			transaction.onabort = () => {
+				database.close();
+				reject(transaction.error);
+			};
 		});
 	}
 
@@ -73,9 +86,18 @@ export class IndexedDbService {
 
 			ids.forEach((id) => store.delete(id));
 
-			transaction.oncomplete = () => resolve();
-			transaction.onerror = () => reject(transaction.error);
-			transaction.onabort = () => reject(transaction.error);
+			transaction.oncomplete = () => {
+				database.close();
+				resolve();
+			};
+			transaction.onerror = () => {
+				database.close();
+				reject(transaction.error);
+			};
+			transaction.onabort = () => {
+				database.close();
+				reject(transaction.error);
+			};
 		});
 	}
 
@@ -96,6 +118,7 @@ export class IndexedDbService {
 			};
 			request.onsuccess = () => {
 				const database = request.result;
+				database.onversionchange = () => database.close();
 
 				if (!database.objectStoreNames.contains(parametro)) {
 					const nextVersion = database.version + 1;
@@ -110,7 +133,11 @@ export class IndexedDbService {
 							upgradeRequest.transaction,
 						);
 					};
-					upgradeRequest.onsuccess = () => resolve(upgradeRequest.result);
+					upgradeRequest.onsuccess = () => {
+						const upgradedDatabase = upgradeRequest.result;
+						upgradedDatabase.onversionchange = () => upgradedDatabase.close();
+						resolve(upgradedDatabase);
+					};
 					upgradeRequest.onerror = () => reject(upgradeRequest.error);
 					return;
 				}
@@ -139,7 +166,11 @@ export class IndexedDbService {
 						upgradeRequest.transaction,
 					);
 				};
-				upgradeRequest.onsuccess = () => resolve(upgradeRequest.result);
+				upgradeRequest.onsuccess = () => {
+					const upgradedDatabase = upgradeRequest.result;
+					upgradedDatabase.onversionchange = () => upgradedDatabase.close();
+					resolve(upgradedDatabase);
+				};
 				upgradeRequest.onerror = () => reject(upgradeRequest.error);
 			};
 			request.onerror = () => reject(request.error);

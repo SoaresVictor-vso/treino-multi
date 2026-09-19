@@ -47,16 +47,21 @@ export class AuthService {
 	 * forem inválidas ou o usuário estiver inativo / deletado.
 	 */
 	async validateUser(login: string, password: string): Promise<User | null> {
+		const normalizedLogin = this.normalizeLogin(login);
 		// Tenta localizar a person pelo e-mail; se não encontrar, tenta pelo document
-		let person = await this.personRepo.findOne({ where: { email: login } });
+		let person = await this.personRepo.findOne({
+			where: { email: normalizedLogin },
+		});
 		if (!person) {
-			person = await this.personRepo.findOne({ where: { document: login } });
+			person = await this.personRepo.findOne({
+				where: { document: normalizedLogin },
+			});
 		}
 		if (!person) return null;
 
 		const user = await this.userRepo.findOne({
 			where: { personId: person.id, isActive: true },
-			relations: ['userRoles'],
+			relations: ['userRoles', 'person'],
 		});
 		if (!user) return null;
 
@@ -76,7 +81,8 @@ export class AuthService {
 		ipAddress?: string,
 		userAgent?: string,
 	): Promise<AuthTokens> {
-		const user = await this.validateUser(dto.login, dto.password);
+		const normalizedLogin = this.normalizeLogin(dto.login);
+		const user = await this.validateUser(normalizedLogin, dto.password);
 
 		// Resolve o contexto para o log antes de lançar exceção
 		const loginContext = user?.context ?? 'standalone';
@@ -85,9 +91,9 @@ export class AuthService {
 		// Registra tentativa de login (sucesso ou falha)
 		await this.auditLogService.logAuthentication({
 			tenantId: loginTenantId,
-			context: loginContext as 'organization' | 'tenant' | 'standalone',
+			context: loginContext,
 			success: !!user,
-			loginUsed: dto.login,
+			loginUsed: normalizedLogin,
 			ipAddress: ipAddress ?? null,
 		});
 
@@ -95,11 +101,12 @@ export class AuthService {
 
 		const roles = (user.userRoles ?? [])
 			.filter((ur) => !ur.deletedAt)
-			.map((ur) => ur.role as Role);
+			.map((ur) => ur.role);
 
 		const payload: JwtPayload = {
 			sub: user.id,
 			personId: user.personId,
+			name: user.person?.name,
 			context: user.context,
 			tenantId: user.tenantId,
 			roles,
@@ -145,7 +152,7 @@ export class AuthService {
 
 		const stored = await this.refreshTokenRepo.findOne({
 			where: { tokenHash },
-			relations: ['user', 'user.userRoles'],
+			relations: ['user', 'user.userRoles', 'user.person'],
 		});
 
 		if (!stored) throw new UnauthorizedException('Refresh token inválido');
@@ -155,13 +162,17 @@ export class AuthService {
 			throw new UnauthorizedException('Refresh token expirado');
 
 		const { user } = stored;
+		if (!user?.isActive)
+			throw new UnauthorizedException('Usuário inativo');
+
 		const roles = (user.userRoles ?? [])
 			.filter((ur) => !ur.deletedAt)
-			.map((ur) => ur.role as Role);
+			.map((ur) => ur.role);
 
 		const payload: JwtPayload = {
 			sub: user.id,
 			personId: user.personId,
+			name: user.person?.name,
 			context: user.context,
 			tenantId: user.tenantId,
 			roles,
@@ -201,7 +212,7 @@ export class AuthService {
 		if (targetUserId) {
 			targetUser = await this.userRepo.findOne({
 				where: { id: targetUserId, tenantId, isActive: true },
-				relations: ['userRoles'],
+				relations: ['userRoles', 'person'],
 			});
 			if (!targetUser) throw new NotFoundException('Usuário alvo não encontrado');
 		} else {
@@ -209,6 +220,7 @@ export class AuthService {
 			targetUser = await this.userRepo
 				.createQueryBuilder('u')
 				.innerJoin('u.userRoles', 'ur')
+				.leftJoinAndSelect('u.person', 'person')
 				.where('u.tenant_id = :tenantId', { tenantId })
 				.andWhere('u.is_active = true')
 				.andWhere('ur.role = :role', { role: 'tenant:admin' })
@@ -221,11 +233,12 @@ export class AuthService {
 
 		const roles = (targetUser.userRoles ?? [])
 			.filter((ur) => !ur.deletedAt)
-			.map((ur) => ur.role as Role);
+			.map((ur) => ur.role);
 
 		const payload: JwtPayload = {
 			sub: targetUser.id,
 			personId: targetUser.personId,
+			name: targetUser.person?.name,
 			context: targetUser.context,
 			tenantId: targetUser.tenantId,
 			roles,
@@ -253,5 +266,12 @@ export class AuthService {
 		const value = parseInt(duration.slice(0, -1), 10);
 		const MS = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
 		return value * (MS[unit] ?? 1000);
+	}
+
+	private normalizeLogin(login: string): string {
+		const trimmedLogin = login.trim();
+		return trimmedLogin.includes('@')
+			? trimmedLogin.toLocaleLowerCase('en-US')
+			: trimmedLogin;
 	}
 }

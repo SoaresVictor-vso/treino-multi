@@ -23,6 +23,8 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 	hint?: string;
 	mask?: InputMask | InputMask[];
 	leadingIcon?: ReactNode;
+	trailingContent?: ReactNode;
+	selectOnClick?: boolean;
 	sideComponent?: 'right' | 'left' | 'both' | 'none';
 }
 
@@ -43,6 +45,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 			mask,
 			type,
 			leadingIcon,
+			trailingContent,
+			selectOnClick = true,
 			sideComponent = 'none',
 			...props
 		},
@@ -99,6 +103,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
 		const handleClick = (event: MouseEvent<HTMLInputElement>) => {
 			onClick?.(event);
+			if (!selectOnClick) return;
+
 			try {
 				event.currentTarget.select();
 			} catch {
@@ -126,7 +132,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 		}
 
 		return (
-			<div className="flex flex-col gap-1">
+			<div className="flex min-w-0 flex-col gap-1">
 				{label && (
 					<label
 						htmlFor={inputId}
@@ -140,7 +146,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 				)}
 				<div
 					className={
-						`relative border border-outline-variant bg-surface-container-high transition-colors ` +
+					`relative min-w-0 border border-outline-variant bg-surface-container-high transition-colors ` +
 						roundedClass +
 						(error ? 'border-error/60 ' : 'focus-within:border-primary-fixed-dim/50 ')
 					}
@@ -148,6 +154,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 					{leadingIcon ? (
 						<span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
 							{leadingIcon}
+						</span>
+					) : null}
+					{trailingContent ? (
+						<span className="absolute right-2 top-1/2 -translate-y-1/2">
+							{trailingContent}
 						</span>
 					) : null}
 					<input
@@ -159,8 +170,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 						}
 						placeholder={hasValue ? '' : (placeholder ?? label)}
 						className={
-							`w-full rounded-xl bg-transparent ${sizeClass} text-primary outline-none focus:ring-0 ` +
-							(leadingIcon ? ' ps-12 pe-3' : ' px-3') +
+							`min-w-0 w-full rounded-xl bg-transparent ${sizeClass} text-primary outline-none focus:ring-0 ` +
+							(leadingIcon ? ' ps-12' : ' ps-3') +
+							(trailingContent ? ' pe-12' : ' pe-3') +
 							' autofill:bg-surface-container-high autofill:text-primary autofill:shadow-[inset_0_0_0px_1000px_var(--color-surface-container-high)] autofill:[-webkit-text-fill-color:var(--color-primary)] ' +
 							className
 						}

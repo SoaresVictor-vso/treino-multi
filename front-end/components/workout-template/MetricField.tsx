@@ -14,6 +14,8 @@ export function MetricField({
 	onTypeChange,
 	optional = false,
 	disabled = false,
+	inputClassName,
+	compact = false,
 }: {
 	value: string | number | undefined;
 	metric: Metric;
@@ -22,6 +24,8 @@ export function MetricField({
 	onTypeChange: (value: 'v' | 'p') => void;
 	optional?: boolean;
 	disabled?: boolean;
+	inputClassName?: string;
+	compact?: boolean;
 	limits?: {
 		min?: number;
 		max?: number;
@@ -74,10 +78,12 @@ export function MetricField({
 	};
 
 	return (
-		<div className="block text-xs font-semibold leading-none text-on-surface-variant">
-			{label}
-			{unit ? ` (${unit})` : ''}
-			{optional ? ' (opcional)' : ''}
+		<div className={`block min-w-0 font-semibold leading-none text-on-surface-variant ${compact ? 'text-[10px]' : 'text-xs'}`}>
+			<span className="block truncate">
+				{label}
+				{unit ? ` (${unit})` : ''}
+				{optional ? ' (opcional)' : ''}
+			</span>
 			<div className="mt-1 flex h-8">
 				<Input
 					aria-label={`${label}${unit ? ` (${unit})` : ''}`}
@@ -95,6 +101,7 @@ export function MetricField({
 					value={handleValue(value)}
 					onChange={handleChange}
 					disabled={disabled}
+					className={inputClassName}
 					sideComponent={allowPercent ? 'right' : 'none'}
 				/>
 				{allowPercent && (

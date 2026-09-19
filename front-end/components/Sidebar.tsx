@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import React from 'react';
 import * as icons from 'react-icons/ri';
-import { clearAuthCookie } from '@/lib/auth';
+import { clearSessionTokens } from '@/gateway/client';
 import { NavItemPublic } from '@/lib/navigation';
 
 export default function Sidebar({
@@ -22,7 +22,7 @@ export default function Sidebar({
 	const [collapsed, setCollapsed] = useState(true);
 
 	function handleLogout() {
-		clearAuthCookie();
+		clearSessionTokens();
 		router.push('/login');
 	}
 

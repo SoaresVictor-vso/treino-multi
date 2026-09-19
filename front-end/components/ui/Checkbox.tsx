@@ -28,10 +28,10 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
 						type="checkbox"
 						aria-describedby={error ? `${inputId}-error` : undefined}
 						className={[
-							'mt-0.5 h-4 w-4 flex-shrink-0 rounded border-gray-300 text-blue-600',
-							'focus:ring-2 focus:ring-blue-500 focus:ring-offset-1',
+							'mt-0.5 h-4 w-4 flex-shrink-0 rounded border border-outline-variant bg-surface-container-high accent-primary-container',
+							'focus:ring-2 focus:ring-primary-fixed-dim/30 focus:ring-offset-2 focus:ring-offset-surface-container',
 							'transition cursor-pointer',
-							error ? 'border-red-500 focus:ring-red-400' : '',
+							error ? 'border-error accent-error focus:ring-error/30' : '',
 							props.disabled ? 'cursor-not-allowed' : '',
 							className,
 						]
@@ -42,10 +42,10 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
 					{(label || description) && (
 						<div className="flex flex-col">
 							{label && (
-								<span className="text-sm font-medium text-gray-700">{label}</span>
+								<span className="text-sm font-medium text-on-surface">{label}</span>
 							)}
 							{description && (
-								<span className="text-xs text-gray-500">{description}</span>
+								<span className="text-xs text-on-surface-variant">{description}</span>
 							)}
 						</div>
 					)}
@@ -55,7 +55,7 @@ const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
 					<p
 						id={`${inputId}-error`}
 						role="alert"
-						className="text-xs text-red-600 ml-7"
+					className="ml-7 text-xs text-error"
 					>
 						{error}
 					</p>

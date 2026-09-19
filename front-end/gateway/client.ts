@@ -1,5 +1,5 @@
 import { API_URL } from '@/lib/constants';
-import { getAuthToken, setAuthCookie } from '@/lib/auth';
+import { clearAuthCookie, getAuthToken, setAuthCookie } from '@/lib/auth';
 
 export interface ApiResponse<T> {
 	success: boolean;
@@ -9,9 +9,30 @@ export interface ApiResponse<T> {
 }
 
 const MINIMUM_TOKEN_LIFETIME_SECONDS = 60;
+const ACCESS_TOKEN_KEY = 'accessToken';
+const REFRESH_TOKEN_KEY = 'refreshToken';
+const REMEMBER_ME_KEY = 'rememberMe';
 let refreshPromise: Promise<ApiResponse<{ accessToken: string }>> | null = null;
+let inMemoryRefreshToken: string | null = null;
 
-function tokenHasEnoughLifetime(token: string | null): boolean {
+export function storeSessionTokens(accessToken: string, refreshToken: string): void {
+	setAuthCookie(accessToken);
+	inMemoryRefreshToken = refreshToken;
+}
+
+export function clearSessionTokens(): void {
+	inMemoryRefreshToken = null;
+	refreshPromise = null;
+	clearAuthCookie();
+
+	if (typeof localStorage !== 'undefined') {
+		localStorage.removeItem(ACCESS_TOKEN_KEY);
+		localStorage.removeItem(REFRESH_TOKEN_KEY);
+		localStorage.removeItem(REMEMBER_ME_KEY);
+	}
+}
+
+export function tokenHasEnoughLifetime(token: string | null): boolean {
 	if (!token) return false;
 
 	try {
@@ -34,9 +55,10 @@ function tokenHasEnoughLifetime(token: string | null): boolean {
 }
 
 function getRefreshToken(): string | null {
+	if (inMemoryRefreshToken) return inMemoryRefreshToken;
 	if (typeof localStorage === 'undefined') return null;
 
-	const persistedValue = localStorage.getItem('refreshToken');
+	const persistedValue = localStorage.getItem(REFRESH_TOKEN_KEY);
 	if (!persistedValue) return null;
 
 	// usePersistedState persists strings with JSON.stringify(), so older
@@ -50,7 +72,7 @@ function getRefreshToken(): string | null {
 	}
 }
 
-async function refreshAccessToken(): Promise<
+export async function refreshAccessToken(): Promise<
 	ApiResponse<{ accessToken: string }>
 > {
 	if (!refreshPromise) {
@@ -102,7 +124,7 @@ export async function apiRequest<T>(
 			};
 
 		return { success: true, data, status: res.status };
-	} catch (error) {
+	} catch {
 		return {
 			success: false,
 			error: 'Não foi possível conectar ao servidor.',

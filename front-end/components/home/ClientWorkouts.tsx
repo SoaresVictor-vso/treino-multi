@@ -122,7 +122,7 @@ export default function ClientWorkouts() {
 				setError(activeResponse.error || completedResponse.error || null);
 			else {
 				setWorkouts(activeResponse.data ?? []);
-				setCompletedWorkouts(completedResponse.data ?? []);
+				setCompletedWorkouts(completedResponse.data?.workouts ?? []);
 			}
 			setIsLoading(false);
 		});
@@ -290,6 +290,7 @@ export default function ClientWorkouts() {
 					onCancel={() => setCreateOpen(false)}
 					isSubmitting={creating}
 					submitLabel="Criar treino"
+					noteLabel="Minha nota (opcional)"
 				/>
 			</Modal>
 			<Modal

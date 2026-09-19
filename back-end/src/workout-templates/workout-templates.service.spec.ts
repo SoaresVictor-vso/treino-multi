@@ -42,9 +42,7 @@ describe('WorkoutTemplatesService', () => {
 			findOne: jest.fn(),
 			delete: jest.fn(),
 			query: jest.fn(),
-		} as unknown as jest.Mocked<
-			Pick<EntityManager, 'create' | 'save' | 'findOne' | 'delete' | 'query'>
-		>;
+		};
 		queryBuilder = {
 			leftJoin: jest.fn(),
 			select: jest.fn(),

@@ -224,3 +224,35 @@ optgroup {
   background-color: var(--color-surface-container-high);
   color: var(--color-on-surface);
 }
+
+@keyframes athlete-orbit {
+  from { transform: rotate(0deg) translateX(9rem) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(9rem) rotate(-360deg); }
+}
+
+.athlete-orbit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 0.7rem;
+  width: 0.7rem;
+  border-radius: 9999px;
+  background: var(--color-primary-container);
+  box-shadow: 0 0 22px var(--color-primary-container);
+  pointer-events: none;
+}
+
+.athlete-orbit-one {
+  animation: athlete-orbit 8s linear infinite;
+}
+
+.athlete-orbit-two {
+  height: 0.45rem;
+  width: 0.45rem;
+  animation: athlete-orbit 12s linear infinite reverse;
+  opacity: 0.65;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .athlete-orbit { animation: none; }
+}

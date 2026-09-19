@@ -21,19 +21,18 @@ import { PasswordChangeLog } from './entities/password-change-log.entity';
 
 const makeAuthLog = (
 	overrides: Partial<AuthenticationLog> = {},
-): AuthenticationLog =>
-	({
-		id: 'auth-log-uuid-1',
-		tenantId: null,
-		contextTypeId: 1,
-		success: true,
-		loginUsed: 'admin@org.com',
-		ipAddress: '127.0.0.1',
-		createdAt: new Date(),
-		tenant: null,
-		contextType: { id: 1, name: 'organization' } as any,
-		...overrides,
-	}) as AuthenticationLog;
+): AuthenticationLog => ({
+	id: 'auth-log-uuid-1',
+	tenantId: null,
+	contextTypeId: 1,
+	success: true,
+	loginUsed: 'admin@org.com',
+	ipAddress: '127.0.0.1',
+	createdAt: new Date(),
+	tenant: null,
+	contextType: { id: 1, name: 'organization' } as any,
+	...overrides,
+});
 
 const makeCriticalLog = (
 	overrides: Partial<CriticalOperationLog> = {},
@@ -54,19 +53,18 @@ const makeCriticalLog = (
 
 const makePasswordLog = (
 	overrides: Partial<PasswordChangeLog> = {},
-): PasswordChangeLog =>
-	({
-		id: 'pw-log-uuid-1',
-		tenantId: null,
-		userId: 'user-uuid-1',
-		isSession: true,
-		ipAddress: '127.0.0.1',
-		usedToken: null,
-		createdAt: new Date(),
-		tenant: null,
-		user: null as any,
-		...overrides,
-	}) as PasswordChangeLog;
+): PasswordChangeLog => ({
+	id: 'pw-log-uuid-1',
+	tenantId: null,
+	userId: 'user-uuid-1',
+	isSession: true,
+	ipAddress: '127.0.0.1',
+	usedToken: null,
+	createdAt: new Date(),
+	tenant: null,
+	user: null as any,
+	...overrides,
+});
 
 /**
  * Cria um mock de SelectQueryBuilder que suporta a interface fluente
@@ -321,7 +319,7 @@ describe('AuditLogService', () => {
 
 	describe('isPasswordResetTokenAlreadyUsed()', () => {
 		it('deve retornar true quando encontrar token já utilizado', async () => {
-			passwordLogRepo.findOne.mockResolvedValue(makePasswordLog() as any);
+			passwordLogRepo.findOne.mockResolvedValue(makePasswordLog());
 
 			await expect(
 				service.isPasswordResetTokenAlreadyUsed('sha256-token-hash'),

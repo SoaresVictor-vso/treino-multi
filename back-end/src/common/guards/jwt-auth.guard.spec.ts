@@ -56,7 +56,7 @@ describe('JwtAuthGuard', () => {
 		}).compile();
 
 		guard = moduleRef.get(JwtAuthGuard);
-		reflector = moduleRef.get(Reflector) as any;
+		reflector = moduleRef.get(Reflector);
 	});
 
 	describe('canActivate()', () => {
