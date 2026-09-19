@@ -10,6 +10,8 @@ import {
 } from 'react-icons/ri';
 import { BiDumbbell } from 'react-icons/bi';
 import { MetricField } from '@/components/workout-template/MetricField';
+import SeriesIndicator, { seriesTypeClassName } from './SeriesIndicator';
+import RpeIndicator from './RpeIndicator';
 import type {
 	ExecutionSetType,
 	ExecutionStatus,
@@ -182,21 +184,20 @@ export default function ExecutionSet({
 					}}
 				>
 					<div className="flex items-center justify-center self-center">
-						<button
+						<SeriesIndicator
 							ref={buttonRef}
-							type="button"
+							number={number}
+							completed={execution.status === 'completed'}
+							tooltip={
+								execution.status === 'completed'
+										? `Série ${number} concluída — abrir opções`
+										: `Abrir opções da série ${number}`
+							}
 							disabled={menuDisabled}
 							onClick={toggleMenu}
-							aria-label={`Abrir opções da série ${number}`}
 							aria-expanded={menuOpen}
-							className="rounded-md disabled:cursor-default"
-						>
-							<span
-								className={`inline-flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-semibold ${setOption.className}`}
-							>
-								{number}
-							</span>
-						</button>
+							className={seriesTypeClassName[execution.setType] ?? setOption.className}
+						/>
 					</div>
 					<MetricField
 						metric={execution.exercise.metric_1}
@@ -232,27 +233,15 @@ export default function ExecutionSet({
 						/>
 					)}
 					{hasRpe && (
-						<button
-							type="button"
+						<RpeIndicator
+							prescribed={execution.prescribedPse}
+							performed={execution.performedPse}
 							disabled={fieldsDisabled}
 							onClick={() => {
 								setRpePickerOpen(true);
 								toggleMenu();
 							}}
-							className="inline-flex h-8 items-center rounded-md border border-outline-variant bg-surface-variant px-1.5 text-[10px] font-bold text-on-surface-variant hover:border-primary-fixed-dim hover:text-primary-fixed-dim disabled:cursor-default"
-							title={
-								execution.prescribedPse !== null
-									? `Prescrito: ${execution.prescribedPse}`
-									: undefined
-							}
-						>
-							RPE {execution.performedPse ?? execution.prescribedPse}
-							{execution.performedPse !== null &&
-							execution.prescribedPse !== null &&
-							execution.performedPse !== execution.prescribedPse
-								? `/${execution.prescribedPse}`
-								: ''}
-						</button>
+						/>
 					)}
 				</div>
 				{execution.status === 'completed' && (

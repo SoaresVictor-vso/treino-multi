@@ -1,0 +1,57 @@
+import { type PointerEvent } from 'react';
+
+type RpeIndicatorProps = {
+	prescribed: number | null;
+	performed: number | null;
+	mode?: 'expected' | 'performed';
+	onClick?: () => void;
+	disabled?: boolean;
+};
+
+export default function RpeIndicator({
+	prescribed,
+	performed,
+	mode = 'performed',
+	onClick,
+	disabled = false,
+}: RpeIndicatorProps) {
+	const value = mode === 'expected' ? prescribed : performed ?? prescribed;
+	const differsFromPrescription =
+		mode === 'performed' &&
+		performed !== null &&
+		prescribed !== null &&
+		performed !== prescribed;
+	const content = (
+		<>
+			RPE {value}
+			{differsFromPrescription ? `/${prescribed}` : ''}
+		</>
+	);
+	const title = prescribed !== null ? `Prescrito: ${prescribed}` : undefined;
+	const className =
+		'inline-flex h-8 items-center rounded-md border border-outline-variant bg-surface-variant px-1.5 text-[10px] font-bold text-on-surface-variant hover:border-primary-fixed-dim hover:text-primary-fixed-dim disabled:cursor-default';
+
+	if (!onClick)
+		return (
+			<span className={className} title={title} aria-label={title ?? 'RPE'}>
+				{content}
+			</span>
+		);
+
+	const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+		event.stopPropagation();
+	};
+
+	return (
+		<button
+			type="button"
+			disabled={disabled}
+			onPointerDown={handlePointerDown}
+			onClick={onClick}
+			className={className}
+			title={title}
+		>
+			{content}
+		</button>
+	);
+}

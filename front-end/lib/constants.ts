@@ -5,6 +5,7 @@ export const TTL_PARAMETROS = 24 * 60 * 60 * 1000;
 export const CACHE_PARAMETROS = true;
 
 export const DEFAULT_REST_DURATION = 90;
+export const WORKOUT_REFRESH_INTERVAL = 5 * 1000;
 
 export const CPF_REGEX = /^(\d{11}|\d{3}\.\d{3}\.\d{3}-\d{2})$/;
 export const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;

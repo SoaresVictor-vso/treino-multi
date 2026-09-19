@@ -30,7 +30,7 @@ import {
 	secondsToTime,
 	timeToSeconds,
 } from '@/gateway/services/workout-templates';
-import { DEFAULT_REST_DURATION } from '@/lib/constants';
+import { DEFAULT_REST_DURATION, WORKOUT_REFRESH_INTERVAL } from '@/lib/constants';
 
 function serializeExecution(execution: WorkoutExecution) {
 	const {
@@ -111,8 +111,8 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const savingRef = useRef(false);
 	const dirtyRef = useRef(false);
 
-	const load = async () => {
-		setLoading(true);
+	const load = useCallback(async (background = false) => {
+		if (!background) setLoading(true);
 		const response = await workoutsService.findOne(id);
 		if (!response.success || !response.data)
 			setError(response.error || 'Não foi possível carregar o treino.');
@@ -129,13 +129,21 @@ export default function TrainingExecution({ id }: { id: string }) {
 			)
 				setMissingRpOpen(true);
 		}
-		setLoading(false);
-	};
-	useEffect(() => {
-		void Promise.resolve().then(load);
+		if (!background) setLoading(false);
 	}, [id]);
+	useEffect(() => {
+		void Promise.resolve().then(() => load());
+	}, [load]);
 
 	const isAthlete = !!workout && getSessionUser()?.sub === workout.athleteId;
+	useEffect(() => {
+		if (isAthlete || workout?.status !== 'in_progress') return;
+		const refresh = window.setInterval(
+			() => void load(true),
+			WORKOUT_REFRESH_INTERVAL,
+		);
+		return () => window.clearInterval(refresh);
+	}, [isAthlete, load, workout?.status]);
 	const editable = isAthlete && workout?.status === 'in_progress';
 	const unresolved =
 		workout?.executions.some(

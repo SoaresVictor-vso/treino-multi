@@ -11,6 +11,7 @@ export interface ApiResponse<T> {
 const MINIMUM_TOKEN_LIFETIME_SECONDS = 60;
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
+const SESSION_REFRESH_TOKEN_KEY = 'sessionRefreshToken';
 const REMEMBER_ME_KEY = 'rememberMe';
 let refreshPromise: Promise<ApiResponse<{ accessToken: string }>> | null = null;
 let inMemoryRefreshToken: string | null = null;
@@ -18,6 +19,8 @@ let inMemoryRefreshToken: string | null = null;
 export function storeSessionTokens(accessToken: string, refreshToken: string): void {
 	setAuthCookie(accessToken);
 	inMemoryRefreshToken = refreshToken;
+	if (typeof sessionStorage !== 'undefined')
+		sessionStorage.setItem(SESSION_REFRESH_TOKEN_KEY, refreshToken);
 }
 
 export function clearSessionTokens(): void {
@@ -30,6 +33,8 @@ export function clearSessionTokens(): void {
 		localStorage.removeItem(REFRESH_TOKEN_KEY);
 		localStorage.removeItem(REMEMBER_ME_KEY);
 	}
+	if (typeof sessionStorage !== 'undefined')
+		sessionStorage.removeItem(SESSION_REFRESH_TOKEN_KEY);
 }
 
 export function tokenHasEnoughLifetime(token: string | null): boolean {
@@ -56,6 +61,10 @@ export function tokenHasEnoughLifetime(token: string | null): boolean {
 
 function getRefreshToken(): string | null {
 	if (inMemoryRefreshToken) return inMemoryRefreshToken;
+	if (typeof sessionStorage !== 'undefined') {
+		const sessionValue = sessionStorage.getItem(SESSION_REFRESH_TOKEN_KEY);
+		if (sessionValue) return sessionValue;
+	}
 	if (typeof localStorage === 'undefined') return null;
 
 	const persistedValue = localStorage.getItem(REFRESH_TOKEN_KEY);
