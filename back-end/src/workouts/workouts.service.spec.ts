@@ -424,6 +424,7 @@ describe('WorkoutsService', () => {
 			id: 'workout-id',
 			athleteId: input.athleteId,
 			status: WorkoutStatus.SCHEDULED,
+			scheduledDate: '2026-09-21',
 			performedAt: null,
 		} as Workout;
 		const repository = {
@@ -447,10 +448,10 @@ describe('WorkoutsService', () => {
 		});
 
 		expect(workout.status).toBe(WorkoutStatus.CANCELLED);
-		expect(workout.performedAt).toBeInstanceOf(Date);
+		expect(workout.performedAt).toEqual(new Date('2026-09-21T12:00:00.000Z'));
 		expect(repository.save).toHaveBeenCalledWith(
 			expect.objectContaining({
-				performedAt: expect.any(Date),
+				performedAt: new Date('2026-09-21T12:00:00.000Z'),
 				updatedBy: input.createdBy,
 			}),
 		);

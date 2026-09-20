@@ -460,6 +460,12 @@ export class WorkoutsService {
 								timeZone,
 								referenceMonth,
 							},
+						)
+						.orWhere(
+							'workout.status IN (:...unscheduledStatuses) AND workout.scheduled_date IS NULL',
+							{
+								unscheduledStatuses: [WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED],
+							},
 						),
 				),
 			)
@@ -1194,15 +1200,41 @@ export class WorkoutsService {
 			.getRepository(Workout)
 			.findOne({ where: { id } });
 		if (!workout) throw new NotFoundException('Treino não encontrado.');
-		await this.ensureCanManageAthleteWorkout(workout.athleteId, actor);
+		if (actor.sub !== workout.athleteId)
+			await this.ensureCanManageAthleteWorkout(workout.athleteId, actor);
 		if (
 			![WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED].includes(workout.status)
 		)
 			throw new BadRequestException(
 				'Apenas treinos pendentes ou agendados podem ser cancelados.',
 			);
+		const scheduledDate = workout.scheduledDate;
 		workout.status = WorkoutStatus.CANCELLED;
-		workout.performedAt = new Date();
+		workout.performedAt = scheduledDate
+			? new Date(`${scheduledDate}T12:00:00.000Z`)
+			: null;
+		workout.updatedBy = actor.sub;
+		await this.dataSource.getRepository(Workout).save(workout);
+		return this.findWorkout(id, actor);
+	}
+
+	async rescheduleWorkout(id: string, scheduledDate: string, actor: JwtPayload) {
+		const workout = await this.dataSource
+			.getRepository(Workout)
+			.findOne({ where: { id } });
+		if (!workout) throw new NotFoundException('Treino não encontrado.');
+		if (actor.sub !== workout.athleteId)
+			throw new ForbiddenException(
+				'Somente o atleta deste treino pode reagendá-lo.',
+			);
+		if (
+			![WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED].includes(workout.status)
+		)
+			throw new BadRequestException(
+				'Apenas treinos pendentes ou agendados podem ser reagendados.',
+			);
+		workout.scheduledDate = scheduledDate;
+		workout.status = WorkoutStatus.SCHEDULED;
 		workout.updatedBy = actor.sub;
 		await this.dataSource.getRepository(Workout).save(workout);
 		return this.findWorkout(id, actor);
@@ -1318,7 +1350,7 @@ export class WorkoutsService {
 					templateName: template.name,
 					templateDescription: template.description,
 					scheduledDate,
-					performedAt: undefined,
+					performedAt: null,
 					status: scheduledDate ? WorkoutStatus.SCHEDULED : WorkoutStatus.PENDING,
 					createdBy: input.createdBy,
 					updatedBy: input.createdBy,
