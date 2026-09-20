@@ -23,7 +23,7 @@ function formatScheduledDate(date: string | null) {
 
 	return new Intl.DateTimeFormat('pt-BR', {
 		dateStyle: 'long',
-	}).format(new Date(`${date}`));
+	}).format(new Date(`${date}T12:00:00`));
 }
 
 const workoutStatusPresentation = {

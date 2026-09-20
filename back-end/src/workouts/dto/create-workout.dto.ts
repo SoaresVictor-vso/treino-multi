@@ -23,7 +23,7 @@ export class CreateWorkoutDto {
 
 	@IsOptional()
 	@IsDateString()
-	scheduledDate?: string;
+	scheduledDate?: string | null;
 
 	/** Cria o treino diretamente em execução; permitido apenas ao próprio atleta. */
 	@IsOptional()

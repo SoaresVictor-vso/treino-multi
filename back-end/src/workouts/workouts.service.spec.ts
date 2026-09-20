@@ -152,6 +152,33 @@ describe('WorkoutsService', () => {
 		);
 	});
 
+	it('cria um treino próprio agendado com a data informada', async () => {
+		Object.assign((service as any).usersService, {
+			findOne: jest.fn().mockResolvedValue({ person: { name: 'Atleta' } }),
+		});
+		manager.save.mockResolvedValueOnce({ id: 'workout-id' });
+		jest
+			.spyOn(service, 'findWorkout')
+			.mockResolvedValue({ id: 'workout-id' } as never);
+
+		await service.createMyWorkout(
+			{ scheduledDate: '2026-08-10' },
+			{
+				sub: input.athleteId,
+				tenantId: input.template.tenantId,
+				roles: [Role.TENANT_CLIENT],
+			},
+		);
+
+		expect(manager.save).toHaveBeenCalledWith(
+			Workout,
+			expect.objectContaining({
+				scheduledDate: '2026-08-10',
+				status: WorkoutStatus.SCHEDULED,
+			}),
+		);
+	});
+
 	it('inclui treinos pendentes e agendados na agenda do atleta', async () => {
 		dataSource.query.mockResolvedValueOnce([
 			{ workouts: [], total: '0', inProgress: null },

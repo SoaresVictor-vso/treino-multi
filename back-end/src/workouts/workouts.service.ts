@@ -1052,11 +1052,13 @@ export class WorkoutsService {
 					workoutTemplateId: null,
 					templateName: dto.name?.trim() || defaultName,
 					templateDescription: dto.description?.trim() ?? '',
-					scheduledDate: null,
+					scheduledDate: dto.scheduledDate ?? null,
 					performedAt: startImmediately ? new Date() : null,
 					status: startImmediately
 						? WorkoutStatus.IN_PROGRESS
-						: WorkoutStatus.PENDING,
+						: dto.scheduledDate
+							? WorkoutStatus.SCHEDULED
+							: WorkoutStatus.PENDING,
 					createdBy: actor.sub,
 					updatedBy: actor.sub,
 				}),
@@ -1156,9 +1158,11 @@ export class WorkoutsService {
 			await manager.delete(Execution, { workoutId: workout.id });
 			workout.templateName = dto.name!.trim();
 			workout.templateDescription = dto.description?.trim() ?? '';
-			if (dto.scheduledDate) {
-				workout.scheduledDate = dto.scheduledDate;
-				workout.status = WorkoutStatus.SCHEDULED;
+			if (dto.scheduledDate !== undefined) {
+				workout.scheduledDate = dto.scheduledDate ?? null;
+				workout.status = dto.scheduledDate
+					? WorkoutStatus.SCHEDULED
+					: WorkoutStatus.PENDING;
 			}
 			workout.updatedBy = actor.sub;
 			await manager.save(workout);

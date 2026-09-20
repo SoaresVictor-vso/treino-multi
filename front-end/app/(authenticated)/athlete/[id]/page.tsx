@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { RiAddLine, RiArrowLeftLine, RiEditLine, RiEyeLine, RiFileCopyLine, RiForbidLine } from 'react-icons/ri';
 import Button from '@/components/ui/Button';
 import ErrorBox from '@/components/ui/ErrorBox';
-import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
 import TrainingForm, { type TrainingFormValues } from '@/components/training/TrainingForm';
@@ -33,7 +32,7 @@ function ActionTooltip({ label, children }: { label: string; children: ReactNode
 
 function formatDate(value: string | null) {
 	if (!value) return 'Sem data definida';
-	return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(value));
+	return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(`${value}T12:00:00`));
 }
 
 function isEditable(workout: AthleteWorkout) {
@@ -55,6 +54,7 @@ function formValues(workout: WorkoutDetail): TrainingFormValues {
 	return {
 		name: workout.templateName,
 		description: workout.templateDescription,
+		scheduledDate: workout.scheduledDate ?? undefined,
 		activities: workout.executions.map((execution) => ({
 			exerciseId: execution.exerciseId,
 			metric1: execution.prescribedMetric1 ?? 0,
@@ -116,8 +116,6 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 	const [createOpen, setCreateOpen] = useState(false);
 	const [editing, setEditing] = useState<WorkoutDetail | null>(null);
 	const [duplicating, setDuplicating] = useState<WorkoutDetail | null>(null);
-	const [duplicateScheduledDate, setDuplicateScheduledDate] = useState('');
-	const [editingScheduledDate, setEditingScheduledDate] = useState('');
 	const [cancelTarget, setCancelTarget] = useState<AthleteWorkout | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [templates, setTemplates] = useState<WorkoutTemplateSummary[]>([]);
@@ -157,16 +155,8 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 		if (!athleteId) return;
 		setSaving(true);
 		const response = editing
-			? await workoutsService.updateDraft(editing.id, {
-				...values,
-				...(editingScheduledDate ? { scheduledDate: editingScheduledDate } : {}),
-			})
-			: await workoutsService.createForAthlete(athleteId, {
-				...values,
-				...(duplicating && duplicateScheduledDate
-					? { scheduledDate: duplicateScheduledDate }
-					: {}),
-			});
+			? await workoutsService.updateDraft(editing.id, values)
+			: await workoutsService.createForAthlete(athleteId, values);
 		setSaving(false);
 		if (!response.success) {
 			setError(response.error || 'Não foi possível salvar o treino.');
@@ -175,8 +165,6 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 		setCreateOpen(false);
 		setEditing(null);
 		setDuplicating(null);
-		setDuplicateScheduledDate('');
-		setEditingScheduledDate('');
 		await refresh();
 	};
 	const edit = async (workout: AthleteWorkout) => {
@@ -185,7 +173,6 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 			setError(response.error || 'Não foi possível carregar o treino.');
 			return;
 		}
-		setEditingScheduledDate(response.data.scheduledDate ?? '');
 		setEditing(response.data);
 	};
 	const duplicate = async (workout: AthleteWorkout) => {
@@ -194,7 +181,6 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 			setError(response.error || 'Não foi possível carregar o treino.');
 			return;
 		}
-		setDuplicateScheduledDate(response.data.scheduledDate ?? '');
 		setDuplicating(response.data);
 	};
 	const selectTemplate = async (templateId: string) => {
@@ -264,10 +250,8 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 					))}
 				</div>
 			)}
-			<Modal isOpen={createOpen || !!editing || !!duplicating} title={editing ? 'Editar treino' : duplicating ? 'Duplicar treino' : 'Adicionar treino'} description={duplicating ? 'Revise o treino copiado antes de gerar uma nova versão independente.' : 'Defina exercícios e séries para o atleta.'} onClose={() => { if (!saving) { setCreateOpen(false); setEditing(null); setDuplicating(null); setDuplicateScheduledDate(''); setEditingScheduledDate(''); } }}>
+			<Modal isOpen={createOpen || !!editing || !!duplicating} title={editing ? 'Editar treino' : duplicating ? 'Duplicar treino' : 'Adicionar treino'} description={duplicating ? 'Revise o treino copiado antes de gerar uma nova versão independente.' : 'Defina exercícios e séries para o atleta.'} onClose={() => { if (!saving) { setCreateOpen(false); setEditing(null); setDuplicating(null); } }}>
 				<div className="space-y-5">
-					{duplicating && <Input label="Data do treino (opcional)" type="date" value={duplicateScheduledDate} onChange={(event) => setDuplicateScheduledDate(event.target.value)} hint="Com uma data definida, o novo treino será criado como agendado." />}
-					{editing && <Input label="Data do treino (opcional)" type="date" value={editingScheduledDate} onChange={(event) => setEditingScheduledDate(event.target.value)} hint="Altere a data para reagendar este treino." />}
 					{!editing && !duplicating && (
 						<Select
 							label="Template ativa (opcional)"
@@ -277,7 +261,7 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 							options={templates.map((template) => ({ value: template.id, label: template.name }))}
 						/>
 					)}
-					<TrainingForm key={editing?.id ?? duplicating?.id ?? selectedTemplate?.id ?? 'new'} initialValues={editing ? formValues(editing) : duplicating ? formValues(duplicating) : selectedTemplate ? templateFormValues(selectedTemplate) : undefined} initialExercises={editing ? Array.from(new Map(editing.executions.map((execution) => [execution.exerciseId, execution.exercise])).values()) : duplicating ? Array.from(new Map(duplicating.executions.map((execution) => [execution.exerciseId, execution.exercise])).values()) : selectedTemplate ? templateExercises(selectedTemplate) : undefined} onSubmit={save} onCancel={() => { setCreateOpen(false); setEditing(null); setDuplicating(null); setDuplicateScheduledDate(''); setEditingScheduledDate(''); }} isSubmitting={saving} submitLabel={editing ? 'Salvar alterações' : duplicating ? 'Gerar treino duplicado' : 'Criar treino'} />
+					<TrainingForm key={editing?.id ?? duplicating?.id ?? selectedTemplate?.id ?? 'new'} initialValues={editing ? formValues(editing) : duplicating ? formValues(duplicating) : selectedTemplate ? templateFormValues(selectedTemplate) : undefined} initialExercises={editing ? Array.from(new Map(editing.executions.map((execution) => [execution.exerciseId, execution.exercise])).values()) : duplicating ? Array.from(new Map(duplicating.executions.map((execution) => [execution.exerciseId, execution.exercise])).values()) : selectedTemplate ? templateExercises(selectedTemplate) : undefined} onSubmit={save} onCancel={() => { setCreateOpen(false); setEditing(null); setDuplicating(null); }} isSubmitting={saving} submitLabel={editing ? 'Salvar alterações' : duplicating ? 'Gerar treino duplicado' : 'Criar treino'} />
 				</div>
 			</Modal>
 			<Modal isOpen={!!cancelTarget} title="Cancelar treino" description="Esta ação não pode ser desfeita." onClose={() => !saving && setCancelTarget(null)}>

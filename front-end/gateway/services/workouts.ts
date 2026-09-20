@@ -117,7 +117,7 @@ export type CreateMyWorkoutDto = {
 	name?: string;
 	description?: string;
 	activities?: Activity[];
-	scheduledDate?: string;
+	scheduledDate?: string | null;
 	startImmediately?: boolean;
 };
 

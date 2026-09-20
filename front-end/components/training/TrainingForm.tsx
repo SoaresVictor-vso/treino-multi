@@ -21,6 +21,7 @@ export type TrainingFormValues = {
 	name: string;
 	description: string;
 	activities: Activity[];
+	scheduledDate?: string | null;
 };
 
 const initialActivity = (exerciseId: number): Activity => ({
@@ -54,6 +55,9 @@ export default function TrainingForm({
 	const [name, setName] = useState(initialValues?.name ?? '');
 	const [description, setDescription] = useState(
 		initialValues?.description ?? '',
+	);
+	const [scheduledDate, setScheduledDate] = useState(
+		initialValues?.scheduledDate ?? '',
 	);
 	const [selected, setSelected] = useState<Exercise[]>(initialExercises ?? []);
 	const [activities, setActivities] = useState<Record<number, Activity[]>>(
@@ -132,6 +136,9 @@ export default function TrainingForm({
 		await onSubmit({
 			name: name.trim(),
 			description: description.trim(),
+			// O input date já representa a data civil no fuso local. Envie o
+			// valor YYYY-MM-DD diretamente para não deslocá-lo com UTC.
+			scheduledDate: scheduledDate || null,
 			activities: selected.flatMap((exercise) => activities[exercise.id] ?? []),
 		});
 	};
@@ -154,6 +161,13 @@ export default function TrainingForm({
 					onChange={(event) => setDescription(event.target.value)}
 					placeholder="Descreva o objetivo do treino"
 					rows={3}
+				/>
+				<Input
+					label="Data de agendamento (opcional)"
+					type="date"
+					value={scheduledDate}
+					onChange={(event) => setScheduledDate(event.target.value)}
+					hint="A data será considerada no seu fuso horário."
 				/>
 			</div>
 
