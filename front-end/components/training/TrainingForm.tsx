@@ -13,24 +13,25 @@ import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';
 import Textarea from '@/components/ui/Textarea';
 import ExercisePicker from '@/components/shared/ExercisePicker';
-import { ActivityBlock } from '@/components/workout-template/ActivityBlock';
-import type { Activity } from '@/gateway/services/workout-templates';
+import TrainingActivityBlock from './TrainingActivityBlock';
+import type { TrainingActivity } from '@/gateway/services/workouts';
 import type { Exercise } from '@/gateway/services/parametro';
 
 export type TrainingFormValues = {
 	name: string;
 	description: string;
-	activities: Activity[];
+	activities: TrainingActivity[];
 	scheduledDate?: string | null;
 };
 
-const initialActivity = (exerciseId: number): Activity => ({
+const initialActivity = (exerciseId: number): TrainingActivity => ({
 	exerciseId,
 	metric1: 0,
 	metric2: 0,
 	type1: 'v',
 	type2: 'v',
 	pse: 0,
+	setType: 'padrao',
 	restDuration: 0,
 	note: '',
 });
@@ -60,12 +61,12 @@ export default function TrainingForm({
 		initialValues?.scheduledDate ?? '',
 	);
 	const [selected, setSelected] = useState<Exercise[]>(initialExercises ?? []);
-	const [activities, setActivities] = useState<Record<number, Activity[]>>(
+	const [activities, setActivities] = useState<Record<number, TrainingActivity[]>>(
 		() =>
 			Object.groupBy(
 				initialValues?.activities ?? [],
 				(activity) => activity.exerciseId,
-			) as Record<number, Activity[]>,
+			) as Record<number, TrainingActivity[]>,
 	);
 	const [pickerOpen, setPickerOpen] = useState(false);
 	const [openNotes, setOpenNotes] = useState<Record<number, boolean>>(() =>
@@ -87,10 +88,23 @@ export default function TrainingForm({
 		setActivities((current) => {
 			const nextActivities = Object.fromEntries(
 				Object.entries(current).filter(([id]) => ids.has(Number(id))),
-			) as Record<number, Activity[]>;
-			next.forEach((exercise) => {
-				if (!nextActivities[exercise.id])
-					nextActivities[exercise.id] = [initialActivity(exercise.id)];
+			) as Record<number, TrainingActivity[]>;
+			next.forEach((exercise, index) => {
+				if (!nextActivities[exercise.id]) {
+					const previousActivity = next
+						.slice(0, index)
+						.toReversed()
+						.map((previousExercise) =>
+							nextActivities[previousExercise.id]?.at(-1),
+						)
+						.find(Boolean);
+					nextActivities[exercise.id] = [
+						{
+							...initialActivity(exercise.id),
+							setType: previousActivity?.setType ?? 'padrao',
+						},
+					];
+				}
 			});
 			return nextActivities;
 		});
@@ -105,14 +119,14 @@ export default function TrainingForm({
 			(current) =>
 				Object.fromEntries(
 					Object.entries(current).filter(([id]) => Number(id) !== exerciseId),
-				) as Record<number, Activity[]>,
+			) as Record<number, TrainingActivity[]>,
 		);
 	};
 
 	const updateActivity = (
 		exerciseId: number,
 		index: number,
-		key: keyof Activity,
+		key: keyof TrainingActivity,
 		value: string | number,
 	) =>
 		setActivities((current) => ({
@@ -249,7 +263,7 @@ export default function TrainingForm({
 							)}
 							<div className="mt-3 space-y-3">
 								{(activities[exercise.id] ?? []).map((activity, index) => (
-									<ActivityBlock
+									<TrainingActivityBlock
 										key={`${exercise.id}-${index}`}
 										exercise={exercise}
 										activity={activity}

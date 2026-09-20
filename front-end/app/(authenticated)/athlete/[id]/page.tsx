@@ -62,6 +62,7 @@ function formValues(workout: WorkoutDetail): TrainingFormValues {
 			type1: 'v',
 			type2: execution.metric2Type ?? 'v',
 			pse: execution.prescribedPse ?? 0,
+			setType: execution.setType,
 			restDuration: execution.prescribedRestDuration ?? 0,
 			note:
 				workout.exerciseNotes.find(
@@ -82,6 +83,7 @@ function templateFormValues(template: WorkoutTemplateResponse): TrainingFormValu
 			type1: 'v',
 			type2: activity.type2 ?? 'v',
 			pse: Number(activity.pse ?? 0),
+			setType: 'padrao',
 			restDuration: activity.restDuration ?? 0,
 			note: activity.note ?? '',
 		})),

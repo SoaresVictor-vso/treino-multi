@@ -360,6 +360,10 @@ export default function TrainingExecution({ id }: { id: string }) {
 				activeRestDurations.every((duration) => duration === activeRestDurations[0])
 					? activeRestDurations[0]
 					: DEFAULT_REST_DURATION;
+			const previousSetType = current.executions
+				.filter((execution) => execution.status !== 'skipped')
+				.toSorted((left, right) => left.position - right.position)
+				.at(-1)?.setType ?? 'padrao';
 			return {
 				...current,
 				executions: [
@@ -379,7 +383,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 						performedPse: null,
 						performedRestDuration: restDuration,
 						performedNote: null,
-						setType: 'padrao' as const,
+						setType: previousSetType,
 						finishedAt: null,
 						status: 'in_progress' as const,
 						exercise,

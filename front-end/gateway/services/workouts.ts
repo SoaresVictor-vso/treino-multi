@@ -9,6 +9,7 @@ export type ExecutionStatus =
 	| 'skipped';
 export type WorkoutStatus = ExecutionStatus | 'scheduled' | 'cancelled';
 export type ExecutionSetType = 'padrao' | 'aquecimento' | 'dropset' | 'falha';
+export type TrainingActivity = Activity & { setType: ExecutionSetType };
 
 export type WorkoutExecution = {
 	id: number;
@@ -92,7 +93,7 @@ export type GenerateWorkoutsFromTemplateResponse = { count: number };
 export type CreateMyWorkoutDto = {
 	name?: string;
 	description?: string;
-	activities?: Activity[];
+	activities?: TrainingActivity[];
 	scheduledDate?: string | null;
 	startImmediately?: boolean;
 };

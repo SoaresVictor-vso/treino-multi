@@ -89,6 +89,7 @@ type WorkoutActivityInput = {
 	type1: 'v';
 	type2?: 'p' | 'v' | null;
 	pse?: number | null;
+	setType?: ExecutionSetType;
 	restDuration?: number | null;
 	note?: string | null;
 };
@@ -1046,6 +1047,7 @@ export class WorkoutsService {
 			position: index + 1,
 			type1: 'v' as const,
 			type2: activity.type2 ?? 'v',
+			setType: activity.setType ?? ExecutionSetType.PADRAO,
 		}));
 		const athlete = await this.usersService.findOne(actor.sub);
 		const defaultName = this.getDefaultWorkoutName(athlete.person.name);
@@ -1177,6 +1179,7 @@ export class WorkoutsService {
 				position: index + 1,
 				type1: 'v' as const,
 				type2: activity.type2 ?? 'v',
+				setType: activity.setType,
 			}));
 			await manager.save(
 				Execution,
@@ -1251,6 +1254,7 @@ export class WorkoutsService {
 			position: index + 1,
 			type1: 'v' as const,
 			type2: activity.type2 ?? 'v',
+			setType: activity.setType ?? ExecutionSetType.PADRAO,
 		}));
 		return this.dataSource.transaction(async (manager) => {
 			const workout = await manager.save(
@@ -1434,7 +1438,7 @@ export class WorkoutsService {
 			performedPse: null,
 			performedRestDuration: null,
 			performedNote: null,
-			setType: ExecutionSetType.PADRAO,
+			setType: activity.setType ?? ExecutionSetType.PADRAO,
 			status: ExecutionStatus.PENDING,
 			startedAt: null,
 			finishedAt: null,
