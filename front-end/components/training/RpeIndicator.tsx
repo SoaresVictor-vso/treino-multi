@@ -6,6 +6,8 @@ type RpeIndicatorProps = {
 	mode?: 'expected' | 'performed';
 	onClick?: () => void;
 	disabled?: boolean;
+	compact?: boolean;
+	showComparison?: boolean;
 };
 
 export default function RpeIndicator({
@@ -14,22 +16,33 @@ export default function RpeIndicator({
 	mode = 'performed',
 	onClick,
 	disabled = false,
+	compact = false,
+	showComparison = true,
 }: RpeIndicatorProps) {
-	const value = mode === 'expected' ? prescribed : performed ?? prescribed;
+	const prescribedValue = prescribed !== null && prescribed > 0 ? prescribed : null;
+	const performedValue = performed !== null && performed > 0 ? performed : null;
+	const value =
+		mode === 'expected'
+			? prescribedValue
+			: showComparison
+				? performedValue ?? prescribedValue
+				: performedValue;
 	const differsFromPrescription =
+		showComparison &&
 		mode === 'performed' &&
-		performed !== null &&
-		prescribed !== null &&
-		performed !== prescribed;
+		performedValue !== null &&
+		prescribedValue !== null &&
+		performedValue !== prescribedValue;
+	if (value === null) return null;
 	const content = (
 		<>
 			RPE {value}
 			{differsFromPrescription ? `/${prescribed}` : ''}
 		</>
 	);
-	const title = prescribed !== null ? `Prescrito: ${prescribed}` : undefined;
+	const title = prescribedValue !== null ? `Prescrito: ${prescribedValue}` : undefined;
 	const className =
-		'inline-flex h-8 items-center rounded-md border border-outline-variant bg-surface-variant px-1.5 text-[10px] font-bold text-on-surface-variant hover:border-primary-fixed-dim hover:text-primary-fixed-dim disabled:cursor-default';
+		`inline-flex shrink-0 items-center whitespace-nowrap rounded-md border border-outline-variant bg-surface-variant font-bold text-on-surface-variant hover:border-primary-fixed-dim hover:text-primary-fixed-dim disabled:cursor-default ${compact ? 'h-7 px-1 text-[9px] leading-none' : 'h-8 px-1.5 text-[10px]'}`;
 
 	if (!onClick)
 		return (

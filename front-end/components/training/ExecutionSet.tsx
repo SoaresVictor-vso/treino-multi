@@ -96,7 +96,7 @@ export default function ExecutionSet({
 		setOptions.find((option) => option.value === execution.setType) ??
 		setOptions[0];
 	const hasRpe =
-		execution.prescribedPse !== null || execution.performedPse !== null;
+		(execution.prescribedPse ?? 0) > 0 || (execution.performedPse ?? 0) > 0;
 	const closeMenu = () => {
 		setMenuOpen(false);
 		setRpePickerOpen(false);

@@ -43,7 +43,7 @@ const comparisonPresentation = ({ isDone }: { isDone: boolean }) =>
 		},
 		added: {
 			label: 'Valor novo',
-			icon: RiCheckLine,
+			icon: RiUserAddLine,
 			className: `border-primary-fixed-dim/50 ${isDone ? 'bg-primary-fixed-dim/10' : ''} text-primary-fixed`,
 		},
 		maintained: {
@@ -78,8 +78,15 @@ function DiffValueCards({
 	return (
 		<>
 			{values.map((item, index) => {
+				const counterpart = counterpartValues[index]?.value ?? null;
+				const showValue =
+					item.value !== null &&
+					(counterpart === null ||
+						item.value !== counterpart ||
+						variant === 'performed');
+				if (!showValue) return null;
 				const presentation = comparisonPresentation({ isDone })[
-					statusFor(item.value, counterpartValues[index]?.value ?? null)
+					statusFor(item.value, counterpart)
 				];
 				const formatted = formatValue(item);
 				return (
@@ -213,12 +220,41 @@ export default function WorkoutComparison({
 						<div className="divide-y divide-outline-variant">
 							{sets.map((execution, index) => {
 								const includeRpe =
-									execution.prescribedPse !== null || execution.performedPse !== null;
+									(execution.prescribedPse ?? 0) > 0 ||
+									(execution.performedPse ?? 0) > 0;
 								const expectedValues = executionValues(execution, 'expected');
 								const performedValues =
 									execution.status === 'skipped'
 										? expectedValues.map((item) => ({ ...item, value: null }))
 										: executionValues(execution, 'performed');
+								const showExpectedRpe =
+									(execution.prescribedPse ?? 0) > 0 &&
+									((execution.performedPse ?? 0) === 0 ||
+										execution.performedPse !== execution.prescribedPse);
+								const showPerformedRpe =
+									(execution.performedPse ?? 0) > 0 ||
+									((execution.prescribedPse ?? 0) > 0 &&
+										execution.performedPse === execution.prescribedPse);
+								const hasMetricDifference = expectedValues.some(
+									(item, valueIndex) =>
+										item.value !== null &&
+										performedValues[valueIndex]?.value !== null &&
+										item.value !== performedValues[valueIndex]?.value,
+								);
+								const hasRpeDifference =
+									(execution.prescribedPse ?? 0) > 0 &&
+									(execution.performedPse ?? 0) > 0 &&
+									execution.prescribedPse !== execution.performedPse;
+								const hasComparisonDifference =
+									hasMetricDifference || hasRpeDifference;
+								const hasPerformedValue =
+									performedValues.some((item) => item.value !== null) ||
+									(execution.performedPse ?? 0) > 0;
+								const comparisonSide = hasComparisonDifference
+									? 'both'
+									: hasPerformedValue
+										? 'performed'
+										: 'expected';
 
 								const isDone = execution.status == 'completed';
 								return (
@@ -226,8 +262,8 @@ export default function WorkoutComparison({
 						key={execution.id}
 						className="p-4 sm:px-5"
 					>
-										<div
-											className={`grid gap-3 ${isAthleteAdded ? 'grid-cols-[1.5rem_minmax(0,1fr)]' : 'grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1fr)]'}`}
+						<div
+															className={`grid gap-3 ${isAthleteAdded || comparisonSide !== 'both' ? 'grid-cols-[1.5rem_minmax(0,1fr)]' : 'grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1fr)]'}`}
 											aria-label={`Comparação da execução ${index + 1}`}
 										>
 							<SeriesIndicator
@@ -236,60 +272,62 @@ export default function WorkoutComparison({
 								className={seriesTypeClassName[execution.setType]}
 								tooltip={isDone ? `Série ${index + 1} concluída` : `Série ${index + 1}`}
 							/>
-											{!isAthleteAdded && (
+											{!isAthleteAdded && comparisonSide !== 'performed' && (
 												<div>
 													{index === 0 && (
 														<p className="mb-2 type-label-caps text-on-surface-variant">
 															Esperado
 														</p>
 													)}
-													<div
-														className="grid grid-cols-2 gap-2"
-														aria-label="Valores esperados"
-													>
-															<DiffValueCards
-																variant="expected"
-																values={expectedValues}
-																counterpartValues={performedValues}
-																isDone={isDone}
-															/>
-														{includeRpe && (
-															<div className="col-span-full flex justify-center">
-																<RpeIndicator
-																	prescribed={execution.prescribedPse}
-																	performed={execution.performedPse}
-																	mode="expected"
-																/>
+															<div className="flex min-w-0 items-center gap-2" aria-label="Valores esperados">
+																<div className="grid min-w-0 flex-1 grid-cols-[repeat(auto-fit,minmax(5rem,1fr))] gap-2">
+																	<DiffValueCards
+																		variant="expected"
+																		values={expectedValues}
+																		counterpartValues={performedValues}
+																		isDone={isDone}
+																	/>
+																</div>
+																{includeRpe && showExpectedRpe && (
+																	<RpeIndicator
+																		prescribed={execution.prescribedPse}
+																performed={execution.performedPse}
+																mode="expected"
+																compact
+																showComparison={false}
+																	/>
+																)}
 															</div>
-														)}
-													</div>
 												</div>
 											)}
+											{comparisonSide !== 'expected' && (
 											<div
 												className={
-													isAthleteAdded ? '' : 'border-l border-outline-variant pl-3'
-												}
+														comparisonSide === 'both'
+															? 'border-l border-outline-variant pl-3'
+															: ''
+													}
 											>
-												<div
-													className={`grid grid-cols-2 gap-2`}
-													aria-label="Valores cumpridos"
-												>
+													<div className="flex min-w-0 items-center gap-2" aria-label="Valores cumpridos">
+														<div className="grid min-w-0 flex-1 grid-cols-[repeat(auto-fit,minmax(5rem,1fr))] gap-2">
 															<DiffValueCards
 																variant="performed"
 																values={performedValues}
 																counterpartValues={expectedValues}
 																isDone={isDone}
-															/>
-														{includeRpe && (
-															<div className="col-span-full flex justify-center">
-																<RpeIndicator
-																	prescribed={execution.prescribedPse}
-																	performed={execution.performedPse}
-																/>
-															</div>
-														)}
-												</div>
-											</div>
+																	/>
+																</div>
+																	{includeRpe && showPerformedRpe && (
+																		<RpeIndicator
+																prescribed={execution.prescribedPse}
+																performed={execution.performedPse}
+																compact
+																showComparison={false}
+																		/>
+																	)}
+																</div>
+														</div>
+													)}
 										</div>
 									</div>
 								);

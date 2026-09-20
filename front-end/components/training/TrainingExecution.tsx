@@ -30,7 +30,10 @@ import {
 	secondsToTime,
 	timeToSeconds,
 } from '@/gateway/services/workout-templates';
-import { DEFAULT_REST_DURATION, WORKOUT_REFRESH_INTERVAL } from '@/lib/constants';
+import {
+	DEFAULT_REST_DURATION,
+	WORKOUT_REFRESH_INTERVAL,
+} from '@/lib/constants';
 
 function serializeExecution(execution: WorkoutExecution) {
 	const {
@@ -62,14 +65,21 @@ function preloadPrescribedValues(workout: WorkoutDetail): WorkoutDetail {
 		...workout,
 		executions: workout.executions
 			.toSorted((left, right) => left.position - right.position)
-			.map((execution, index) => ({
-				...execution,
-				position: index + 1,
-				performedMetric1: execution.performedMetric1 ?? execution.prescribedMetric1,
-				performedMetric2: execution.performedMetric2 ?? execution.prescribedMetric2,
-				performedRestDuration:
-					execution.performedRestDuration ?? execution.prescribedRestDuration,
-			})),
+			.map((execution, index) => {
+				const prescribedRestDuration =
+					execution.prescribedRestDuration || DEFAULT_REST_DURATION;
+				return {
+					...execution,
+					position: index + 1,
+					prescribedRestDuration,
+					performedMetric1:
+						execution.performedMetric1 ?? execution.prescribedMetric1,
+					performedMetric2:
+						execution.performedMetric2 ?? execution.prescribedMetric2,
+					performedRestDuration:
+						execution.performedRestDuration || prescribedRestDuration,
+				};
+			}),
 	};
 }
 
@@ -111,26 +121,29 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const savingRef = useRef(false);
 	const dirtyRef = useRef(false);
 
-	const load = useCallback(async (background = false) => {
-		if (!background) setLoading(true);
-		const response = await workoutsService.findOne(id);
-		if (!response.success || !response.data)
-			setError(response.error || 'Não foi possível carregar o treino.');
-		else {
-			const prescribedWorkout = preloadPrescribedValues(response.data);
-			workoutRef.current = prescribedWorkout;
-			setWorkout(prescribedWorkout);
-			setError(null);
-			if (
-				getSessionUser()?.sub === response.data.athleteId &&
-				response.data.executions.some(
-					(item) => item.metric2Type === 'p' && !item.referencePersonalRecord,
+	const load = useCallback(
+		async (background = false) => {
+			if (!background) setLoading(true);
+			const response = await workoutsService.findOne(id);
+			if (!response.success || !response.data)
+				setError(response.error || 'Não foi possível carregar o treino.');
+			else {
+				const prescribedWorkout = preloadPrescribedValues(response.data);
+				workoutRef.current = prescribedWorkout;
+				setWorkout(prescribedWorkout);
+				setError(null);
+				if (
+					getSessionUser()?.sub === response.data.athleteId &&
+					response.data.executions.some(
+						(item) => item.metric2Type === 'p' && !item.referencePersonalRecord,
+					)
 				)
-			)
-				setMissingRpOpen(true);
-		}
-		if (!background) setLoading(false);
-	}, [id]);
+					setMissingRpOpen(true);
+			}
+			if (!background) setLoading(false);
+		},
+		[id],
+	);
 	useEffect(() => {
 		void Promise.resolve().then(() => load());
 	}, [load]);
@@ -338,8 +351,8 @@ export default function TrainingExecution({ id }: { id: string }) {
 				.filter((execution) => execution.status !== 'skipped')
 				.map(
 					(execution) =>
-						execution.performedRestDuration ??
-						execution.prescribedRestDuration ??
+						execution.performedRestDuration ||
+						execution.prescribedRestDuration ||
 						DEFAULT_REST_DURATION,
 				);
 			const restDuration =
@@ -418,7 +431,9 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const openRest = (execution: WorkoutExecution) => {
 		setRestExecution(execution);
 		setRestSeconds(
-			execution.performedRestDuration ?? execution.prescribedRestDuration ?? 0,
+			execution.performedRestDuration ||
+			execution.prescribedRestDuration ||
+			DEFAULT_REST_DURATION,
 		);
 		setApplyRestToExercise(false);
 		setApplyRestToWorkout(false);
@@ -456,7 +471,9 @@ export default function TrainingExecution({ id }: { id: string }) {
 		)[0];
 		if (!last?.finishedAt) return null;
 		const duration =
-			last.performedRestDuration ?? last.prescribedRestDuration ?? 0;
+			last.performedRestDuration ||
+			last.prescribedRestDuration ||
+			DEFAULT_REST_DURATION;
 		if (!duration) return null;
 		return {
 			duration,
