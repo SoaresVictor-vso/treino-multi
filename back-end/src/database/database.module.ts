@@ -22,6 +22,8 @@ import { WorkoutExerciseNote } from '../workouts/entities/workout-exercise-note.
 import { ExerciseGroup } from '../exercise-groups/entities/exercise-group.entity';
 import { ExerciseGroupExercise } from '../exercise-groups/entities/exercise-group-exercise.entity';
 import { PersonalRecord } from '../personal-records/entities/personal-record.entity';
+import { Measurement } from '../measurements/entities/measurement.entity';
+import { WorkoutMeasurement } from '../measurements/entities/workout-measurement.entity';
 import { DatabaseSyncService } from './database-sync.service';
 
 @Module({
@@ -58,6 +60,8 @@ import { DatabaseSyncService } from './database-sync.service';
 					ExerciseGroup,
 					ExerciseGroupExercise,
 					PersonalRecord,
+					Measurement,
+					WorkoutMeasurement,
 				],
 				migrations: [__dirname + '/migrations/*{.ts,.js}'],
 				migrationsRun: true,

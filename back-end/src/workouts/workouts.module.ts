@@ -8,6 +8,7 @@ import { WorkoutTemplate } from '../workout-templates/entities/workout-template.
 import { UsersModule } from '../users/users.module';
 import { WorkoutsController } from './workouts.controller';
 import { WorkoutsService } from './workouts.service';
+import { MeasurementsModule } from '../measurements/measurements.module';
 
 @Module({
 	imports: [
@@ -19,6 +20,7 @@ import { WorkoutsService } from './workouts.service';
 			WorkoutTemplate,
 		]),
 		UsersModule,
+		MeasurementsModule,
 	],
 	controllers: [WorkoutsController],
 	providers: [WorkoutsService],

@@ -28,6 +28,7 @@ import { UpdateWorkoutExecutionsDto } from './dto/update-workout-executions.dto'
 import { Execution } from './entities/execution.entity';
 import { WorkoutExerciseNote } from './entities/workout-exercise-note.entity';
 import { Workout } from './entities/workout.entity';
+import { MeasurementsService } from '../measurements/measurements.service';
 
 export interface GenerateWorkoutFromTemplateInput {
 	template: WorkoutTemplate;
@@ -156,6 +157,7 @@ export class WorkoutsService {
 		@InjectRepository(WorkoutTemplate)
 		private readonly templates: Repository<WorkoutTemplate>,
 		private readonly usersService: UsersService,
+		private readonly measurementsService: MeasurementsService,
 	) {}
 
 	async findMyWorkouts(actor: JwtPayload) {
@@ -640,14 +642,39 @@ export class WorkoutsService {
 				FROM exercise_group_exercises membership
 				WHERE membership.exercise_id = execution.exercise_id
 					AND membership.deleted_at IS NULL
+					AND EXISTS (
+						SELECT 1
+						FROM exercise_groups exercise_group
+						WHERE exercise_group.id = membership.exercise_group_id
+							AND exercise_group.tenant_id = workout.tenant_id
+							AND exercise_group.deleted_at IS NULL
+					)
 				ORDER BY membership.id
 				LIMIT 1
 			) membership ON true
 			LEFT JOIN exercise_groups exercise_group ON exercise_group.id = membership.exercise_group_id
 				AND exercise_group.deleted_at IS NULL
-			LEFT JOIN personal_records group_record ON group_record.athlete_id = workout.athlete_id
-				AND group_record.exercise_group_id = exercise_group.id
-				AND group_record.deleted_at IS NULL
+			LEFT JOIN LATERAL (
+				SELECT record.*
+				FROM personal_records record
+				WHERE record.athlete_id = workout.athlete_id
+					AND record.deleted_at IS NULL
+					AND record.exercise_group_id IN (
+						SELECT membership.exercise_group_id
+						FROM exercise_group_exercises membership
+						WHERE membership.exercise_id = execution.exercise_id
+							AND membership.deleted_at IS NULL
+							AND EXISTS (
+								SELECT 1
+								FROM exercise_groups exercise_group
+								WHERE exercise_group.id = membership.exercise_group_id
+									AND exercise_group.tenant_id = workout.tenant_id
+									AND exercise_group.deleted_at IS NULL
+							)
+					)
+				ORDER BY record.measured_at DESC, record.updated_at DESC
+				LIMIT 1
+			) group_record ON TRUE
 			LEFT JOIN personal_records exercise_record ON exercise_record.athlete_id = workout.athlete_id
 				AND exercise_record.exercise_id = execution.exercise_id
 				AND exercise_record.exercise_group_id IS NULL
@@ -674,6 +701,10 @@ export class WorkoutsService {
 			templateDescription: workout.templateDescription,
 			scheduledDate: workout.scheduledDate,
 			status: workout.workoutStatus,
+			measurements:
+				workout.workoutStatus === WorkoutStatus.COMPLETED
+					? await this.measurementsService.findForWorkout(id)
+					: [],
 			executions: rows
 				.filter((row) => row.executionId !== null)
 				.map((execution) => ({
@@ -768,9 +799,10 @@ export class WorkoutsService {
 			await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
 				workout.athleteId,
 			]);
-			const missingPersonalRecords = await manager.query(
-				`SELECT 1
+			const missingPersonalRecords: { name: string }[] = await manager.query(
+				`SELECT DISTINCT exercise.name AS name
 				FROM executions execution
+				INNER JOIN exercises exercise ON exercise.id = execution.exercise_id
 				WHERE execution.workout_id = $1
 					AND execution.metric2_type = 'p'
 					AND NOT EXISTS (
@@ -780,22 +812,27 @@ export class WorkoutsService {
 							AND record.deleted_at IS NULL
 							AND (
 								record.exercise_id = execution.exercise_id
-								OR record.exercise_group_id = (
+								OR record.exercise_group_id IN (
 									SELECT membership.exercise_group_id
 									FROM exercise_group_exercises membership
 									WHERE membership.exercise_id = execution.exercise_id
 										AND membership.deleted_at IS NULL
-									ORDER BY membership.id
-									LIMIT 1
+										AND EXISTS (
+											SELECT 1
+											FROM exercise_groups exercise_group
+											WHERE exercise_group.id = membership.exercise_group_id
+												AND exercise_group.tenant_id = $3
+												AND exercise_group.deleted_at IS NULL
+										)
 								)
 							)
 					)
-					LIMIT 1`,
-				[id, workout.athleteId],
+				ORDER BY name`,
+				[id, workout.athleteId, workout.tenantId],
 			);
 			if (missingPersonalRecords?.length)
 				throw new BadRequestException(
-					'Cadastre os RPs necessários antes de iniciar o treino.',
+					`Cadastre os RPs necessários antes de iniciar o treino: ${missingPersonalRecords.map((record) => record.name).join(', ')}.`,
 				);
 			const hasWorkoutInProgress = await manager.getRepository(Workout).existsBy({
 				athleteId: workout.athleteId,
@@ -943,9 +980,12 @@ export class WorkoutsService {
 			throw new BadRequestException(
 				'Conclua ou pule todas as séries antes de finalizar o treino.',
 			);
-		workout.status = WorkoutStatus.COMPLETED;
-		workout.updatedBy = actor.sub;
-		await this.dataSource.getRepository(Workout).save(workout);
+		await this.dataSource.transaction(async (manager) => {
+			workout.status = WorkoutStatus.COMPLETED;
+			workout.updatedBy = actor.sub;
+			await manager.save(workout);
+			await this.measurementsService.persistForWorkout(manager, id);
+		});
 		return this.findWorkout(id, actor);
 	}
 

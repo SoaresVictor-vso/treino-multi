@@ -53,6 +53,24 @@ export type WorkoutDetail = {
 	status: WorkoutStatus;
 	executions: WorkoutExecution[];
 	exerciseNotes: WorkoutExerciseNote[];
+	measurements: WorkoutMeasurement[];
+};
+
+export type WorkoutMeasurement = {
+	id: string;
+	measurementId: string;
+	value: number;
+	/** Internal ranking value; intentionally never rendered. */
+	score: number;
+	key: string;
+	name: string;
+	icon: string;
+	presentation: {
+		containerClass: string;
+		iconClass: string;
+		valueClass: string;
+		labelClass: string;
+	};
 };
 
 export type MyWorkout = {

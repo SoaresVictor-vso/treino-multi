@@ -322,7 +322,7 @@ describe('WorkoutsService', () => {
 			query: jest
 				.fn()
 				.mockResolvedValueOnce(undefined)
-				.mockResolvedValueOnce([{ missing: true }]),
+				.mockResolvedValueOnce([{ name: 'SUPINO RETO' }]),
 			getRepository: jest.fn().mockReturnValue(workoutRepository),
 		});
 		jest.spyOn(service as any, 'findWritableWorkout').mockResolvedValue(workout);
@@ -333,7 +333,9 @@ describe('WorkoutsService', () => {
 				tenantId: input.template.tenantId,
 				roles: [Role.TENANT_CLIENT],
 			}),
-		).rejects.toThrow('Cadastre os RPs necessários antes de iniciar o treino.');
+		).rejects.toThrow(
+			'Cadastre os RPs necessários antes de iniciar o treino: SUPINO RETO.',
+		);
 
 		expect(workoutRepository.existsBy).not.toHaveBeenCalled();
 		expect(manager.save).not.toHaveBeenCalled();

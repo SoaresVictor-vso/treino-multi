@@ -17,6 +17,7 @@ import { AthleteModule } from './athlete/athlete.module';
 import { WorkoutsModule } from './workouts/workouts.module';
 import { ExerciseGroupsModule } from './exercise-groups/exercise-groups.module';
 import { PersonalRecordsModule } from './personal-records/personal-records.module';
+import { MeasurementsModule } from './measurements/measurements.module';
 
 @Module({
 	imports: [
@@ -37,6 +38,7 @@ import { PersonalRecordsModule } from './personal-records/personal-records.modul
 		ExercisesModule,
 		ExerciseGroupsModule,
 		PersonalRecordsModule,
+		MeasurementsModule,
 		WorkoutTemplatesModule,
 		AthleteModule,
 		WorkoutsModule,

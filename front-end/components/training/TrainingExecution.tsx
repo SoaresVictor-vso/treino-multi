@@ -19,6 +19,7 @@ import PersonalRecordRequiredModal from '@/components/shared/PersonalRecordRequi
 import ExerciseReorderModal from '@/components/shared/ExerciseReorderModal';
 import ExerciseExecutionCard from './ExerciseExecutionCard';
 import WorkoutComparison from './WorkoutComparison';
+import WorkoutMeasurements from './WorkoutMeasurements';
 import { getSessionUser } from '@/lib/auth';
 import {
 	workoutsService,
@@ -98,6 +99,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const [saving, setSaving] = useState(false);
 	const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 	const [completionOpen, setCompletionOpen] = useState(false);
+	const [showPostCompletion, setShowPostCompletion] = useState(false);
 	const [startOpen, setStartOpen] = useState(false);
 	const [skipOpen, setSkipOpen] = useState(false);
 	const [pickerOpen, setPickerOpen] = useState(false);
@@ -568,6 +570,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 			const completedWorkout = preloadPrescribedValues(result.data);
 			workoutRef.current = completedWorkout;
 			setWorkout(completedWorkout);
+			setShowPostCompletion(true);
 			window.dispatchEvent(new Event('workout-status-changed'));
 		}
 		setSaving(false);
@@ -689,7 +692,16 @@ export default function TrainingExecution({ id }: { id: string }) {
 				)}
 			{workout.status === 'completed' ||
 			!(isAthlete && workout.status == 'in_progress') ? (
-				<WorkoutComparison executions={workout.executions} />
+				<>
+					<WorkoutMeasurements
+						measurements={
+							showPostCompletion
+								? workout.measurements.slice(0, 3)
+								: workout.measurements
+						}
+					/>
+					<WorkoutComparison executions={workout.executions} />
+				</>
 			) : (
 				<>
 					{isAthlete &&
