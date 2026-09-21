@@ -80,6 +80,21 @@ type WorkoutExecutionRow = {
 	recordId: string | null;
 	recordValue: string | number | null;
 	recordMeasuredAt: string | null;
+	measurementResultId: string | null;
+	measurementId: string | null;
+	measurementValue: string | number | null;
+	measurementScore: string | number | null;
+	measurementKey: string | null;
+	measurementName: string | null;
+	measurementIcon: string | null;
+	measurementPresentation: WorkoutMeasurementPresentation | null;
+};
+
+type WorkoutMeasurementPresentation = {
+	containerClass: string;
+	iconClass: string;
+	valueClass: string;
+	labelClass: string;
 };
 
 type WorkoutActivityInput = {
@@ -613,6 +628,14 @@ export class WorkoutsService {
 				workout_exercise_note.note AS "note",
 				workout_exercise_note.athlete_note AS "athleteNote",
 				execution.status AS "executionStatus",
+				workout_measurement.id AS "measurementResultId",
+				workout_measurement.measurement_id AS "measurementId",
+				workout_measurement.value AS "measurementValue",
+				workout_measurement.score AS "measurementScore",
+				workout_measurement.snapshot->>'key' AS "measurementKey",
+				workout_measurement.snapshot->>'name' AS "measurementName",
+				workout_measurement.snapshot->>'icon' AS "measurementIcon",
+				workout_measurement.snapshot->'presentation' AS "measurementPresentation",
 				exercise.id AS "exerciseIdReference",
 				exercise.name AS "exerciseName",
 				exercise.description AS "exerciseDescription",
@@ -634,6 +657,8 @@ export class WorkoutsService {
 			LEFT JOIN workout_exercise_notes workout_exercise_note
 				ON workout_exercise_note.workout_id = workout.id
 				AND workout_exercise_note.exercise_id = execution.exercise_id
+			LEFT JOIN workout_measurements workout_measurement
+				ON workout_measurement.workout_id = workout.id
 			LEFT JOIN exercises exercise ON exercise.id = execution.exercise_id
 			LEFT JOIN metrics metric_1 ON metric_1.id = exercise.metric_1_id
 			LEFT JOIN metrics metric_2 ON metric_2.id = exercise.metric_2_id
@@ -694,6 +719,41 @@ export class WorkoutsService {
 		if (!rows[0].canRead)
 			throw new ForbiddenException('Você não pode visualizar este treino.');
 		const workout = rows[0];
+		let measurements = Array.from(
+			new Map(
+				rows
+					.filter(
+						(row) =>
+							workout.workoutStatus === WorkoutStatus.COMPLETED &&
+							row.measurementResultId !== null,
+					)
+					.map((row) => [
+						row.measurementResultId!,
+						{
+							id: row.measurementResultId!,
+							measurementId: row.measurementId!,
+							value: Number(row.measurementValue),
+							score: Number(row.measurementScore),
+							key: row.measurementKey!,
+							name: row.measurementName!,
+							icon: row.measurementIcon!,
+							presentation: row.measurementPresentation!,
+						},
+					]),
+			).values(),
+		);
+		if (
+			workout.workoutStatus === WorkoutStatus.COMPLETED &&
+			!measurements.length
+		) {
+			await this.dataSource.transaction(async (manager) => {
+				// Evita que duas revisões abertas simultaneamente gerem o mesmo snapshot.
+				await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [id]);
+				if (!(await this.measurementsService.findForWorkout(id)).length)
+					await this.measurementsService.persistForWorkout(manager, id);
+			});
+			measurements = await this.measurementsService.findForWorkout(id);
+		}
 		return {
 			id: workout.workoutId,
 			athleteId: workout.athleteId,
@@ -701,76 +761,77 @@ export class WorkoutsService {
 			templateDescription: workout.templateDescription,
 			scheduledDate: workout.scheduledDate,
 			status: workout.workoutStatus,
-			measurements:
-				workout.workoutStatus === WorkoutStatus.COMPLETED
-					? await this.measurementsService.findForWorkout(id)
-					: [],
-			executions: rows
-				.filter((row) => row.executionId !== null)
-				.map((execution) => ({
-					id: Number(execution.executionId),
-					exerciseId: Number(execution.exerciseId),
-					position: Number(execution.position),
-					prescribedMetric1: numberOrNull(execution.prescribedMetric1),
-					prescribedMetric2:
-						execution.metric2Type === 'p' &&
-						execution.recordId !== null &&
-						execution.prescribedMetric2 !== null
-							? (Number(execution.prescribedMetric2) * Number(execution.recordValue)) /
-								100
-							: numberOrNull(execution.prescribedMetric2),
-					metric1Type: execution.metric1Type,
-					metric2Type:
-						execution.metric2Type === 'p' && execution.recordId !== null
-							? 'v'
-							: execution.metric2Type,
-					prescribedPse: numberOrNull(execution.prescribedPse),
-					prescribedRestDuration: numberOrNull(execution.prescribedRestDuration),
-					performedMetric1: numberOrNull(execution.performedMetric1),
-					performedMetric2: numberOrNull(execution.performedMetric2),
-					performedPse: numberOrNull(execution.performedPse),
-					performedRestDuration: numberOrNull(execution.performedRestDuration),
-					performedNote: execution.performedNote,
-					setType: execution.setType,
-					finishedAt: execution.finishedAt,
-					status: execution.executionStatus,
-					exercise: {
-						id: Number(execution.exerciseIdReference),
-						name: execution.exerciseName,
-						description: execution.exerciseDescription,
-						metric_1: {
-							id: Number(execution.metric1Id),
-							name: execution.metric1Name,
-							symbol: execution.metric1Symbol,
-							fieldType: execution.metric1FieldType,
-						},
-						...(execution.metric2Id === null
-							? {}
-							: {
-									metric_2: {
-										id: Number(execution.metric2Id),
-										name: execution.metric2Name!,
-										symbol: execution.metric2Symbol!,
-										fieldType: execution.metric2FieldType!,
-									},
-								}),
+			measurements,
+			executions: Array.from(
+				new Map(
+					rows
+						.filter((row) => row.executionId !== null)
+						.map((row) => [row.executionId!, row]),
+				).values(),
+			).map((execution) => ({
+				id: Number(execution.executionId),
+				exerciseId: Number(execution.exerciseId),
+				position: Number(execution.position),
+				prescribedMetric1: numberOrNull(execution.prescribedMetric1),
+				prescribedMetric2:
+					execution.metric2Type === 'p' &&
+					execution.recordId !== null &&
+					execution.prescribedMetric2 !== null
+						? (Number(execution.prescribedMetric2) * Number(execution.recordValue)) /
+							100
+						: numberOrNull(execution.prescribedMetric2),
+				metric1Type: execution.metric1Type,
+				metric2Type:
+					execution.metric2Type === 'p' && execution.recordId !== null
+						? 'v'
+						: execution.metric2Type,
+				prescribedPse: numberOrNull(execution.prescribedPse),
+				prescribedRestDuration: numberOrNull(execution.prescribedRestDuration),
+				performedMetric1: numberOrNull(execution.performedMetric1),
+				performedMetric2: numberOrNull(execution.performedMetric2),
+				performedPse: numberOrNull(execution.performedPse),
+				performedRestDuration: numberOrNull(execution.performedRestDuration),
+				performedNote: execution.performedNote,
+				setType: execution.setType,
+				finishedAt: execution.finishedAt,
+				status: execution.executionStatus,
+				exercise: {
+					id: Number(execution.exerciseIdReference),
+					name: execution.exerciseName,
+					description: execution.exerciseDescription,
+					metric_1: {
+						id: Number(execution.metric1Id),
+						name: execution.metric1Name,
+						symbol: execution.metric1Symbol,
+						fieldType: execution.metric1FieldType,
 					},
-					referencePersonalRecord:
-						execution.metric2Type === 'p' && execution.recordId
-							? {
-									id: execution.recordId,
-									value: Number(execution.recordValue),
-									measuredAt: execution.recordMeasuredAt!,
-								}
-							: null,
-					referenceGroup:
-						execution.referenceGroupId === null
-							? null
-							: {
-									id: Number(execution.referenceGroupId),
-									name: execution.referenceGroupName!,
+					...(execution.metric2Id === null
+						? {}
+						: {
+								metric_2: {
+									id: Number(execution.metric2Id),
+									name: execution.metric2Name!,
+									symbol: execution.metric2Symbol!,
+									fieldType: execution.metric2FieldType!,
 								},
-				})),
+							}),
+				},
+				referencePersonalRecord:
+					execution.metric2Type === 'p' && execution.recordId
+						? {
+								id: execution.recordId,
+								value: Number(execution.recordValue),
+								measuredAt: execution.recordMeasuredAt!,
+							}
+						: null,
+				referenceGroup:
+					execution.referenceGroupId === null
+						? null
+						: {
+								id: Number(execution.referenceGroupId),
+								name: execution.referenceGroupName!,
+							},
+			})),
 			exerciseNotes: Array.from(
 				new Map(
 					rows
@@ -1135,9 +1196,11 @@ export class WorkoutsService {
 		const normalizedName = name.trim();
 		if (!normalizedName)
 			throw new BadRequestException('Informe o nome do treino.');
-		if (workout.status === WorkoutStatus.CANCELLED)
+		if (
+			[WorkoutStatus.COMPLETED, WorkoutStatus.CANCELLED].includes(workout.status)
+		)
 			throw new BadRequestException(
-				'Treinos cancelados não podem ser renomeados.',
+				'Treinos finalizados ou cancelados não podem ser renomeados.',
 			);
 
 		workout.templateName = normalizedName;

@@ -19,6 +19,10 @@ import PersonalRecordRequiredModal from '@/components/shared/PersonalRecordRequi
 import ExerciseReorderModal from '@/components/shared/ExerciseReorderModal';
 import ExerciseExecutionCard from './ExerciseExecutionCard';
 import WorkoutComparison from './WorkoutComparison';
+import {
+	completionMessages,
+	default as WorkoutCompletionScreen,
+} from './WorkoutCompletionScreen';
 import WorkoutMeasurements from './WorkoutMeasurements';
 import { getSessionUser } from '@/lib/auth';
 import {
@@ -100,6 +104,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 	const [completionOpen, setCompletionOpen] = useState(false);
 	const [showPostCompletion, setShowPostCompletion] = useState(false);
+	const [completionMessage, setCompletionMessage] = useState('');
 	const [startOpen, setStartOpen] = useState(false);
 	const [skipOpen, setSkipOpen] = useState(false);
 	const [pickerOpen, setPickerOpen] = useState(false);
@@ -526,7 +531,12 @@ export default function TrainingExecution({ id }: { id: string }) {
 		setStartOpen(false);
 	};
 	const renameWorkout = async () => {
-		if (!workout || !workoutName.trim()) return;
+		if (
+			!workout ||
+			!workoutName.trim() ||
+			['completed', 'cancelled'].includes(workout.status)
+		)
+			return;
 		setRenaming(true);
 		setError(null);
 		const response = await workoutsService.updateName(
@@ -570,6 +580,11 @@ export default function TrainingExecution({ id }: { id: string }) {
 			const completedWorkout = preloadPrescribedValues(result.data);
 			workoutRef.current = completedWorkout;
 			setWorkout(completedWorkout);
+			setCompletionMessage(
+				completionMessages[
+					Math.floor(Math.random() * completionMessages.length)
+				],
+			);
 			setShowPostCompletion(true);
 			window.dispatchEvent(new Event('workout-status-changed'));
 		}
@@ -603,6 +618,17 @@ export default function TrainingExecution({ id }: { id: string }) {
 			<section className="mx-auto max-w-3xl">
 				<ErrorBox message={error || 'Treino não encontrado.'} />
 			</section>
+		);
+	if (showPostCompletion)
+		return (
+			<WorkoutCompletionScreen
+				measurements={workout.measurements}
+				message={completionMessage}
+				onConfirm={() => {
+					setShowPostCompletion(false);
+					router.replace(`/training/${workout.id}`);
+				}}
+			/>
 		);
 	return (
 		<section className="mx-auto w-full max-w-5xl space-y-4 pb-10">
@@ -656,7 +682,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 					<h1 className="line-clamp-2 min-w-0 flex-1 text-base font-bold leading-snug sm:text-lg">
 						{workout.templateName}
 					</h1>
-					{isAthlete && workout.status !== 'cancelled' && (
+					{isAthlete && !['completed', 'cancelled'].includes(workout.status) && (
 						<button
 							type="button"
 							onClick={() => {
@@ -694,11 +720,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 			!(isAthlete && workout.status == 'in_progress') ? (
 				<>
 					<WorkoutMeasurements
-						measurements={
-							showPostCompletion
-								? workout.measurements.slice(0, 3)
-								: workout.measurements
-						}
+						measurements={workout.measurements}
 					/>
 					<WorkoutComparison executions={workout.executions} />
 				</>

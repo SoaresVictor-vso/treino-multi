@@ -132,6 +132,7 @@ export class PersonalRecordsService {
 				'Informe exatamente um: exerciseGroupId ou exerciseId.',
 			);
 		}
+		if (athlete.tenantId === null) return null;
 		return this.records.findOne({
 			where: {
 				athleteId,
