@@ -17,10 +17,11 @@ type ComparedValue = {
 	label: string;
 	value: number | null;
 	metric?: Metric;
+	unit?: string;
 	type?: 'v' | 'p' | null;
 };
 
-function formatValue({ value, metric, type }: Omit<ComparedValue, 'label'>) {
+function formatValue({ value, metric, type, unit }: Omit<ComparedValue, 'label'>) {
 	if (value === null) return { number: '—', unit: '' };
 	if (metric?.fieldType === MetricFieldType.TIME && type !== 'p') {
 		const totalSeconds = Math.round(value);
@@ -34,7 +35,7 @@ function formatValue({ value, metric, type }: Omit<ComparedValue, 'label'>) {
 	}
 	return {
 		number: String(value),
-		unit: type === 'p' ? '%' : (metric?.symbol ?? ''),
+		unit: unit ?? (type === 'p' ? '%' : (metric?.symbol ?? '')),
 	};
 }
 
@@ -139,14 +140,27 @@ function executionValues(
 					},
 				]
 			: []),
+		// O 1RM é um resultado da execução, portanto aparece ao lado das métricas
+		// realizadas e nunca no lado prescrito da comparação.
+		...(!expected && execution.predictedRm !== null && execution.predictedRm !== undefined
+			? [
+					{
+						label: '1RM estimado',
+						value: Number(execution.predictedRm.toFixed(1)),
+						unit: 'kg',
+					},
+				]
+			: []),
 	];
 	return values;
 }
 
 export default function WorkoutComparison({
 	executions,
+	onExerciseClick,
 }: {
 	executions: WorkoutExecution[];
+	onExerciseClick?: (exerciseId: number, execution: WorkoutExecution) => void;
 }) {
 	const [legendOpen, setLegendOpen] = useState(false);
 	const exerciseGroups = Array.from(
@@ -222,7 +236,13 @@ export default function WorkoutComparison({
 					>
 						<div className="border-b border-outline-variant bg-surface-container px-4 py-3 sm:px-5">
 							<div className="flex items-center gap-2">
-								<h3 className="font-bold">{exercise.name}</h3>
+								<button
+									type="button"
+									onClick={() => onExerciseClick?.(exerciseId, sets[0])}
+									className="text-left font-bold hover:text-primary"
+								>
+									{exercise.name}
+								</button>
 								{isAthleteAdded && (
 									<span
 										className="inline-flex text-on-surface-variant"

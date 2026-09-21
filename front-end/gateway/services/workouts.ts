@@ -23,6 +23,7 @@ export type WorkoutExecution = {
 	prescribedRestDuration: number | null;
 	performedMetric1: number | null;
 	performedMetric2: number | null;
+	predictedRm?: number | null;
 	performedPse: number | null;
 	performedRestDuration: number | null;
 	performedNote: string | null;
@@ -50,6 +51,8 @@ export type WorkoutDetail = {
 	templateName: string;
 	templateDescription: string;
 	scheduledDate: string | null;
+	performedAt: string | null;
+	finishedAt: string | null;
 	status: WorkoutStatus;
 	executions: WorkoutExecution[];
 	exerciseNotes: WorkoutExerciseNote[];
@@ -138,6 +141,7 @@ export type UpdateWorkoutExecution = Omit<
 	| 'referencePersonalRecord'
 	| 'metric1Type'
 	| 'metric2Type'
+	| 'predictedRm'
 	| 'finishedAt'
 > & { id?: number };
 

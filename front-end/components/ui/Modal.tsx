@@ -6,7 +6,7 @@ import { RiCloseLine } from 'react-icons/ri';
 
 type ModalProps = {
 	isOpen: boolean;
-	title: string;
+	title: React.ReactNode;
 	description?: string;
 	onClose: () => void;
 	children: React.ReactNode;

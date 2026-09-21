@@ -6,6 +6,7 @@ import {
 	RiArrowLeftLine,
 	RiCheckLine,
 	RiEditLine,
+	RiExternalLinkLine,
 	RiPlayLine,
 } from 'react-icons/ri';
 import { useRouter } from 'next/navigation';
@@ -15,6 +16,7 @@ import Checkbox from '@/components/ui/Checkbox';
 import ErrorBox from '@/components/ui/ErrorBox';
 import Modal from '@/components/ui/Modal';
 import ExercisePicker from '@/components/shared/ExercisePicker';
+import ExerciseHistorySeriesList from '@/components/shared/ExerciseHistorySeriesList';
 import PersonalRecordRequiredModal from '@/components/shared/PersonalRecordRequiredModal';
 import ExerciseReorderModal from '@/components/shared/ExerciseReorderModal';
 import ExerciseExecutionCard from './ExerciseExecutionCard';
@@ -30,6 +32,7 @@ import {
 	type WorkoutDetail,
 	type WorkoutExecution,
 } from '@/gateway/services/workouts';
+import { exerciseReviewsService } from '@/gateway/services/exercise-reviews';
 import type { Exercise } from '@/gateway/services/parametro';
 import {
 	secondsToTime,
@@ -48,6 +51,7 @@ function serializeExecution(execution: WorkoutExecution) {
 		referencePersonalRecord: _referencePersonalRecord,
 		metric1Type: _metric1Type,
 		metric2Type: _metric2Type,
+		predictedRm: _predictedRm,
 		finishedAt: _finishedAt,
 		...payload
 	} = execution;
@@ -123,6 +127,22 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const [restDismissed, setRestDismissed] = useState(false);
 	const [workoutName, setWorkoutName] = useState('');
 	const [renaming, setRenaming] = useState(false);
+	const [historyOpen, setHistoryOpen] = useState(false);
+	const [exerciseHistory, setExerciseHistory] = useState<{
+		name: string;
+		id: number;
+		metric1Label: string;
+		metric2Label: string | null;
+		rows: Array<{
+			workoutName: string;
+			performedAt: string;
+			metric1: number | null;
+			metric2: number | null;
+			predictedRm: number | null;
+			setType: string;
+			note: string | null;
+		}> | null;
+	} | null>(null);
 	const workoutRef = useRef<WorkoutDetail | null>(null);
 	const saveQueueRef = useRef<WorkoutDetail | null>(null);
 	const savingRef = useRef(false);
@@ -331,7 +351,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 				performedNote: null,
 				setType: 'padrao',
 				finishedAt: null,
-				status: 'in_progress',
+				status: 'pending',
 				exercise,
 				referenceGroup: null,
 				referencePersonalRecord: null,
@@ -343,7 +363,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 					position: index + 1,
 				})),
 			};
-		});
+		}, { saveImmediately: true });
 	const addExercises = (selected: Exercise[]) => {
 		updateWorkout((current) => {
 			const existingExerciseIds = new Set(
@@ -367,10 +387,11 @@ export default function TrainingExecution({ id }: { id: string }) {
 				activeRestDurations.every((duration) => duration === activeRestDurations[0])
 					? activeRestDurations[0]
 					: DEFAULT_REST_DURATION;
-			const previousSetType = current.executions
-				.filter((execution) => execution.status !== 'skipped')
-				.toSorted((left, right) => left.position - right.position)
-				.at(-1)?.setType ?? 'padrao';
+			const previousSetType =
+				current.executions
+					.filter((execution) => execution.status !== 'skipped')
+					.toSorted((left, right) => left.position - right.position)
+					.at(-1)?.setType ?? 'padrao';
 			return {
 				...current,
 				executions: [
@@ -392,14 +413,14 @@ export default function TrainingExecution({ id }: { id: string }) {
 						performedNote: null,
 						setType: previousSetType,
 						finishedAt: null,
-						status: 'in_progress' as const,
+						status: 'pending' as const,
 						exercise,
 						referenceGroup: null,
 						referencePersonalRecord: null,
 					})),
 				],
 			};
-		});
+		}, { saveImmediately: true });
 		setPickerOpen(false);
 	};
 	const openExercisePicker = () => {
@@ -438,13 +459,13 @@ export default function TrainingExecution({ id }: { id: string }) {
 					? { ...item, status: 'skipped' }
 					: item,
 			),
-		}));
+		}), { saveImmediately: true });
 	const openRest = (execution: WorkoutExecution) => {
 		setRestExecution(execution);
 		setRestSeconds(
 			execution.performedRestDuration ||
-			execution.prescribedRestDuration ||
-			DEFAULT_REST_DURATION,
+				execution.prescribedRestDuration ||
+				DEFAULT_REST_DURATION,
 		);
 		setApplyRestToExercise(false);
 		setApplyRestToWorkout(false);
@@ -581,9 +602,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 			workoutRef.current = completedWorkout;
 			setWorkout(completedWorkout);
 			setCompletionMessage(
-				completionMessages[
-					Math.floor(Math.random() * completionMessages.length)
-				],
+				completionMessages[Math.floor(Math.random() * completionMessages.length)],
 			);
 			setShowPostCompletion(true);
 			window.dispatchEvent(new Event('workout-status-changed'));
@@ -719,10 +738,31 @@ export default function TrainingExecution({ id }: { id: string }) {
 			{workout.status === 'completed' ||
 			!(isAthlete && workout.status == 'in_progress') ? (
 				<>
-					<WorkoutMeasurements
-						measurements={workout.measurements}
+					<WorkoutMeasurements measurements={workout.measurements} />
+					<WorkoutComparison
+						executions={workout.executions}
+						onExerciseClick={(exerciseId, execution) => {
+							setHistoryOpen(true);
+							setExerciseHistory({
+								name: execution.exercise.name,
+								id: exerciseId,
+								metric1Label: `${execution.exercise.metric_1.name} (${execution.exercise.metric_1.symbol})`,
+								metric2Label: execution.exercise.metric_2
+									? `${execution.exercise.metric_2.name} (${execution.exercise.metric_2.symbol})`
+									: null,
+								rows: null,
+							});
+							void exerciseReviewsService
+								.latest(workout.athleteId, exerciseId)
+								.then((response) =>
+									setExerciseHistory((previous) =>
+										previous
+											? { ...previous, rows: response.data?.item ?? [] }
+											: previous,
+									),
+								);
+						}}
 					/>
-					<WorkoutComparison executions={workout.executions} />
 				</>
 			) : (
 				<>
@@ -795,6 +835,27 @@ export default function TrainingExecution({ id }: { id: string }) {
 									onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
 									onAddSeries={() => addSeries(sets[0].exercise, 'after')}
 									onTitleLongPress={() => setReorderOpen(true)}
+									onTitleClick={() => {
+										setHistoryOpen(true);
+										setExerciseHistory({
+											name: sets[0].exercise.name,
+											id: exerciseId,
+											metric1Label: `${sets[0].exercise.metric_1.name} (${sets[0].exercise.metric_1.symbol})`,
+											metric2Label: sets[0].exercise.metric_2
+												? `${sets[0].exercise.metric_2.name} (${sets[0].exercise.metric_2.symbol})`
+												: null,
+											rows: null,
+										});
+										void exerciseReviewsService
+											.latest(workout.athleteId, exerciseId)
+											.then((response) =>
+												setExerciseHistory((previous) =>
+													previous
+														? { ...previous, rows: response.data?.item ?? [] }
+														: previous,
+												),
+											);
+									}}
 									onRestClick={openRest}
 								/>
 							);
@@ -957,6 +1018,47 @@ export default function TrainingExecution({ id }: { id: string }) {
 						{saving ? 'Pulando...' : 'Confirmar pulo'}
 					</Button>
 				</div>
+			</Modal>
+			<Modal
+				isOpen={historyOpen}
+				title={
+					exerciseHistory ? (
+						<button
+							type="button"
+							onClick={() =>
+								router.push(
+									`/athlete/${workout.athleteId}/exercises/${exerciseHistory.id}?returnTo=${encodeURIComponent(`/training/${id}`)}`,
+								)
+							}
+							className="inline-flex items-center gap-2 text-left hover:underline"
+						>
+							{exerciseHistory.name}
+							<RiExternalLinkLine aria-label="Abrir detalhes do exercício" />
+						</button>
+					) : (
+						'Histórico'
+					)
+				}
+				onClose={() => setHistoryOpen(false)}
+			>
+				{exerciseHistory?.rows?.length ? (
+					<p className="-mt-3 mb-4 text-sm text-on-surface-variant">
+						{exerciseHistory.rows[0].workoutName} ·{' '}
+						{new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(
+							new Date(exerciseHistory.rows[0].performedAt),
+						)}
+					</p>
+				) : null}
+
+				{exerciseHistory?.rows === null ? (
+					<p>Carregando histórico…</p>
+				) : !exerciseHistory?.rows?.length ? (
+					<p className="text-on-surface-variant">
+						Não há execução anterior disponível.
+					</p>
+				) : (
+					<ExerciseHistorySeriesList series={exerciseHistory.rows} metric1Label={exerciseHistory.metric1Label} metric2Label={exerciseHistory.metric2Label} />
+				)}
 			</Modal>
 			{pickerOpen && (
 				<ExercisePicker

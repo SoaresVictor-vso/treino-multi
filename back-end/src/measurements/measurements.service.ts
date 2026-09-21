@@ -3,6 +3,7 @@ import { EntityManager, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ExecutionStatus } from '../common/enums/execution-status.enum';
 import { Execution } from '../workouts/entities/execution.entity';
+import { Workout } from '../workouts/entities/workout.entity';
 import { Metric } from '../metrics/entities/metric.entity';
 import { Measurement } from './entities/measurement.entity';
 import { WorkoutMeasurement } from './entities/workout-measurement.entity';
@@ -97,6 +98,9 @@ export class MeasurementsService {
 			};
 		},
 	) {
+		// A prescribed, pending or skipped set has no training result and must not
+		// participate in any aggregate metric (tonnage, adherence, pace, etc.).
+		if (execution.status !== ExecutionStatus.COMPLETED) return false;
 		const context = this.context(execution);
 		const needs = [measurement.metric1, measurement.metric2].filter(
 			(metric): metric is NonNullable<typeof metric> => !!metric,
@@ -109,6 +113,9 @@ export class MeasurementsService {
 			)
 		)
 			return false;
+		// The duration measurement is the workout interval, not the interval of an
+		// individual set. A legacy/directly-completed set may not have startedAt.
+		if (measurement.key === 'duration') return true;
 		return formulaFields(measurement.formula).every((field) => {
 			const value = context[field];
 			return (
@@ -122,7 +129,7 @@ export class MeasurementsService {
 		manager: EntityManager,
 		workoutId: string,
 	): Promise<CalculatedMeasurement[]> {
-		const [measurements, executions] = await Promise.all([
+		const [measurements, executions, workout] = await Promise.all([
 			manager
 				.getRepository(Measurement)
 				.find({
@@ -135,7 +142,11 @@ export class MeasurementsService {
 					where: { workoutId },
 					relations: { exercise: { metric1: true, metric2: true } },
 				}),
+			manager.getRepository(Workout).findOneByOrFail({ id: workoutId }),
 		]);
+		const workoutDuration = workout.performedAt && workout.finishedAt
+			? Math.max(0, (workout.finishedAt.getTime() - workout.performedAt.getTime()) / 1000)
+			: null;
 		return measurements
 			.flatMap((measurement) => {
 				const compatible = executions.filter((execution) =>
@@ -144,7 +155,13 @@ export class MeasurementsService {
 				if (!compatible.length) return [];
 				const curr = createZeroState();
 				try {
-					for (const execution of compatible)
+					if (measurement.key === 'duration') {
+						if (workoutDuration === null || !compatible[0]) return [];
+						executeFormula(measurement.formula, curr, {
+							...this.context(compatible[0]),
+							duration: workoutDuration,
+						});
+					} else for (const execution of compatible)
 						executeFormula(measurement.formula, curr, this.context(execution));
 					const value = evaluateValueFormula(measurement.valueFormula, curr);
 					return [

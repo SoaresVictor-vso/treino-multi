@@ -29,6 +29,8 @@ import { Execution } from './entities/execution.entity';
 import { WorkoutExerciseNote } from './entities/workout-exercise-note.entity';
 import { Workout } from './entities/workout.entity';
 import { MeasurementsService } from '../measurements/measurements.service';
+import { Exercise } from '../exercises/entities/exercise.entity';
+import { predictedRmForExecution } from '../exercise-reviews/predicted-rm';
 
 export interface GenerateWorkoutFromTemplateInput {
 	template: WorkoutTemplate;
@@ -43,6 +45,8 @@ type WorkoutExecutionRow = {
 	templateName: string;
 	templateDescription: string;
 	scheduledDate: string | null;
+	performedAt: string | null;
+	workoutFinishedAt: string | null;
 	workoutStatus: WorkoutStatus;
 	canRead: boolean;
 	executionId: string | number | null;
@@ -56,6 +60,7 @@ type WorkoutExecutionRow = {
 	prescribedRestDuration: string | number | null;
 	performedMetric1: string | number | null;
 	performedMetric2: string | number | null;
+	predictedRm: string | number | null;
 	performedPse: string | number | null;
 	performedRestDuration: string | number | null;
 	performedNote: string | null;
@@ -545,6 +550,8 @@ export class WorkoutsService {
 				workout.template_description AS "templateDescription",
 				workout.scheduled_date AS "scheduledDate",
 				workout.performed_at AS "performedAt",
+				workout.finished_at AS "workoutFinishedAt",
+				workout.performed_at AS "performedAt",
 				workout.status AS status
 			FROM workouts workout
 			LEFT JOIN athlete_trainer_associations association
@@ -593,6 +600,8 @@ export class WorkoutsService {
 				workout.template_name AS "templateName",
 				workout.template_description AS "templateDescription",
 				workout.scheduled_date AS "scheduledDate",
+				workout.performed_at AS "performedAt",
+				workout.finished_at AS "workoutFinishedAt",
 				workout.status AS "workoutStatus",
 				(
 					workout.athlete_id = $2
@@ -620,6 +629,7 @@ export class WorkoutsService {
 				execution.prescribed_rest_duration AS "prescribedRestDuration",
 				execution.performed_metric_1 AS "performedMetric1",
 				execution.performed_metric_2 AS "performedMetric2",
+				execution.predicted_rm AS "predictedRm",
 				execution.performed_pse AS "performedPse",
 				execution.performed_rest_duration AS "performedRestDuration",
 				execution.performed_note AS "performedNote",
@@ -742,10 +752,7 @@ export class WorkoutsService {
 					]),
 			).values(),
 		);
-		if (
-			workout.workoutStatus === WorkoutStatus.COMPLETED &&
-			!measurements.length
-		) {
+		if (workout.workoutStatus === WorkoutStatus.COMPLETED && !measurements.length) {
 			await this.dataSource.transaction(async (manager) => {
 				// Evita que duas revisões abertas simultaneamente gerem o mesmo snapshot.
 				await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [id]);
@@ -760,6 +767,8 @@ export class WorkoutsService {
 			templateName: workout.templateName,
 			templateDescription: workout.templateDescription,
 			scheduledDate: workout.scheduledDate,
+			performedAt: workout.performedAt,
+			finishedAt: workout.workoutFinishedAt,
 			status: workout.workoutStatus,
 			measurements,
 			executions: Array.from(
@@ -789,6 +798,7 @@ export class WorkoutsService {
 				prescribedRestDuration: numberOrNull(execution.prescribedRestDuration),
 				performedMetric1: numberOrNull(execution.performedMetric1),
 				performedMetric2: numberOrNull(execution.performedMetric2),
+				predictedRm: numberOrNull(execution.predictedRm),
 				performedPse: numberOrNull(execution.performedPse),
 				performedRestDuration: numberOrNull(execution.performedRestDuration),
 				performedNote: execution.performedNote,
@@ -907,15 +917,7 @@ export class WorkoutsService {
 			workout.performedAt = new Date();
 			workout.updatedBy = actor.sub;
 			await manager.save(workout);
-			await manager
-				.createQueryBuilder()
-				.update(Execution)
-				.set({ status: ExecutionStatus.IN_PROGRESS, startedAt: new Date() })
-				.where('workout_id = :id AND status = :status', {
-					id,
-					status: ExecutionStatus.PENDING,
-				})
-				.execute();
+			await this.startNextExecution(manager, id, workout.performedAt);
 		});
 		return this.findWorkout(id, actor);
 	}
@@ -970,8 +972,8 @@ export class WorkoutsService {
 						position: input.position,
 						metric1Type: 'v',
 						metric2Type: null,
-						status: ExecutionStatus.IN_PROGRESS,
-						startedAt: new Date(),
+						status: ExecutionStatus.PENDING,
+						startedAt: null,
 					});
 				const previousStatus = entity.status;
 				Object.assign(entity, input);
@@ -979,12 +981,31 @@ export class WorkoutsService {
 					entity.status === ExecutionStatus.COMPLETED ||
 					entity.status === ExecutionStatus.SKIPPED
 				) {
+					if (!entity.startedAt) {
+						const previous = current
+							.filter((item) => item.position < entity.position && item.finishedAt)
+							.toSorted((left, right) => right.position - left.position)[0];
+						entity.startedAt = previous?.finishedAt ?? workout.performedAt ?? new Date();
+					}
 					if (previousStatus !== entity.status || !entity.finishedAt)
 						entity.finishedAt = new Date();
 				} else if (entity.status === ExecutionStatus.IN_PROGRESS)
 					entity.finishedAt = null;
+				const exercise = await manager.findOne(Exercise, {
+					where: { id: entity.exerciseId },
+					relations: { metric1: true, metric2: true },
+				});
+				if (!exercise) throw new BadRequestException('Exercício não encontrado.');
+				entity.predictedRm = predictedRmForExecution({
+					metric1Name: exercise.metric1.name,
+					metric2Name: exercise.metric2?.name,
+					metric1: entity.performedMetric1,
+					metric2: entity.performedMetric2,
+					completed: entity.status === ExecutionStatus.COMPLETED,
+				});
 				await manager.save(entity);
 			}
+			await this.startNextExecution(manager, id);
 			if (dto.exerciseNotes?.length) {
 				const currentNotes = await manager.find(WorkoutExerciseNote, {
 					where: { workoutId: id },
@@ -1042,7 +1063,9 @@ export class WorkoutsService {
 				'Conclua ou pule todas as séries antes de finalizar o treino.',
 			);
 		await this.dataSource.transaction(async (manager) => {
+			const finishedAt = new Date();
 			workout.status = WorkoutStatus.COMPLETED;
+			workout.finishedAt = finishedAt;
 			workout.updatedBy = actor.sub;
 			await manager.save(workout);
 			await this.measurementsService.persistForWorkout(manager, id);
@@ -1071,6 +1094,7 @@ export class WorkoutsService {
 				.execute();
 			workout.status = WorkoutStatus.CANCELLED;
 			workout.performedAt = finishedAt;
+			workout.finishedAt = finishedAt;
 			workout.updatedBy = actor.sub;
 			await manager.save(workout);
 		});
@@ -1153,6 +1177,7 @@ export class WorkoutsService {
 		const athlete = await this.usersService.findOne(actor.sub);
 		const defaultName = this.getDefaultWorkoutName(athlete.person.name);
 		const workout = await this.dataSource.transaction(async (manager) => {
+			const startedAt = startImmediately ? new Date() : null;
 			const created = await manager.save(
 				Workout,
 				manager.create(Workout, {
@@ -1162,7 +1187,7 @@ export class WorkoutsService {
 					templateName: dto.name?.trim() || defaultName,
 					templateDescription: dto.description?.trim() ?? '',
 					scheduledDate: dto.scheduledDate ?? null,
-					performedAt: startImmediately ? new Date() : null,
+					performedAt: startedAt,
 					status: startImmediately
 						? WorkoutStatus.IN_PROGRESS
 						: dto.scheduledDate
@@ -1174,10 +1199,9 @@ export class WorkoutsService {
 			);
 			await manager.save(
 				Execution,
-				activities.map((activity) =>
-					this.createExecution(manager, created.id, activity),
-				),
+				activities.map((activity) => this.createExecution(manager, created.id, activity)),
 			);
+			if (startedAt) await this.startNextExecution(manager, created.id, startedAt);
 			const notes = this.createExerciseNotes(
 				manager,
 				created.id,
@@ -1546,6 +1570,24 @@ export class WorkoutsService {
 			startedAt: null,
 			finishedAt: null,
 		});
+	}
+
+	private async startNextExecution(
+		manager: EntityManager,
+		workoutId: string,
+		startedAt = new Date(),
+	): Promise<void> {
+		const executions = manager.getRepository(Execution);
+		if (await executions.existsBy({ workoutId, status: ExecutionStatus.IN_PROGRESS })) return;
+		const next = await executions.findOne({
+			where: { workoutId, status: ExecutionStatus.PENDING },
+			order: { position: 'ASC' },
+		});
+		if (!next) return;
+		next.status = ExecutionStatus.IN_PROGRESS;
+		next.startedAt = startedAt;
+		next.finishedAt = null;
+		await executions.save(next);
 	}
 
 	private createExerciseNotes(
