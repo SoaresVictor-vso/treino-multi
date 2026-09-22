@@ -49,6 +49,11 @@ export class UpdateWorkoutExecutionsDto {
 
 	@IsOptional()
 	@IsArray()
+	@IsInt({ each: true })
+	deletedExecutionIds?: number[];
+
+	@IsOptional()
+	@IsArray()
 	@ValidateNested({ each: true })
 	@Type(() => UpdateWorkoutExerciseNoteDto)
 	exerciseNotes?: UpdateWorkoutExerciseNoteDto[];

@@ -12,12 +12,16 @@ const MINIMUM_TOKEN_LIFETIME_SECONDS = 60;
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 const REMEMBER_ME_KEY = 'rememberMe';
+export const SESSION_EXPIRED_EVENT = 'auth:session-expired';
+export const API_ERROR_EVENT = 'api:error';
 let refreshPromise: Promise<ApiResponse<{ accessToken: string }>> | null = null;
 let inMemoryRefreshToken: string | null = null;
+let sessionExpirationReported = false;
 
 export function storeSessionTokens(accessToken: string, refreshToken: string): void {
 	setAuthCookie(accessToken);
 	inMemoryRefreshToken = refreshToken;
+	sessionExpirationReported = false;
 }
 
 export function clearSessionTokens(): void {
@@ -29,6 +33,10 @@ export function clearSessionTokens(): void {
 		localStorage.removeItem(ACCESS_TOKEN_KEY);
 		localStorage.removeItem(REFRESH_TOKEN_KEY);
 		localStorage.removeItem(REMEMBER_ME_KEY);
+	}
+
+	if (typeof sessionStorage !== 'undefined') {
+		sessionStorage.removeItem(REFRESH_TOKEN_KEY);
 	}
 }
 
@@ -56,20 +64,48 @@ export function tokenHasEnoughLifetime(token: string | null): boolean {
 
 function getRefreshToken(): string | null {
 	if (inMemoryRefreshToken) return inMemoryRefreshToken;
-	if (typeof localStorage === 'undefined') return null;
-
-	const persistedValue = localStorage.getItem(REFRESH_TOKEN_KEY);
-	if (!persistedValue) return null;
+	const persistedValue =
+		typeof localStorage !== 'undefined'
+			? localStorage.getItem(REFRESH_TOKEN_KEY)
+			: null;
+	const sessionValue =
+		typeof sessionStorage !== 'undefined'
+			? sessionStorage.getItem(REFRESH_TOKEN_KEY)
+			: null;
+	const value = persistedValue || sessionValue;
+	if (!value) return null;
 
 	// usePersistedState persists strings with JSON.stringify(), so older
 	// entries may be stored as `"token"` instead of `token`.
 	try {
-		const parsedValue: unknown = JSON.parse(persistedValue);
+		const parsedValue: unknown = JSON.parse(value);
 		return typeof parsedValue === 'string' ? parsedValue : null;
 	} catch {
 		// Keep compatibility with values stored directly in localStorage.
-		return persistedValue;
+		return value;
 	}
+}
+
+export function hasStoredRefreshToken(): boolean {
+	return !!getRefreshToken();
+}
+
+function reportSessionExpired(): void {
+	if (sessionExpirationReported || typeof window === 'undefined') return;
+
+	sessionExpirationReported = true;
+	clearSessionTokens();
+	window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+}
+
+function reportApiError(response: ApiResponse<unknown>): void {
+	if (response.success || response.status === 401 || typeof window === 'undefined')
+		return;
+	window.dispatchEvent(
+		new CustomEvent(API_ERROR_EVENT, {
+			detail: { message: response.error || 'Não foi possível realizar a operação.' },
+		}),
+	);
 }
 
 export async function refreshAccessToken(): Promise<
@@ -81,7 +117,7 @@ export async function refreshAccessToken(): Promise<
 			? apiRequest<{ accessToken: string }>('auth/refresh', {
 					method: 'POST',
 					body: JSON.stringify({ refreshToken }),
-				})
+				}, false)
 			: Promise.resolve({
 					success: false,
 					error: 'Sessão expirada. Faça login novamente.',
@@ -103,6 +139,7 @@ export async function refreshAccessToken(): Promise<
 export async function apiRequest<T>(
 	endpoint: string,
 	options?: RequestInit,
+	reportErrors = true,
 ): Promise<ApiResponse<T>> {
 	try {
 		const res = await fetch(`${API_URL}/${endpoint}`, {
@@ -116,20 +153,25 @@ export async function apiRequest<T>(
 			? await res.json()
 			: await res.text();
 
-		if (!res.ok)
-			return {
+		if (!res.ok) {
+			const response = {
 				success: false,
 				error: data?.message || 'Não foi possível realizar a operação.',
 				status: res.status,
 			};
+			if (reportErrors) reportApiError(response);
+			return response;
+		}
 
 		return { success: true, data, status: res.status };
 	} catch {
-		return {
+		const response = {
 			success: false,
 			error: 'Não foi possível conectar ao servidor.',
 			status: 0,
 		};
+		if (reportErrors) reportApiError(response);
+		return response;
 	}
 }
 
@@ -142,6 +184,7 @@ export async function authenticatedRequest<T>(
 	if (!tokenHasEnoughLifetime(token)) {
 		const refreshResponse = await refreshAccessToken();
 		if (!refreshResponse.success || !refreshResponse.data?.accessToken) {
+			reportSessionExpired();
 			return {
 				success: false,
 				error: refreshResponse.error || 'Sessão expirada. Faça login novamente.',
@@ -151,11 +194,35 @@ export async function authenticatedRequest<T>(
 		token = refreshResponse.data.accessToken;
 	}
 
-	return apiRequest<T>(endpoint, {
+	const requestWithToken = (accessToken: string) =>
+		apiRequest<T>(endpoint, {
 		...options,
 		headers: {
-			...(token ? { Authorization: `Bearer ${token}` } : {}),
+			...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
 			...options?.headers,
 		},
-	});
+		}, false);
+
+	const response = await requestWithToken(token || '');
+	if (response.status !== 401) {
+		reportApiError(response);
+		return response;
+	}
+
+	// A token can expire between the pre-flight check and the API validation.
+	// The rejected request never reached its handler, so retrying it once is safe.
+	const refreshResponse = await refreshAccessToken();
+	if (!refreshResponse.success || !refreshResponse.data?.accessToken) {
+		reportSessionExpired();
+		return {
+			success: false,
+			error: refreshResponse.error || 'Sessão expirada. Faça login novamente.',
+			status: refreshResponse.status || 401,
+		};
+	}
+
+	const retryResponse = await requestWithToken(refreshResponse.data.accessToken);
+	if (retryResponse.status === 401) reportSessionExpired();
+	else reportApiError(retryResponse);
+	return retryResponse;
 }
