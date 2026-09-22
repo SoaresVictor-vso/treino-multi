@@ -35,6 +35,7 @@ export type WorkoutExecution = {
 		value: number;
 		measuredAt: string;
 	} | null;
+	pendingRemoval?: boolean;
 };
 
 export type WorkoutExerciseNote = {
@@ -144,6 +145,7 @@ export type UpdateWorkoutExecution = Omit<
 	| 'metric1Type'
 	| 'metric2Type'
 	| 'finishedAt'
+	| 'pendingRemoval'
 > & { id?: number };
 
 export const workoutsService = {
@@ -185,10 +187,11 @@ export const workoutsService = {
 		id: string,
 		executions: UpdateWorkoutExecution[],
 		exerciseNotes: Pick<WorkoutExerciseNote, 'exerciseId' | 'athleteNote'>[],
+		deletedExecutionIds: number[] = [],
 	) =>
 		authenticatedRequest<WorkoutDetail>(`workouts/${id}/executions`, {
 			method: 'PATCH',
-			body: JSON.stringify({ executions, exerciseNotes }),
+			body: JSON.stringify({ executions, exerciseNotes, deletedExecutionIds }),
 		}),
 	complete: (id: string) =>
 		authenticatedRequest<WorkoutDetail>(`workouts/${id}/complete`, {

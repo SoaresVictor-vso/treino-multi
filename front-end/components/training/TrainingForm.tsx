@@ -109,7 +109,7 @@ export default function TrainingForm({
 		exerciseId: number,
 		index: number,
 		key: keyof Activity,
-		value: string | number,
+		value: string | number | undefined,
 	) =>
 		setActivities((current) => ({
 			...current,

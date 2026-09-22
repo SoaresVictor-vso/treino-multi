@@ -37,6 +37,7 @@ function serializeExecution(execution: WorkoutExecution) {
 		metric1Type: _metric1Type,
 		metric2Type: _metric2Type,
 		finishedAt: _finishedAt,
+		pendingRemoval: _pendingRemoval,
 		...payload
 	} = execution;
 	return { ...payload, ...(id > 0 ? { id } : {}) };
@@ -70,9 +71,67 @@ function preloadPrescribedValues(workout: WorkoutDetail): WorkoutDetail {
 }
 
 function serializeExecutions(executions: WorkoutExecution[]) {
-	return executions.map((execution, index) =>
+	return executions
+		.filter((execution) => !execution.pendingRemoval)
+		.map((execution, index) =>
 		serializeExecution({ ...execution, position: index + 1 }),
 	);
+}
+
+function deletedExecutionIds(executions: WorkoutExecution[]) {
+	return executions
+		.filter((execution) => execution.pendingRemoval && execution.id > 0)
+		.map((execution) => execution.id);
+}
+
+function executionHasChanged(
+	current: WorkoutExecution,
+	snapshot: WorkoutExecution,
+) {
+	return JSON.stringify(serializeExecution(current)) !== JSON.stringify(serializeExecution(snapshot));
+}
+
+function reconcileSavedWorkout(
+	snapshot: WorkoutDetail,
+	current: WorkoutDetail,
+	saved: WorkoutDetail,
+): WorkoutDetail {
+	const savedById = new Map(saved.executions.map((execution) => [execution.id, execution]));
+	const representedSavedIds = new Set<number>();
+	const executions = current.executions.map((execution) => {
+		const snapshotExecution = snapshot.executions.find((item) => item.id === execution.id);
+		const savedExecution = snapshotExecution
+			? snapshotExecution.id > 0
+				? savedById.get(snapshotExecution.id)
+				: saved.executions.find(
+						(item) =>
+							item.exerciseId === snapshotExecution.exerciseId &&
+							item.position === snapshotExecution.position,
+					)
+			: execution.id > 0
+				? savedById.get(execution.id)
+				: undefined;
+
+		if (!savedExecution) return execution;
+		representedSavedIds.add(savedExecution.id);
+		if (!snapshotExecution || executionHasChanged(execution, snapshotExecution))
+			return { ...savedExecution, ...execution, id: savedExecution.id };
+		return savedExecution;
+	});
+
+	// A série foi criada no servidor, mas foi removida localmente enquanto o
+	// request estava em voo. Mantemos-a apenas para enviá-la como remoção no
+	// próximo ciclo, sem fazê-la reaparecer visualmente.
+	for (const execution of saved.executions) {
+		if (!representedSavedIds.has(execution.id))
+			executions.push({ ...execution, pendingRemoval: true });
+	}
+
+	return {
+		...saved,
+		executions,
+		exerciseNotes: current.exerciseNotes,
+	};
 }
 
 export default function TrainingExecution({ id }: { id: string }) {
@@ -101,7 +160,6 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const [workoutName, setWorkoutName] = useState('');
 	const [renaming, setRenaming] = useState(false);
 	const workoutRef = useRef<WorkoutDetail | null>(null);
-	const saveQueueRef = useRef<WorkoutDetail | null>(null);
 	const savingRef = useRef(false);
 	const dirtyRef = useRef(false);
 
@@ -133,12 +191,18 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const editable = isAthlete && workout?.status === 'in_progress';
 	const unresolved =
 		workout?.executions.some(
-			(item) => !['completed', 'skipped'].includes(item.status),
+			(item) =>
+				!item.pendingRemoval && !['completed', 'skipped'].includes(item.status),
 		) ?? false;
 	const missingRecords = useMemo(
 		() =>
 			(workout?.executions ?? [])
-				.filter((item) => item.metric2Type === 'p' && !item.referencePersonalRecord)
+				.filter(
+					(item) =>
+						!item.pendingRemoval &&
+						item.metric2Type === 'p' &&
+						!item.referencePersonalRecord,
+				)
 				.map((item) => ({
 					name: item.exercise.name,
 					groupName: item.referenceGroup?.name,
@@ -146,36 +210,37 @@ export default function TrainingExecution({ id }: { id: string }) {
 		[workout],
 	);
 	const save = useCallback(async (snapshot = workoutRef.current) => {
-		if (!snapshot) return;
-		saveQueueRef.current = snapshot;
-		if (savingRef.current) return;
+		if (!snapshot || savingRef.current) return;
 
 		savingRef.current = true;
 		setSaving(true);
 		setError(null);
-		while (saveQueueRef.current) {
-			const workoutToSave = saveQueueRef.current;
-			saveQueueRef.current = null;
-			const response = await workoutsService.updateExecutions(
-				workoutToSave.id,
-				serializeExecutions(workoutToSave.executions),
-				workoutToSave.exerciseNotes.map(({ exerciseId, athleteNote }) => ({
-					exerciseId,
-					athleteNote,
-				})),
-			);
-			if (!response.success || !response.data) {
-				setError(response.error || 'Não foi possível salvar as séries.');
-				saveQueueRef.current = null;
-				break;
-			}
+		const response = await workoutsService.updateExecutions(
+			snapshot.id,
+			serializeExecutions(snapshot.executions),
+			snapshot.exerciseNotes.map(({ exerciseId, athleteNote }) => ({
+				exerciseId,
+				athleteNote,
+			})),
+			deletedExecutionIds(snapshot.executions),
+		);
+		if (!response.success || !response.data) {
+			setError(response.error || 'Não foi possível salvar as séries.');
+		} else {
 			const savedWorkout = preloadPrescribedValues(response.data);
-			if (workoutRef.current === workoutToSave) {
-				workoutRef.current = savedWorkout;
-				setWorkout(savedWorkout);
-				dirtyRef.current = false;
-				setHasUnsavedChanges(false);
-			}
+			const latestWorkout = workoutRef.current ?? snapshot;
+			const reconciledWorkout = reconcileSavedWorkout(
+				snapshot,
+				latestWorkout,
+				savedWorkout,
+			);
+			const hasPendingChanges =
+				latestWorkout !== snapshot ||
+				reconciledWorkout.executions.some((execution) => execution.pendingRemoval);
+			workoutRef.current = reconciledWorkout;
+			setWorkout(reconciledWorkout);
+			dirtyRef.current = hasPendingChanges;
+			setHasUnsavedChanges(hasPendingChanges);
 		}
 		savingRef.current = false;
 		setSaving(false);
@@ -191,10 +256,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 		return () => window.clearInterval(interval);
 	}, []);
 
-	const updateWorkout = (
-		updater: (current: WorkoutDetail) => WorkoutDetail,
-		options: { saveImmediately?: boolean } = {},
-	) => {
+	const updateWorkout = (updater: (current: WorkoutDetail) => WorkoutDetail) => {
 		const current = workoutRef.current;
 		if (!current) return;
 		const updatedWorkout = updater(current);
@@ -202,12 +264,6 @@ export default function TrainingExecution({ id }: { id: string }) {
 		setWorkout(updatedWorkout);
 		dirtyRef.current = true;
 		setHasUnsavedChanges(true);
-		if (
-			options.saveImmediately &&
-			updatedWorkout.status === 'in_progress' &&
-			getSessionUser()?.sub === updatedWorkout.athleteId
-		)
-			void save(updatedWorkout);
 	};
 
 	const updateExecution = (
@@ -230,7 +286,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 					? { ...item, ...patch, ...(patch.status === 'completed' ? { finishedAt: new Date().toISOString() } : {}), ...(patch.status === 'in_progress' ? { finishedAt: null } : {}) }
 					: item,
 			),
-		}), { saveImmediately: patch.status === 'completed' });
+		}));
 	};
 	const updateAthleteNote = (exerciseId: number, athleteNote: string) =>
 		updateWorkout((current) => {
@@ -413,12 +469,14 @@ export default function TrainingExecution({ id }: { id: string }) {
 				const shouldApply = item.id === restExecution.id || (pending && (applyRestToWorkout || (applyRestToExercise && sameExercise)));
 				return shouldApply ? { ...item, performedRestDuration: restSeconds } : item;
 			}),
-		}), { saveImmediately: true });
+		}));
 		setRestOpen(false);
 	};
 	const activeRest = useMemo(() => {
 		if (restDismissed) return null;
-		const completed = (workout?.executions ?? []).filter((item) => item.status === 'completed' && item.finishedAt);
+		const completed = (workout?.executions ?? []).filter(
+			(item) => !item.pendingRemoval && item.status === 'completed' && item.finishedAt,
+		);
 		const last = completed.toSorted((a, b) => new Date(b.finishedAt!).getTime() - new Date(a.finishedAt!).getTime())[0];
 		if (!last?.finishedAt) return null;
 		const duration = last.performedRestDuration ?? last.prescribedRestDuration ?? 0;
@@ -437,7 +495,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 	};
 	const reorderableExercises = Array.from(
 		new Map(
-			(workout?.executions ?? []).map((execution) => [
+			(workout?.executions ?? []).filter((execution) => !execution.pendingRemoval).map((execution) => [
 				execution.exerciseId,
 				{ id: execution.exerciseId, name: execution.exercise.name },
 			]),
@@ -445,7 +503,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 	);
 	const executionGroups = useMemo(() => {
 		const groups = new Map<number, WorkoutExecution[]>();
-		(workout?.executions ?? []).forEach((execution) => {
+		(workout?.executions ?? []).filter((execution) => !execution.pendingRemoval).forEach((execution) => {
 			const sets = groups.get(execution.exerciseId) ?? [];
 			sets.push(execution);
 			groups.set(execution.exerciseId, sets);
@@ -494,6 +552,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 				exerciseId,
 				athleteNote,
 			})),
+			deletedExecutionIds(workout.executions),
 		);
 		if (!saveResult.success || !saveResult.data) {
 			setError(saveResult.error || 'Não foi possível salvar as séries.');

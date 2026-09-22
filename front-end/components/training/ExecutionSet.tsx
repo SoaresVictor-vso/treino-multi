@@ -72,6 +72,7 @@ export default function ExecutionSet({
 	});
 	const [rpePickerOpen, setRpePickerOpen] = useState(false);
 	const buttonRef = useRef<HTMLButtonElement>(null);
+	const menuRef = useRef<HTMLDivElement>(null);
 	const [dragStartX, setDragStartX] = useState<number | null>(null);
 	const [dragOffset, setDragOffset] = useState(0);
 	const locked = !editable || execution.status === 'skipped';
@@ -102,11 +103,16 @@ export default function ExecutionSet({
 
 	useEffect(() => {
 		if (!menuOpen) return;
+		const closeOnPageScroll = (event: Event) => {
+			if (event.target instanceof Node && menuRef.current?.contains(event.target))
+				return;
+			closeMenu();
+		};
 		window.addEventListener('resize', closeMenu);
-		window.addEventListener('scroll', closeMenu, true);
+		window.addEventListener('scroll', closeOnPageScroll, true);
 		return () => {
 			window.removeEventListener('resize', closeMenu);
-			window.removeEventListener('scroll', closeMenu, true);
+			window.removeEventListener('scroll', closeOnPageScroll, true);
 		};
 	}, [menuOpen]);
 	const toggleMenu = () => {
@@ -186,6 +192,7 @@ export default function ExecutionSet({
 							ref={buttonRef}
 							type="button"
 							disabled={menuDisabled}
+							onPointerDown={(event) => event.stopPropagation()}
 							onClick={toggleMenu}
 							aria-label={`Abrir opções da série ${number}`}
 							aria-expanded={menuOpen}
@@ -194,7 +201,11 @@ export default function ExecutionSet({
 							<span
 								className={`inline-flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-semibold ${setOption.className}`}
 							>
-								{number}
+								{execution.status === 'completed' ? (
+									<RiCheckLine size={16} aria-hidden="true" />
+								) : (
+									number
+								)}
 							</span>
 						</button>
 					</div>
@@ -271,6 +282,7 @@ export default function ExecutionSet({
 						role="presentation"
 					>
 						<div
+							ref={menuRef}
 							className="absolute w-52 overflow-y-auto rounded-lg border border-outline-variant bg-surface-container p-2 shadow-2xl"
 							style={{
 								top: menuPosition.top || undefined,

@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
+import SessionExpiredModal from '@/components/SessionExpiredModal';
+import ApiErrorModal from '@/components/ApiErrorModal';
 import './globals.css';
 
 const inter = Inter({
@@ -27,7 +29,11 @@ export default function RootLayout({
 			lang="pt-BR"
 			className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased bg-background`}
 		>
-			<body className="min-h-full flex flex-col">{children}</body>
+			<body className="min-h-full flex flex-col">
+				{children}
+				<SessionExpiredModal />
+				<ApiErrorModal />
+			</body>
 		</html>
 	);
 }
