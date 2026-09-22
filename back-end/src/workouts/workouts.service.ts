@@ -935,19 +935,30 @@ export class WorkoutsService {
 			throw new BadRequestException('As posições das séries devem ser únicas.');
 		await this.dataSource.transaction(async (manager) => {
 			const current = await manager.find(Execution, { where: { workoutId: id } });
+			const deletedIds = dto.deletedExecutionIds ?? [];
+			if (new Set(deletedIds).size !== deletedIds.length)
+				throw new BadRequestException('Uma série só pode ser removida uma vez.');
+			const currentIdSet = new Set(current.map((execution) => execution.id));
+			if (deletedIds.some((executionId) => !currentIdSet.has(executionId)))
+				throw new BadRequestException('Série removida não pertence a este treino.');
+			if (deletedIds.length)
+				await manager.delete(Execution, { workoutId: id, id: In(deletedIds) });
+			const activeCurrent = current.filter(
+				(execution) => !deletedIds.includes(execution.id),
+			);
 			const submittedIds = dto.executions
 				.map((execution) => execution.id)
 				.filter((executionId): executionId is number => executionId !== undefined);
 			if (new Set(submittedIds).size !== submittedIds.length)
 				throw new BadRequestException('Uma série só pode ser enviada uma vez.');
 			const submittedIdSet = new Set(submittedIds);
-			if (current.some((execution) => !submittedIdSet.has(execution.id)))
+			if (activeCurrent.some((execution) => !submittedIdSet.has(execution.id)))
 				throw new BadRequestException(
 					'Todas as séries existentes devem ser enviadas para preservar a ordem.',
 				);
-			if (current.length) {
+			if (activeCurrent.length) {
 				const temporaryPositionOffset =
-					Math.max(...current.map((execution) => execution.position)) +
+					Math.max(...activeCurrent.map((execution) => execution.position)) +
 					dto.executions.length +
 					1;
 				await manager
@@ -958,7 +969,7 @@ export class WorkoutsService {
 					.execute();
 			}
 			const currentById = new Map(
-				current.map((execution) => [execution.id, execution]),
+				activeCurrent.map((execution) => [execution.id, execution]),
 			);
 			for (const input of dto.executions) {
 				const execution = input.id ? currentById.get(input.id) : null;

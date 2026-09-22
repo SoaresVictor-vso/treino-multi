@@ -31,7 +31,7 @@ export function ActivityBlock({
 	index: number;
 	activity: Activity;
 	disabled?: boolean;
-	onChange: (key: keyof Activity, value: string | number) => void;
+	onChange: (key: keyof Activity, value: string | number | undefined) => void;
 	onRemove?: () => void;
 }) {
 	const [menuOpen, setMenuOpen] = useState(false);
@@ -83,7 +83,9 @@ export function ActivityBlock({
 						metric={exercise.metric_2}
 						value={activity.metric2}
 						type={activity.type2}
-						onChange={(value) => onChange('metric2', value)}
+						onChange={(value) =>
+							onChange('metric2', value === '' ? undefined : value)
+						}
 						onTypeChange={(value) => onChange('type2', value)}
 						disabled={disabled}
 						allowPercent

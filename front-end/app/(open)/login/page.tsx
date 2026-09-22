@@ -11,6 +11,7 @@ import validateCPF from '@/utilities/validators/cpf';
 import validateEmail from '@/utilities/validators/email';
 import {
 	clearSessionTokens,
+	hasStoredRefreshToken,
 	refreshAccessToken,
 	storeSessionTokens,
 	tokenHasEnoughLifetime,
@@ -38,7 +39,7 @@ export default function Login() {
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
-		if (!rememberMe) return;
+		if (!hasStoredRefreshToken()) return;
 
 		let isActive = true;
 
@@ -101,9 +102,11 @@ export default function Login() {
 			if (rememberMe) {
 				localStorage.setItem(REMEMBER_ME_KEY, 'true');
 				localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
+				sessionStorage.removeItem(REFRESH_TOKEN_KEY);
 			} else {
 				localStorage.setItem(REMEMBER_ME_KEY, 'false');
 				localStorage.removeItem(REFRESH_TOKEN_KEY);
+				sessionStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
 			}
 			localStorage.removeItem(ACCESS_TOKEN_KEY);
 
