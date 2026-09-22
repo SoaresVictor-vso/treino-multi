@@ -201,7 +201,11 @@ export default function ExecutionSet({
 							<span
 								className={`inline-flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-semibold ${setOption.className}`}
 							>
-								{number}
+								{execution.status === 'completed' ? (
+									<RiCheckLine size={16} aria-hidden="true" />
+								) : (
+									number
+								)}
 							</span>
 						</button>
 					</div>
