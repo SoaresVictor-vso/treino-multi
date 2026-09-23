@@ -1179,6 +1179,59 @@ export class WorkoutsService {
 			);
 
 		const startImmediately = dto.startImmediately === true;
+		const recordAsCompleted = dto.recordAsCompleted === true;
+		const timeZone = dto.clientTimeZone || 'UTC';
+		let dateFormatter: Intl.DateTimeFormat;
+		try {
+			dateFormatter = new Intl.DateTimeFormat('en-GB', {
+				timeZone,
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit',
+				hour: '2-digit',
+				minute: '2-digit',
+				second: '2-digit',
+				hourCycle: 'h23',
+			});
+		} catch {
+			throw new BadRequestException('Fuso horário inválido.');
+		}
+		const localParts = (date: Date) =>
+			Object.fromEntries(
+				dateFormatter.formatToParts(date).map(({ type, value }) => [type, value]),
+			);
+		const nowParts = localParts(new Date());
+		const today = `${nowParts.year}-${nowParts.month}-${nowParts.day}`;
+		if (dto.scheduledDate && dto.scheduledDate < today && !recordAsCompleted)
+			throw new BadRequestException(
+				'Datas passadas só podem ser usadas ao registrar um treino realizado.',
+			);
+		const recordedAt = dto.performedAt ? new Date(dto.performedAt) : null;
+		const performedParts =
+			recordedAt && !Number.isNaN(recordedAt.getTime())
+				? localParts(recordedAt)
+				: null;
+		if (
+			recordAsCompleted &&
+			(!dto.scheduledDate ||
+				!recordedAt ||
+				Number.isNaN(recordedAt.getTime()) ||
+				dto.scheduledDate >= today ||
+				recordedAt.getTime() >= Date.now() ||
+				recordedAt.getUTCMilliseconds() !== 0 ||
+				`${performedParts?.year}-${performedParts?.month}-${performedParts?.day}` !==
+					dto.scheduledDate ||
+				performedParts?.hour !== '00' ||
+				performedParts?.minute !== '00' ||
+				performedParts?.second !== '00')
+		)
+			throw new BadRequestException(
+				'Informe uma data e hora passadas para registrar o treino realizado.',
+			);
+		if (recordAsCompleted && startImmediately)
+			throw new BadRequestException(
+				'Um treino realizado não pode ser iniciado novamente.',
+			);
 		const activities = (dto.activities ?? []).map((activity, index) => ({
 			...activity,
 			position: index + 1,
@@ -1186,10 +1239,20 @@ export class WorkoutsService {
 			type2: activity.type2 ?? 'v',
 			setType: activity.setType ?? ExecutionSetType.PADRAO,
 		}));
+		if (recordAsCompleted && activities.length === 0)
+			throw new BadRequestException(
+				'Adicione ao menos uma série para registrar um treino realizado.',
+			);
+		if (recordAsCompleted && activities.some((activity) => activity.type2 === 'p'))
+			throw new BadRequestException(
+				'Informe as métricas realizadas em valores absolutos, sem porcentagem.',
+			);
 		const athlete = await this.usersService.findOne(actor.sub);
 		const defaultName = this.getDefaultWorkoutName(athlete.person.name);
 		const workout = await this.dataSource.transaction(async (manager) => {
-			const startedAt = startImmediately ? new Date() : null;
+			const performedAt = recordAsCompleted
+				? recordedAt
+				: startImmediately ? new Date() : null;
 			const created = await manager.save(
 				Workout,
 				manager.create(Workout, {
@@ -1199,9 +1262,13 @@ export class WorkoutsService {
 					templateName: dto.name?.trim() || defaultName,
 					templateDescription: dto.description?.trim() ?? '',
 					scheduledDate: dto.scheduledDate ?? null,
-					performedAt: startedAt,
-					status: startImmediately
-						? WorkoutStatus.IN_PROGRESS
+					performedAt,
+					finishedAt: recordAsCompleted ? performedAt : null,
+					excludeFromAchievements: recordAsCompleted,
+					status: recordAsCompleted
+						? WorkoutStatus.COMPLETED
+						: startImmediately
+							? WorkoutStatus.IN_PROGRESS
 						: dto.scheduledDate
 							? WorkoutStatus.SCHEDULED
 							: WorkoutStatus.PENDING,
@@ -1209,11 +1276,29 @@ export class WorkoutsService {
 					updatedBy: actor.sub,
 				}),
 			);
-			await manager.save(
-				Execution,
-				activities.map((activity) => this.createExecution(manager, created.id, activity)),
-			);
-			if (startedAt) await this.startPendingExecutions(manager, created.id, startedAt);
+			const executions = activities.map((activity) => {
+				const execution = this.createExecution(manager, created.id, activity);
+				if (recordAsCompleted && performedAt) {
+					execution.prescribedMetric1 = null;
+					execution.prescribedMetric2 = null;
+					execution.prescribedPse = null;
+					execution.prescribedRestDuration = null;
+					execution.metric2Type = null;
+					execution.status = ExecutionStatus.COMPLETED;
+					execution.performedMetric1 = activity.metric1 ?? null;
+					execution.performedMetric2 = activity.metric2 ?? null;
+					execution.performedPse = activity.pse ?? null;
+					execution.performedRestDuration = activity.restDuration ?? null;
+					execution.startedAt = performedAt;
+					execution.finishedAt = performedAt;
+				}
+				return execution;
+			});
+			await manager.save(Execution, executions);
+			if (recordAsCompleted)
+				await this.measurementsService.persistForWorkout(manager, created.id);
+			if (startImmediately && performedAt)
+				await this.startPendingExecutions(manager, created.id, performedAt);
 			const notes = this.createExerciseNotes(
 				manager,
 				created.id,

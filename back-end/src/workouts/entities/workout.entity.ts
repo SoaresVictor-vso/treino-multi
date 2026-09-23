@@ -59,6 +59,9 @@ export class Workout {
 	})
 	status!: WorkoutStatus;
 
+	@Column({ name: 'exclude_from_achievements', type: 'boolean', default: false })
+	excludeFromAchievements!: boolean;
+
 	@Column({ name: 'created_by', type: 'uuid' })
 	createdBy!: string;
 

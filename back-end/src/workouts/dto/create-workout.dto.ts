@@ -37,6 +37,20 @@ export class CreateWorkoutDto {
 	@IsBoolean()
 	startImmediately?: boolean;
 
+	/** Registra como concluído um treino realizado em data passada. */
+	@IsOptional()
+	@IsBoolean()
+	recordAsCompleted?: boolean;
+
+	/** Instante local convertido pelo cliente para UTC, para registrar à meia-noite do atleta. */
+	@IsOptional()
+	@IsDateString()
+	performedAt?: string;
+
+	@IsOptional()
+	@IsString()
+	clientTimeZone?: string;
+
 	@IsOptional()
 	@IsArray()
 	@ValidateNested({ each: true })

@@ -118,6 +118,10 @@ export type CreateMyWorkoutDto = {
 	activities?: TrainingActivity[];
 	scheduledDate?: string | null;
 	startImmediately?: boolean;
+	/** Registra um treino já realizado em uma data anterior. */
+	recordAsCompleted?: boolean;
+	performedAt?: string;
+	clientTimeZone?: string;
 };
 
 export type AthleteWorkout = {

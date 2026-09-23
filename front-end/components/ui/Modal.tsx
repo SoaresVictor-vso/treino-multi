@@ -10,6 +10,7 @@ type ModalProps = {
 	description?: string;
 	onClose: () => void;
 	children: React.ReactNode;
+	closeOnBackdrop?: boolean;
 };
 
 export default function Modal({
@@ -18,6 +19,7 @@ export default function Modal({
 	description,
 	onClose,
 	children,
+	closeOnBackdrop = true,
 }: ModalProps) {
 	React.useEffect(() => {
 		if (!isOpen) return;
@@ -44,7 +46,7 @@ export default function Modal({
 	return createPortal(
 		<div
 			className="surface-scrollbar fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/72 px-4 py-6 backdrop-blur-sm sm:px-6 sm:py-8"
-			onClick={onClose}
+			onClick={closeOnBackdrop ? onClose : undefined}
 			role="presentation"
 		>
 			<div

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RiAddLine, RiCloseLine, RiPlayFill, RiRunLine, RiTimeLine } from 'react-icons/ri';
+import TrainingForm, { type TrainingFormValues } from '@/components/training/TrainingForm';
 import Calendar, { localDateKey } from '@/components/ui/Calendar';
 import Button from '@/components/ui/Button';
 import ErrorBox from '@/components/ui/ErrorBox';
@@ -19,6 +20,11 @@ const activeStatuses = ['pending', 'scheduled'];
 
 function firstName(name?: string) {
 	return name?.trim().split(/\s+/)[0] || 'atleta';
+}
+function previousDate(date: string) {
+	const previous = new Date(`${date}T12:00:00`);
+	previous.setDate(previous.getDate() - 1);
+	return localDateKey(previous);
 }
 function workoutCalendarDate(workout: CalendarWorkout) {
 	if (workout.status === 'completed' || workout.status === 'cancelled')
@@ -53,6 +59,9 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 	const [activeWorkouts, setActiveWorkouts] = useState<MyWorkout[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [starting, setStarting] = useState(false);
+	const [createOpen, setCreateOpen] = useState(false);
+	const [creationMode, setCreationMode] = useState<'future' | 'completed'>('future');
+	const [creating, setCreating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const loadCalendar = useCallback(async (month: Date) => {
 		setLoading(true);
@@ -108,6 +117,22 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 		[activeWorkouts],
 	);
 	const inProgress = activeWorkouts.find((workout) => workout.status === 'in_progress');
+	const today = localDateKey(new Date());
+	const createWorkout = async (values: TrainingFormValues) => {
+		setCreating(true);
+		const result = await workoutsService.createMine({
+			...values,
+			recordAsCompleted: creationMode === 'completed',
+		});
+		setCreating(false);
+		if (!result.success || !result.data) {
+			setError(result.error || 'Não foi possível criar o treino.');
+			return;
+		}
+		setCreateOpen(false);
+		setError(null);
+		await loadCalendar(calendarMonth);
+	};
 	const startWorkout = async (workout: MyWorkout) => {
 		if (workout.status === 'in_progress') { router.push(`/training/${workout.id}`); return; }
 		setStarting(true);
@@ -115,13 +140,6 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 		setStarting(false);
 		if (!result.success || !result.data) { setError(result.error || 'Não foi possível iniciar o treino.'); return; }
 		router.push(`/training/${workout.id}`);
-	};
-	const createFreeWorkout = async () => {
-		setStarting(true);
-		const result = await workoutsService.createMine({ activities: [], startImmediately: true });
-		setStarting(false);
-		if (!result.success || !result.data) { setError(result.error || 'Não foi possível iniciar o treino livre.'); return; }
-		router.push(`/training/${result.data.id}`);
 	};
 	return (
 		<section className="mx-auto w-full max-w-4xl pb-4">
@@ -138,7 +156,8 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 				</div>
 				<div className="hidden h-12 w-12 shrink-0 place-items-center rounded-2xl border border-primary-container/25 bg-primary-container/10 text-primary-fixed sm:grid"><RiRunLine size={24} aria-hidden /></div>
 			</header>
-			{loading ? <Skeleton /> : inProgress ? <FeaturedWorkout workout={inProgress} label="Em andamento" action="Retomar treino" icon={<RiPlayFill size={18} />} starting={starting} onAction={() => void startWorkout(inProgress)} /> : nextWorkout ? <FeaturedWorkout workout={nextWorkout} label="Próximo treino" action="Iniciar treino" icon={<RiPlayFill size={18} />} starting={starting} onAction={() => void startWorkout(nextWorkout)} /> : <AllCaughtUp starting={starting} onCreate={() => void createFreeWorkout()} />}
+			{loading ? <Skeleton /> : inProgress ? <FeaturedWorkout workout={inProgress} label="Em andamento" action="Retomar treino" icon={<RiPlayFill size={18} />} starting={starting} onAction={() => void startWorkout(inProgress)} /> : nextWorkout ? <FeaturedWorkout workout={nextWorkout} label="Próximo treino" action="Iniciar treino" icon={<RiPlayFill size={18} />} starting={starting} onAction={() => void startWorkout(nextWorkout)} /> : <AllCaughtUp onCreate={() => { setCreationMode('future'); setCreateOpen(true); }} />}
+			{!loading && (inProgress || nextWorkout) && <button type="button" onClick={() => { setCreationMode('future'); setCreateOpen(true); }} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary-container/40 px-4 text-sm font-bold text-primary-fixed hover:bg-primary-container hover:text-on-primary-fixed"><RiAddLine size={19} /> Criar treino</button>}
 			<div className="mt-7">
 				{error ? (
 					<ErrorBox message={error} />
@@ -152,6 +171,22 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 					/>
 				)}
 			</div>
+			<Modal isOpen={createOpen} title="Criar treino" description="Escolha se o treino será realizado no futuro ou se deseja registrar um treino já realizado." onClose={() => !creating && setCreateOpen(false)} closeOnBackdrop={false}>
+				<div className="space-y-5">
+					<fieldset className="space-y-2">
+						<legend className="text-sm font-semibold">O que deseja fazer?</legend>
+						<label className="flex cursor-pointer items-start gap-3 rounded-xl border border-outline-variant p-3">
+							<input type="radio" name="creationMode" checked={creationMode === 'future'} onChange={() => setCreationMode('future')} />
+							<span><strong className="block text-sm">Criar</strong><span className="text-xs text-on-surface-variant">Treino pendente ou agendado para hoje ou uma data futura.</span></span>
+						</label>
+						<label className="flex cursor-pointer items-start gap-3 rounded-xl border border-outline-variant p-3">
+							<input type="radio" name="creationMode" checked={creationMode === 'completed'} onChange={() => setCreationMode('completed')} />
+							<span><strong className="block text-sm">Registrar realizado</strong><span className="text-xs text-on-surface-variant">Escolha uma data passada. O início e o fim serão registrados nessa data.</span></span>
+						</label>
+					</fieldset>
+					<TrainingForm key={creationMode} onSubmit={createWorkout} onCancel={() => setCreateOpen(false)} isSubmitting={creating} submitLabel={creationMode === 'completed' ? 'Registrar realizado' : 'Criar treino'} noteLabel="Minha nota (opcional)" recordAsCompleted={creationMode === 'completed'} dateMin={creationMode === 'future' ? today : undefined} dateMax={creationMode === 'completed' ? previousDate(today) : undefined} dateRequired={creationMode === 'completed'} dateLabel={creationMode === 'completed' ? 'Data em que foi realizado' : undefined} dateHint={creationMode === 'completed' ? 'O treino será registrado como realizado nessa data.' : undefined} />
+				</div>
+			</Modal>
 		</section>
 	);
 }
@@ -484,8 +519,8 @@ function FeaturedWorkout({ workout, label, action, icon, starting, onAction }: {
 	return <article className="mt-7 overflow-hidden rounded-[1.75rem] border border-primary-container/30 bg-surface-container-low shadow-[0_18px_60px_rgba(171,214,0,0.1)]"><div className="border-b border-primary-container/15 bg-primary-container/8 px-5 py-3 sm:px-7"><p className="type-label-caps text-primary-fixed">{label}</p></div><div className="p-5 sm:p-7"><h2 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{workout.templateName}</h2><p className="mt-2 text-sm text-on-surface-variant">{workout.templateDescription || (workout.status === 'in_progress' ? 'Sua sessão está em andamento.' : formatScheduledDate(workout.scheduledDate))}</p><button type="button" disabled={starting} onClick={onAction} className="mt-7 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary-container px-5 text-sm font-extrabold text-on-primary-fixed transition hover:bg-primary-fixed disabled:cursor-wait disabled:opacity-65">{icon}{starting ? 'Iniciando...' : action}</button></div></article>;
 }
 
-function AllCaughtUp({ starting, onCreate }: { starting: boolean; onCreate: () => void }) {
-	return <article className="mt-7 rounded-[1.75rem] border border-white/8 bg-surface-container-low p-5 sm:p-7"><p className="type-label-caps text-primary-fixed">Tudo em dia</p><h2 className="mt-3 text-2xl font-extrabold tracking-tight">Nenhum treino na agenda</h2><p className="mt-2 text-sm text-on-surface-variant">Você não possui treinos programados no momento.</p><button type="button" disabled={starting} onClick={onCreate} className="mt-6 flex min-h-11 items-center gap-2 rounded-xl border border-primary-container/40 px-4 text-sm font-bold text-primary-fixed transition hover:bg-primary-container hover:text-on-primary-fixed disabled:cursor-wait disabled:opacity-65"><RiAddLine size={19} />Criar treino livre</button></article>;
+function AllCaughtUp({ onCreate }: { onCreate: () => void }) {
+	return <article className="mt-7 rounded-[1.75rem] border border-white/8 bg-surface-container-low p-5 sm:p-7"><p className="type-label-caps text-primary-fixed">Tudo em dia</p><h2 className="mt-3 text-2xl font-extrabold tracking-tight">Nenhum treino na agenda</h2><p className="mt-2 text-sm text-on-surface-variant">Você não possui treinos programados no momento.</p><button type="button" onClick={onCreate} className="mt-6 flex min-h-11 items-center gap-2 rounded-xl border border-primary-container/40 px-4 text-sm font-bold text-primary-fixed transition hover:bg-primary-container hover:text-on-primary-fixed"><RiAddLine size={19} />Criar treino</button></article>;
 }
 
 function Skeleton() {

@@ -22,6 +22,9 @@ export type TrainingFormValues = {
 	description: string;
 	activities: TrainingActivity[];
 	scheduledDate?: string | null;
+	recordAsCompleted?: boolean;
+	performedAt?: string;
+	clientTimeZone?: string;
 };
 
 const initialActivity = (exerciseId: number): TrainingActivity => ({
@@ -44,6 +47,12 @@ export default function TrainingForm({
 	isSubmitting = false,
 	submitLabel = 'Criar treino',
 	noteLabel = 'Anotações',
+	recordAsCompleted = false,
+	dateMin,
+	dateMax,
+	dateRequired = false,
+	dateLabel,
+	dateHint,
 }: {
 	initialValues?: Partial<TrainingFormValues>;
 	initialExercises?: Exercise[];
@@ -52,6 +61,12 @@ export default function TrainingForm({
 	isSubmitting?: boolean;
 	submitLabel?: string;
 	noteLabel?: string;
+	recordAsCompleted?: boolean;
+	dateMin?: string;
+	dateMax?: string;
+	dateRequired?: boolean;
+	dateLabel?: string;
+	dateHint?: string;
 }) {
 	const [name, setName] = useState(initialValues?.name ?? '');
 	const [description, setDescription] = useState(
@@ -80,6 +95,9 @@ export default function TrainingForm({
 	const [exerciseToRemove, setExerciseToRemove] = useState<number | null>(null);
 	const canSubmit =
 		!!name.trim() &&
+		(!dateRequired || !!scheduledDate) &&
+		(!scheduledDate || !dateMin || scheduledDate >= dateMin) &&
+		(!scheduledDate || !dateMax || scheduledDate <= dateMax) &&
 		selected.length > 0 &&
 		selected.every((exercise) => (activities[exercise.id] ?? []).length > 0);
 
@@ -153,7 +171,14 @@ export default function TrainingForm({
 			// O input date já representa a data civil no fuso local. Envie o
 			// valor YYYY-MM-DD diretamente para não deslocá-lo com UTC.
 			scheduledDate: scheduledDate || null,
-			activities: selected.flatMap((exercise) => activities[exercise.id] ?? []),
+			recordAsCompleted,
+			clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+			...(recordAsCompleted && scheduledDate
+				? { performedAt: new Date(`${scheduledDate}T00:00:00`).toISOString() }
+				: {}),
+			activities: selected.flatMap((exercise) => activities[exercise.id] ?? []).map((activity) =>
+				recordAsCompleted ? { ...activity, type2: 'v' as const } : activity,
+			),
 		});
 	};
 
@@ -177,11 +202,14 @@ export default function TrainingForm({
 					rows={3}
 				/>
 				<Input
-					label="Data de agendamento (opcional)"
+					label={dateLabel ?? 'Data de agendamento (opcional)'}
 					type="date"
 					value={scheduledDate}
+					min={dateMin}
+					max={dateMax}
+					required={dateRequired}
 					onChange={(event) => setScheduledDate(event.target.value)}
-					hint="A data será considerada no seu fuso horário."
+					hint={dateHint ?? 'A data será considerada no seu fuso horário.'}
 				/>
 			</div>
 
@@ -267,6 +295,7 @@ export default function TrainingForm({
 										key={`${exercise.id}-${index}`}
 										exercise={exercise}
 										activity={activity}
+										recordedPerformance={recordAsCompleted}
 										index={index}
 										onChange={(key, value) =>
 											updateActivity(exercise.id, index, key, value)
