@@ -237,6 +237,7 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 					<Button className="w-full sm:w-auto" onClick={() => { setSelectedTemplateId(''); setSelectedTemplate(null); setCreateOpen(true); }}><RiAddLine /> Adicionar treino</Button>
 				</div>
 			</div>
+			{athleteId && <Link href={`/athlete/${athleteId}/analysis`} className="inline-flex rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2 text-sm font-semibold text-primary-fixed hover:border-primary-fixed">Ver análise do atleta →</Link>}
 			<div className="flex gap-2 border-b border-outline-variant">
 				{([['future', 'Treinos futuros'], ['history', 'Treinos realizados']] as const).map(([value, label]) => (
 					<button key={value} type="button" onClick={() => setFilter(value)} className={`border-b-2 px-3 py-3 text-sm font-semibold ${filter === value ? 'border-primary-fixed text-primary' : 'border-transparent text-on-surface-variant'}`}>{label}</button>

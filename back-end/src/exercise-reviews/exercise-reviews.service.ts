@@ -5,13 +5,19 @@ import { Role } from '../common/enums/role.enum';
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
 import { Exercise } from '../exercises/entities/exercise.entity';
 import { ExerciseReviewQueryDto } from './exercise-reviews.dto';
+import { AnalysisService } from '../athlete/analysis/analysis.service';
+import { exerciseReviewPeriod } from './exercise-review-period';
 
 const completed = 'completed';
 const number = (value: unknown) => value === null || value === undefined ? null : Number(value);
 
 @Injectable()
 export class ExerciseReviewsService {
-	constructor(private readonly dataSource: DataSource) {}
+	constructor(private readonly dataSource: DataSource, private readonly analysisService: AnalysisService) {}
+
+	analysis(athleteId: string, exerciseId: number, period: '7' | '15' | '30' | '3m', actor: JwtPayload) {
+		return this.analysisService.exercise(athleteId, exerciseId, period, actor);
+	}
 
 	private async authorize(athleteId: string, actor: JwtPayload) {
 		if (actor.sub === athleteId) return;
@@ -30,12 +36,10 @@ export class ExerciseReviewsService {
 	}
 
 	private period(query: ExerciseReviewQueryDto) {
+		void query;
 		// Exercise reviews intentionally have one fixed window.  Keeping this on the
 		// server also prevents callers from requesting a different period directly.
-		const to = new Date();
-		const from = new Date(to);
-		from.setMonth(from.getMonth() - 3);
-		return { from: from.toISOString(), to: to.toISOString() };
+		return exerciseReviewPeriod();
 	}
 
 	private async exercise(exerciseId: number) {

@@ -14,7 +14,7 @@ import type { WorkoutMeasurement } from '@/gateway/services/workouts';
 const presentationSafelist =
 	'bg-surface-container-high border-outline-variant text-primary-fixed text-on-surface text-on-surface-variant';
 
-const iconRegistry: Record<string, ComponentType<{ className?: string }>> = {
+export const iconRegistry: Record<string, ComponentType<{ className?: string }>> = {
 	timer: RiTimerLine,
 	dumbbell: RiWeightLine,
 	gauge: RiDashboardLine,

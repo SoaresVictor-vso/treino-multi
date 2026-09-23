@@ -5,6 +5,15 @@ import { useRouter } from 'next/navigation';
 import { RiArrowDownSLine, RiArrowLeftLine } from 'react-icons/ri';
 import ErrorBox from '@/components/ui/ErrorBox';
 import ExerciseHistorySeriesList from '@/components/shared/ExerciseHistorySeriesList';
+import AnalysisPeriodFilter, {
+	type AnalysisPeriod,
+} from '@/components/analysis/AnalysisPeriodFilter';
+import AnalysisIndicators from '@/components/analysis/AnalysisIndicators';
+import LifetimeStats from '@/components/analysis/LifetimeStats';
+import {
+	analysisService,
+	type ExerciseAnalysis,
+} from '@/gateway/services/analysis';
 import {
 	exerciseReviewsService,
 	type ExerciseReviewSummary,
@@ -43,6 +52,27 @@ export default function ExerciseReviewPage({
 	const [summary, setSummary] = useState<ExerciseReviewSummary | null>(null);
 	const [workouts, setWorkouts] = useState<ExerciseReviewWorkout[]>([]);
 	const [error, setError] = useState<string | null>(null);
+	const [period, setPeriod] = useState<AnalysisPeriod>('3m');
+	const [analysis, setAnalysis] = useState<ExerciseAnalysis | null>(null);
+	const [analysisError, setAnalysisError] = useState<string | null>(null);
+
+	useEffect(() => {
+		let active = true;
+		void analysisService
+			.exercise(athleteId, exerciseId, period)
+			.then((response) => {
+				if (!active) return;
+				setAnalysis(response.success ? (response.data ?? null) : null);
+				setAnalysisError(
+					response.success
+						? null
+						: (response.error ?? 'Não foi possível carregar a análise.'),
+				);
+			});
+		return () => {
+			active = false;
+		};
+	}, [athleteId, exerciseId, period]);
 
 	useEffect(() => {
 		void Promise.all([
@@ -77,7 +107,7 @@ export default function ExerciseReviewPage({
 	const labels = summary?.exercise.metrics ?? [];
 
 	return (
-		<main className="mx-auto max-w-5xl p-4 sm:p-8">
+		<main className="mx-auto min-w-0 max-w-5xl p-4 sm:p-8">
 			<button
 				type="button"
 				onClick={() => router.back()}
@@ -92,7 +122,9 @@ export default function ExerciseReviewPage({
 						{summary?.exercise.name ?? 'Carregando...'}
 					</h1>
 				</div>
-				<p className="text-sm text-on-surface-variant">Período: últimos 3 meses</p>
+				<p className="text-sm text-on-surface-variant">
+					Histórico: últimos 3 meses
+				</p>
 			</div>
 			{error && <ErrorBox message={error} />}
 			{summary && (
@@ -109,7 +141,7 @@ export default function ExerciseReviewPage({
 						/>
 						<Card label="1RM estimado" value={format(summary.estimatedRm, ' kg')} />
 					</section>
-					<section className="mt-6 grid gap-4 md:grid-cols-2">
+					<section className="mt-6 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
 						<Chart
 							title={
 								isWeightReps
@@ -161,6 +193,26 @@ export default function ExerciseReviewPage({
 							field={secondaryField}
 						/>
 					</section>
+					<section className="mt-8 space-y-4">
+						<div className="flex flex-wrap items-end justify-between gap-3">
+							<div>
+								<p className="type-label-caps text-primary-fixed">Exercício</p>
+								<h2 className="text-xl font-bold">Estatísticas do período</h2>
+							</div>
+							<AnalysisPeriodFilter
+								days={period}
+								onChange={setPeriod}
+								includeThreeMonths
+							/>
+						</div>
+						{analysisError && <ErrorBox message={analysisError} />}
+						{analysis && <AnalysisIndicators indicators={analysis.indicators} />}
+					</section>
+					{analysis && (
+						<div className="mt-8">
+							<LifetimeStats stats={analysis.lifetime} exercise />
+						</div>
+					)}
 					<section className="mt-8">
 						<h2 className="text-xl font-bold">Treinos realizados</h2>
 						{workouts.length ? (
@@ -233,9 +285,9 @@ function Chart({
 			document.removeEventListener('pointerdown', closeOnOutsidePointerDown);
 	}, [selected]);
 
-	if (values.length < 2)
+	if (values.length < 1)
 		return (
-			<div className="rounded-xl border border-outline-variant p-4">
+			<div className="min-w-0 max-w-full rounded-xl border border-outline-variant p-4">
 				<h2 className="font-bold">{title}</h2>
 				<p className="mt-4 text-sm text-on-surface-variant">
 					Dados insuficientes para exibir o gráfico.
@@ -268,13 +320,13 @@ function Chart({
 				? formatDistance(value)
 				: format(value);
 	return (
-		<div ref={chartRef} className="rounded-xl border border-outline-variant p-4">
+		<div ref={chartRef} className="min-w-0 max-w-full rounded-xl border border-outline-variant p-4">
 			<h2 className="font-bold">{title}</h2>
 			<p className="mt-1 text-xs text-on-surface-variant">
 				Métrica: {metric}
 				{unit ? ` (${unit})` : ''} · toque em um índice para ver os detalhes
 			</p>
-			<div className="mt-8 grid grid-cols-[auto_1fr] gap-2">
+			<div className="mt-8 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-2">
 				<div
 					className="flex h-44 flex-col justify-between pb-6 text-right text-[10px] text-on-surface-variant"
 					aria-label={`Escala de ${metric}`}
@@ -283,7 +335,7 @@ function Chart({
 						<span key={value}>{formatChartValue(value)}</span>
 					))}
 				</div>
-				<div className="relative h-44 border-b border-l border-outline-variant">
+				<div className="relative h-44 min-w-0 overflow-x-auto border-b border-l border-outline-variant">
 					<div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-outline-variant" />
 					<div className="flex h-full items-end justify-around gap-1">
 						{values.map((point, index) => {
@@ -353,7 +405,7 @@ function WorkoutAccordion({
 				<ExerciseHistorySeriesList
 					series={workout.series}
 					metric1Label={`${labels[0]?.symbol ?? 'Métrica'}`}
-					metric2Label={labels[1].symbol || null}
+					metric2Label={labels[1]?.symbol || null}
 				/>
 			</div>
 		</details>

@@ -49,6 +49,12 @@ export class Measurement {
 	@Column({ type: 'varchar', length: 40 })
 	icon!: string;
 
+	@Column({ type: 'varchar', length: 20, nullable: true })
+	unit!: string | null;
+
+	@Column({ type: 'varchar', length: 10, default: 'sum' })
+	aggregation!: 'sum' | 'average';
+
 	@Column({ type: 'jsonb', default: () => "'{}'" })
 	presentation!: MeasurementPresentation;
 

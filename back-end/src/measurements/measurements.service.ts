@@ -26,6 +26,7 @@ const executionFields = [
 	'prescribedMetric1',
 	'prescribedMetric2',
 	'hasMetric2',
+	'metricsMatch',
 	'performedRestDuration',
 	'prescribedRestDuration',
 ];
@@ -82,6 +83,14 @@ export class MeasurementsService {
 			prescribedMetric1: execution.prescribedMetric1,
 			prescribedMetric2: execution.prescribedMetric2,
 			hasMetric2: execution.exercise.metric2 !== null,
+			metricsMatch:
+				execution.prescribedMetric1 !== null &&
+				execution.prescribedMetric1 > 0 &&
+				execution.performedMetric1 === execution.prescribedMetric1 &&
+				(execution.exercise.metric2 === null ||
+					(execution.prescribedMetric2 !== null &&
+						execution.prescribedMetric2 > 0 &&
+						execution.performedMetric2 === execution.prescribedMetric2)),
 			performedRestDuration: execution.performedRestDuration,
 			prescribedRestDuration: execution.prescribedRestDuration,
 		};
@@ -100,10 +109,7 @@ export class MeasurementsService {
 			};
 		},
 	) {
-		// Workout adherence intentionally considers every registered set. The
-		// denominator must include prescribed, added, skipped and unresolved sets;
-		// the formula itself counts only completed sets whose performed metrics
-		// match the prescribed metrics in the numerator.
+		// All registered sets contribute to the denominator; skipped sets score zero.
 		if (measurement.key === 'workout-adherence') return true;
 
 		// A prescribed, pending or skipped set has no training result and must not
@@ -138,25 +144,30 @@ export class MeasurementsService {
 		workoutId: string,
 	): Promise<CalculatedMeasurement[]> {
 		const [measurements, executions, workout] = await Promise.all([
-			manager
-				.getRepository(Measurement)
-				.find({
-					where: { active: true },
-					relations: { metric1: true, metric2: true },
-				}),
-			manager
-				.getRepository(Execution)
-				.find({
-					where: { workoutId },
-					relations: { exercise: { metric1: true, metric2: true } },
-				}),
+			manager.getRepository(Measurement).find({
+				where: { active: true },
+				relations: { metric1: true, metric2: true },
+			}),
+			manager.getRepository(Execution).find({
+				where: { workoutId },
+				relations: { exercise: { metric1: true, metric2: true } },
+			}),
 			manager.getRepository(Workout).findOneByOrFail({ id: workoutId }),
 		]);
-		const workoutDuration = workout.performedAt && workout.finishedAt
-			? Math.max(0, (workout.finishedAt.getTime() - workout.performedAt.getTime()) / 1000)
-			: null;
+		const workoutDuration =
+			workout.performedAt && workout.finishedAt
+				? Math.max(
+						0,
+						(workout.finishedAt.getTime() - workout.performedAt.getTime()) / 1000,
+					)
+				: null;
 		return measurements
 			.flatMap((measurement) => {
+				if (
+					measurement.key === 'workout-adherence' &&
+					workout.createdBy === workout.athleteId
+				)
+					return [];
 				const compatible = executions.filter((execution) =>
 					this.compatible(measurement, execution),
 				);
@@ -169,8 +180,9 @@ export class MeasurementsService {
 							...this.context(compatible[0]),
 							duration: workoutDuration,
 						});
-					} else for (const execution of compatible)
-						executeFormula(measurement.formula, curr, this.context(execution));
+					} else
+						for (const execution of compatible)
+							executeFormula(measurement.formula, curr, this.context(execution));
 					const value = evaluateValueFormula(measurement.valueFormula, curr);
 					return [
 						{

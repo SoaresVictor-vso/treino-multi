@@ -5,11 +5,13 @@ import { UsersModule } from '../users/users.module';
 import { AthleteTrainerAssociation } from './entities/athlete-trainer-association.entity';
 import { AthleteController } from './athlete.controller';
 import { AthleteService } from './athlete.service';
+import { AnalysisModule } from './analysis/analysis.module';
 
 @Module({
 	imports: [
 		TypeOrmModule.forFeature([User, AthleteTrainerAssociation]),
 		UsersModule,
+		AnalysisModule,
 	],
 	controllers: [AthleteController],
 	providers: [AthleteService],
