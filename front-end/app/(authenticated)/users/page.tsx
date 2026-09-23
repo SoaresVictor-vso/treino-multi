@@ -23,9 +23,13 @@ const tenantService = new TenantService();
 
 export default function UsersPage() {
 	const sessionUser = getSessionUser();
-	const isOrgActor = !!sessionUser?.roles?.some((role) =>
-		role.startsWith('org:'),
-	);
+	const [hasMounted, setHasMounted] = React.useState(false);
+	useEffect(() => setHasMounted(true), []);
+	// The session is read from a browser cookie, which is unavailable during SSR.
+	// Keep the initial markup identical and reveal org-only UI after hydration.
+	const isOrgActor =
+		hasMounted &&
+		!!sessionUser?.roles?.some((role) => role.startsWith('org:'));
 	const [users, setUsers] = React.useState<UserListItemDto[]>([]);
 	const [tenants, setTenants] = React.useState<TenantListItemDto[]>([]);
 	const [search, setSearch] = React.useState('');

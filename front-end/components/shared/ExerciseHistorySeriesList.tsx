@@ -33,7 +33,7 @@ export default function ExerciseHistorySeriesList({
 						<span
 							className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-[11px] font-semibold ${seriesTypeClassName[set.setType as keyof typeof seriesTypeClassName] ?? seriesTypeClassName.padrao}`}
 						>
-							{set.position ?? index + 1}
+							{index + 1}
 						</span>
 					</div>
 					<div

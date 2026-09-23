@@ -5,6 +5,7 @@ export type ExerciseReviewPoint = {
 	weight: number | null; distance: number | null; duration: number | null; tonnage: number | null; pace: number | null;
 };
 export type ExerciseReviewSummary = {
+	athleteName: string;
 	exercise: { id: number; name: string; metrics: { name: string; symbol: string }[] };
 	period: { from: string; to: string };
 	currentRp: { value: number; measuredAt: string } | null;

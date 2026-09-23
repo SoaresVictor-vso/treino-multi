@@ -8,6 +8,7 @@ import ErrorBox from '@/components/ui/ErrorBox';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
 import TrainingForm, { type TrainingFormValues } from '@/components/training/TrainingForm';
+import AthleteWorkoutSchedule from '@/components/athlete/AthleteWorkoutSchedule';
 import { workoutsService, type AthleteWorkout, type WorkoutDetail } from '@/gateway/services/workouts';
 import {
 	findAll as findWorkoutTemplates,
@@ -16,8 +17,6 @@ import {
 	type WorkoutTemplateSummary,
 } from '@/gateway/services/workout-templates';
 import type { Exercise } from '@/gateway/services/parametro';
-
-type Filter = 'future' | 'history';
 
 function ActionTooltip({ label, children }: { label: string; children: ReactNode }) {
 	return (
@@ -28,26 +27,6 @@ function ActionTooltip({ label, children }: { label: string; children: ReactNode
 			</span>
 		</div>
 	);
-}
-
-function formatDate(value: string | null) {
-	if (!value) return 'Sem data definida';
-	return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(`${value}T12:00:00`));
-}
-
-function isEditable(workout: AthleteWorkout) {
-	return workout.status === 'pending' || workout.status === 'scheduled';
-}
-
-function statusLabel(status: AthleteWorkout['status']) {
-	return {
-		pending: 'Pendente',
-		scheduled: 'Agendado',
-		in_progress: 'Em andamento',
-		completed: 'Finalizado',
-		skipped: 'Pulado',
-		cancelled: 'Cancelado',
-	}[status];
 }
 
 function formValues(workout: WorkoutDetail): TrainingFormValues {
@@ -112,7 +91,6 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 	const [athleteId, setAthleteId] = useState<string | null>(null);
 	const [athleteName, setAthleteName] = useState('');
 	const [workouts, setWorkouts] = useState<AthleteWorkout[]>([]);
-	const [filter, setFilter] = useState<Filter>('future');
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [createOpen, setCreateOpen] = useState(false);
@@ -209,11 +187,6 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 			await refresh();
 		}
 	};
-	const visible = workouts.filter((workout) =>
-		filter === 'future'
-			? ['pending', 'scheduled', 'in_progress'].includes(workout.status)
-			: ['completed', 'cancelled', 'skipped'].includes(workout.status),
-	);
 	const inProgressWorkout = workouts.find(
 		(workout) => workout.status === 'in_progress',
 	);
@@ -238,21 +211,7 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 				</div>
 			</div>
 			{athleteId && <Link href={`/athlete/${athleteId}/analysis`} className="inline-flex rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2 text-sm font-semibold text-primary-fixed hover:border-primary-fixed">Ver análise do atleta →</Link>}
-			<div className="flex gap-2 border-b border-outline-variant">
-				{([['future', 'Treinos futuros'], ['history', 'Treinos realizados']] as const).map(([value, label]) => (
-					<button key={value} type="button" onClick={() => setFilter(value)} className={`border-b-2 px-3 py-3 text-sm font-semibold ${filter === value ? 'border-primary-fixed text-primary' : 'border-transparent text-on-surface-variant'}`}>{label}</button>
-				))}
-			</div>
-			{loading ? <p className="text-on-surface-variant">Carregando treinos...</p> : error ? <ErrorBox message={error} /> : visible.length === 0 ? <p className="rounded-lg border border-outline-variant bg-surface-container-low p-5 text-on-surface-variant">Nenhum treino nesta lista.</p> : (
-				<div className="space-y-3">
-					{visible.map((workout) => (
-						<article key={workout.id} className="flex flex-col gap-4 rounded-lg border border-outline-variant bg-surface-container-low p-4 sm:flex-row sm:items-center sm:justify-between">
-							<div><p className="font-semibold">{workout.templateName}</p><p className="mt-1 text-sm text-on-surface-variant">{workout.templateDescription || formatDate(workout.scheduledDate)}</p></div>
-							<div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-surface-variant px-2 py-1 text-xs font-bold text-on-surface-variant">{statusLabel(workout.status)}</span><ActionTooltip label="Visualizar treino"><Link href={`/training/${workout.id}`} aria-label="Visualizar treino" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-outline-variant text-on-surface-variant transition-colors hover:border-primary-fixed-dim/40 hover:bg-surface-variant/60 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/30"><RiEyeLine size={18} /></Link></ActionTooltip><ActionTooltip label="Duplicar treino"><Button size="icon" variant="outline" aria-label="Duplicar treino" onClick={() => void duplicate(workout)}><RiFileCopyLine size={18} /></Button></ActionTooltip>{isEditable(workout) && <><ActionTooltip label="Editar treino"><Button size="icon" variant="outline" aria-label="Editar treino" onClick={() => void edit(workout)}><RiEditLine size={18} /></Button></ActionTooltip><ActionTooltip label="Cancelar treino"><Button size="icon" variant="ghost" aria-label="Cancelar treino" onClick={() => setCancelTarget(workout)}><RiForbidLine size={18} /></Button></ActionTooltip></>}</div>
-						</article>
-					))}
-				</div>
-			)}
+			{loading ? <p className="text-on-surface-variant">Carregando treinos...</p> : error ? <ErrorBox message={error} /> : <AthleteWorkoutSchedule workouts={workouts} onChanged={() => void refresh()} />}
 			<Modal isOpen={createOpen || !!editing || !!duplicating} title={editing ? 'Editar treino' : duplicating ? 'Duplicar treino' : 'Adicionar treino'} description={duplicating ? 'Revise o treino copiado antes de gerar uma nova versão independente.' : 'Defina exercícios e séries para o atleta.'} onClose={() => { if (!saving) { setCreateOpen(false); setEditing(null); setDuplicating(null); } }}>
 				<div className="space-y-5">
 					{!editing && !duplicating && (

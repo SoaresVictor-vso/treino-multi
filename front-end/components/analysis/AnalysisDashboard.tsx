@@ -42,7 +42,6 @@ export default function AnalysisDashboard({
 			active = false;
 		};
 	}, [athleteId, days]);
-	console.table(data?.measurements);
 	const measurementValue = (key: string) => {
 		const measurement = data?.measurements.find((item) => item.key === key);
 		return {

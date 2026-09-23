@@ -4,6 +4,7 @@ import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RiArrowDownSLine, RiArrowLeftLine } from 'react-icons/ri';
 import ErrorBox from '@/components/ui/ErrorBox';
+import { getSessionUser } from '@/lib/auth';
 import ExerciseHistorySeriesList from '@/components/shared/ExerciseHistorySeriesList';
 import AnalysisPeriodFilter, {
 	type AnalysisPeriod,
@@ -61,6 +62,7 @@ export default function ExerciseReviewPage({
 }) {
 	const { id: athleteId, exerciseId: rawExerciseId } = use(params);
 	const exerciseId = Number(rawExerciseId);
+	const isAthlete = getSessionUser()?.sub === athleteId;
 	const router = useRouter();
 	const [summary, setSummary] = useState<ExerciseReviewSummary | null>(null);
 	const [workouts, setWorkouts] = useState<ExerciseReviewWorkout[]>([]);
@@ -134,6 +136,11 @@ export default function ExerciseReviewPage({
 					<h1 className="text-2xl font-bold">
 						{summary?.exercise.name ?? 'Carregando...'}
 					</h1>
+					{!isAthlete && summary?.athleteName && (
+						<p className="mt-1 text-sm text-on-surface-variant">
+							{summary.athleteName}
+						</p>
+					)}
 				</div>
 				<p className="text-sm text-on-surface-variant">
 					Histórico: últimos 3 meses

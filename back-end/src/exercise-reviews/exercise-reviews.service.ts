@@ -51,6 +51,10 @@ export class ExerciseReviewsService {
 	async summary(athleteId: string, exerciseId: number, query: ExerciseReviewQueryDto, actor: JwtPayload) {
 		await this.authorize(athleteId, actor);
 		const exercise = await this.exercise(exerciseId);
+		const athleteRows = await this.dataSource.query<{ name: string }[]>(
+			`SELECT p.name FROM users u JOIN persons p ON p.id = u.person_id WHERE u.id = $1 LIMIT 1`,
+			[athleteId],
+		);
 		const { from, to } = this.period(query);
 		const rows = await this.dataSource.query<any[]>(`
 			SELECT w.id AS "workoutId", w.template_name AS "workoutName", w.performed_at AS "performedAt", w.performed_at::date::text AS day,
@@ -89,7 +93,7 @@ export class ExerciseReviewsService {
 		});
 		const best = isWeightReps ? [...chart].filter((s) => s.predictedRm !== null).sort((a,b) => (b.predictedRm ?? 0)-(a.predictedRm ?? 0))[0] ?? null : null;
 		const rp = await this.dataSource.query<any[]>(`SELECT value, measured_at AS "measuredAt" FROM personal_records WHERE athlete_id=$1 AND exercise_id=$2 ORDER BY measured_at DESC LIMIT 1`, [athleteId, exerciseId]);
-		return { exercise: { id: exercise.id, name: exercise.name, metrics: [exercise.metric1, exercise.metric2].filter(Boolean) }, period: { from, to }, currentRp: rp[0] ? { value: number(rp[0].value), measuredAt: rp[0].measuredAt } : null, bestSet: best, estimatedRm: best?.predictedRm ?? null, charts: chart };
+		return { athleteName: athleteRows[0]?.name ?? '', exercise: { id: exercise.id, name: exercise.name, metrics: [exercise.metric1, exercise.metric2].filter(Boolean) }, period: { from, to }, currentRp: rp[0] ? { value: number(rp[0].value), measuredAt: rp[0].measuredAt } : null, bestSet: best, estimatedRm: best?.predictedRm ?? null, charts: chart };
 	}
 
 	async workouts(athleteId: string, exerciseId: number, query: ExerciseReviewQueryDto, actor: JwtPayload) {

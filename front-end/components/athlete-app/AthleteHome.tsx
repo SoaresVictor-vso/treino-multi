@@ -15,7 +15,7 @@ import {
 	type MyWorkout,
 } from '@/gateway/services/workouts';
 
-type DatedWorkout = CalendarWorkout & { date: string };
+export type DatedWorkout = CalendarWorkout & { date: string };
 const activeStatuses = ['pending', 'scheduled'];
 
 function firstName(name?: string) {
@@ -191,7 +191,7 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 	);
 }
 
-function WorkoutCalendar({
+export function WorkoutCalendar({
 	month,
 	workouts,
 	undated,
