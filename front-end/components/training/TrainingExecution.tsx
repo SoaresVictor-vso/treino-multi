@@ -561,12 +561,20 @@ export default function TrainingExecution({ id }: { id: string }) {
 				executions.push(execution);
 				executionsByExercise.set(execution.exerciseId, executions);
 			});
-			const executions = exerciseIds.flatMap(
+			const orderedExecutions = exerciseIds.flatMap(
 				(exerciseId) => executionsByExercise.get(exerciseId) ?? [],
+			);
+			// Preserve executions omitted from the reorder dialog (for example,
+			// pending removals) so reordering cannot discard local workout state.
+			const includedExerciseIds = new Set(exerciseIds);
+			orderedExecutions.push(
+				...current.executions.filter(
+					(execution) => !includedExerciseIds.has(execution.exerciseId),
+				),
 			);
 			return {
 				...current,
-				executions: executions.map((execution, index) => ({
+				executions: orderedExecutions.map((execution, index) => ({
 					...execution,
 					position: index + 1,
 				})),
