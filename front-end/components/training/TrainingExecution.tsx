@@ -26,6 +26,7 @@ import {
 	default as WorkoutCompletionScreen,
 } from './WorkoutCompletionScreen';
 import WorkoutMeasurements from './WorkoutMeasurements';
+import { API_ERROR_EVENT } from '@/gateway/client';
 import { getSessionUser } from '@/lib/auth';
 import {
 	workoutsService,
@@ -217,10 +218,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const savingRef = useRef(false);
 	const dirtyRef = useRef(false);
 	const exerciseHistoryCacheRef = useRef<
-		Map<
-			string,
-			NonNullable<typeof exerciseHistory>['rows']
-		>
+		Map<string, NonNullable<typeof exerciseHistory>['rows']>
 	>(new Map());
 
 	const openExerciseHistory = (
@@ -249,8 +247,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 			.latest(workout.athleteId, exerciseId)
 			.then((response) => {
 				const rows = response.data?.item ?? [];
-				if (response.success)
-					exerciseHistoryCacheRef.current.set(cacheKey, rows);
+				if (response.success) exerciseHistoryCacheRef.current.set(cacheKey, rows);
 				setExerciseHistory((previous) =>
 					previous?.id === exerciseId ? { ...previous, rows } : previous,
 				);
@@ -320,17 +317,36 @@ export default function TrainingExecution({ id }: { id: string }) {
 		savingRef.current = true;
 		setSaving(true);
 		setError(null);
-		const response = await workoutsService.updateExecutions(
-			snapshot.id,
-			serializeExecutions(snapshot.executions),
-			snapshot.exerciseNotes.map(({ exerciseId, athleteNote }) => ({
-				exerciseId,
-				athleteNote,
-			})),
-			deletedExecutionIds(snapshot.executions),
-		);
+		const submit = (workout: WorkoutDetail) =>
+			workoutsService.updateExecutions(
+				workout.id,
+				serializeExecutions(workout.executions),
+				workout.exerciseNotes.map(({ exerciseId, athleteNote }) => ({
+					exerciseId,
+					athleteNote,
+				})),
+				deletedExecutionIds(workout.executions),
+			);
+		let response = await submit(snapshot);
+		if (!response.success && response.status === 409 && response.currentState) {
+			const latestWorkout = workoutRef.current ?? snapshot;
+			const serverState = preloadPrescribedValues(response.currentState);
+			const reconciled = reconcileSavedWorkout(snapshot, latestWorkout, serverState);
+			workoutRef.current = reconciled;
+			setWorkout(reconciled);
+			response = await submit(reconciled);
+		}
 		if (!response.success || !response.data) {
 			setError(response.error || 'Não foi possível salvar as séries.');
+			if (typeof window !== 'undefined')
+				window.dispatchEvent(
+					new CustomEvent(API_ERROR_EVENT, {
+						detail: {
+							message:
+								response.error || 'Não foi possível salvar as séries.',
+						},
+					}),
+				);
 		} else {
 			const savedWorkout = preloadPrescribedValues(response.data);
 			const latestWorkout = workoutRef.current ?? snapshot;
@@ -453,7 +469,8 @@ export default function TrainingExecution({ id }: { id: string }) {
 				performedRestDuration:
 					sourceSet?.performedRestDuration ?? DEFAULT_REST_DURATION,
 				performedNote: null,
-				setType: 'padrao',
+				setType:
+					placement === 'before' ? 'aquecimento' : (sourceSet?.setType ?? 'padrao'),
 				finishedAt: null,
 				status: 'in_progress',
 				exercise,
@@ -921,9 +938,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 									onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
 									onAddSeries={() => addSeries(sets[0].exercise, 'after')}
 									onTitleLongPress={() => setReorderOpen(true)}
-									onTitleClick={() =>
-										openExerciseHistory(exerciseId, sets[0])
-									}
+									onTitleClick={() => openExerciseHistory(exerciseId, sets[0])}
 									onRestClick={openRest}
 								/>
 							);

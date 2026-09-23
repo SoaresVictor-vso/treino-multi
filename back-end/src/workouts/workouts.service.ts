@@ -1,5 +1,6 @@
 import {
 	BadRequestException,
+	ConflictException,
 	ForbiddenException,
 	Injectable,
 	NotFoundException,
@@ -941,8 +942,6 @@ export class WorkoutsService {
 			const currentIdSet = new Set(current.map((execution) => execution.id));
 			if (deletedIds.some((executionId) => !currentIdSet.has(executionId)))
 				throw new BadRequestException('Série removida não pertence a este treino.');
-			if (deletedIds.length)
-				await manager.delete(Execution, { workoutId: id, id: In(deletedIds) });
 			const activeCurrent = current.filter(
 				(execution) => !deletedIds.includes(execution.id),
 			);
@@ -953,9 +952,13 @@ export class WorkoutsService {
 				throw new BadRequestException('Uma série só pode ser enviada uma vez.');
 			const submittedIdSet = new Set(submittedIds);
 			if (activeCurrent.some((execution) => !submittedIdSet.has(execution.id)))
-				throw new BadRequestException(
-					'Todas as séries existentes devem ser enviadas para preservar a ordem.',
-				);
+				throw new ConflictException({
+					message:
+						'Todas as séries existentes devem ser enviadas para preservar a ordem.',
+					currentState: await this.findWorkout(id, actor),
+				});
+			if (deletedIds.length)
+				await manager.delete(Execution, { workoutId: id, id: In(deletedIds) });
 			if (activeCurrent.length) {
 				const temporaryPositionOffset =
 					Math.max(...activeCurrent.map((execution) => execution.position)) +
@@ -988,6 +991,11 @@ export class WorkoutsService {
 					});
 				const previousStatus = entity.status;
 				Object.assign(entity, input);
+				if (
+					entity.status === ExecutionStatus.COMPLETED &&
+					(entity.performedPse === null || entity.performedPse === undefined)
+				)
+					entity.performedPse = entity.prescribedPse;
 				if (
 					entity.status === ExecutionStatus.COMPLETED ||
 					entity.status === ExecutionStatus.SKIPPED

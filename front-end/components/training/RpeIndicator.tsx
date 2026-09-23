@@ -19,30 +19,19 @@ export default function RpeIndicator({
 	compact = false,
 	showComparison = true,
 }: RpeIndicatorProps) {
-	const prescribedValue = prescribed !== null && prescribed > 0 ? prescribed : null;
+	const prescribedValue =
+		prescribed !== null && prescribed > 0 ? prescribed : null;
 	const performedValue = performed !== null && performed > 0 ? performed : null;
 	const value =
-		mode === 'expected'
-			? prescribedValue
-			: showComparison
-				? performedValue ?? prescribedValue
-				: performedValue;
-	const differsFromPrescription =
-		showComparison &&
-		mode === 'performed' &&
-		performedValue !== null &&
-		prescribedValue !== null &&
-		performedValue !== prescribedValue;
+		mode === 'expected' ? prescribedValue : performedValue || prescribedValue;
 	if (value === null) return null;
-	const content = (
-		<>
-			RPE {value}
-			{differsFromPrescription ? `/${prescribed}` : ''}
-		</>
-	);
-	const title = prescribedValue !== null ? `Prescrito: ${prescribedValue}` : undefined;
-	const className =
-		`inline-flex shrink-0 items-center whitespace-nowrap rounded-md border border-outline-variant bg-surface-variant font-bold text-on-surface-variant hover:border-primary-fixed-dim hover:text-primary-fixed-dim disabled:cursor-default ${compact ? 'h-7 px-1 text-[9px] leading-none' : 'h-8 px-1.5 text-[10px]'}`;
+	const content = <>RPE {value}</>;
+	const title =
+		prescribedValue !== null &&
+		(mode === 'expected' || showComparison || performedValue === null)
+			? `Prescrito: ${prescribedValue}`
+			: undefined;
+	const className = `inline-flex shrink-0 items-center whitespace-nowrap rounded-md border border-outline-variant bg-surface-variant font-bold text-on-surface-variant hover:border-primary-fixed-dim hover:text-primary-fixed-dim disabled:cursor-default ${compact ? 'h-7 px-1 text-[9px] leading-none' : 'h-8 px-1.5 text-[10px]'}`;
 
 	if (!onClick)
 		return (

@@ -69,7 +69,7 @@ import { DatabaseSyncService } from './database-sync.service';
 				logging: config.get<string>('nodeEnv') === 'development',
 			}),
 		}),
-		TypeOrmModule.forFeature([UserRole, CriticalOperationLog]),
+		TypeOrmModule.forFeature([UserRole, CriticalOperationLog, Measurement, Metric]),
 	],
 	providers: [DatabaseSyncService],
 	exports: [DatabaseSyncService],

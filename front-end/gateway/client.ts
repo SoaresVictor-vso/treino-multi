@@ -4,6 +4,7 @@ import { clearAuthCookie, getAuthToken, setAuthCookie } from '@/lib/auth';
 export interface ApiResponse<T> {
 	success: boolean;
 	data?: T;
+	currentState?: T;
 	error?: string;
 	status: number;
 }
@@ -172,9 +173,10 @@ export async function apiRequest<T>(
 			const response = {
 				success: false,
 				error: data?.message || 'Não foi possível realizar a operação.',
+				currentState: data?.currentState,
 				status: res.status,
 			};
-			if (reportErrors) reportApiError(response);
+			if (reportErrors && res.status !== 409) reportApiError(response);
 			return response;
 		}
 

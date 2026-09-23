@@ -4,118 +4,116 @@ import {
 	executeFormula,
 	validateFormula,
 } from './formula-engine';
+import { MEASUREMENT_DEFINITIONS } from './measurements.constants';
+
+const definition = (key: string) => {
+	const found = MEASUREMENT_DEFINITIONS.find(
+		(measurement) => measurement.key === key,
+	);
+	if (!found) throw new Error(`Missing measurement definition: ${key}`);
+	return found;
+};
+
+const executionFields = [
+	'duration',
+	'rpe',
+	'prescribedRpe',
+	'completed',
+	'prescribedMetric1',
+	'metricsMatch',
+];
 
 describe('formula engine', () => {
-	it('initializes arbitrary curr properties with zero and accumulates safely', () => {
-		const curr = createZeroState();
-		executeFormula(
-			'curr.total = curr.total + peso * repeticoes; curr.count = curr.count + 1',
-			curr,
-			{ peso: 10, repeticoes: 8 },
-		);
-		executeFormula(
-			'curr.total = curr.total + peso * repeticoes; curr.count = curr.count + 1',
-			curr,
-			{ peso: 20, repeticoes: 5 },
-		);
-		expect(curr.total).toBe(180);
-		expect(curr.count).toBe(2);
-		expect(evaluateValueFormula('curr.total / curr.count', curr)).toBe(90);
+	it('validates formulas and value formulas from all measurement definitions', () => {
+		const allowedFields = [
+			...executionFields,
+			...MEASUREMENT_DEFINITIONS.flatMap((measurement) =>
+				[measurement.metric1Name, measurement.metric2Name].filter(
+					(name): name is string => name !== null,
+				),
+			),
+		];
+
+		for (const measurement of MEASUREMENT_DEFINITIONS) {
+			validateFormula(measurement.formula, allowedFields, true);
+			validateFormula(measurement.valueFormula, [], false);
+		}
 	});
 
-	it('supports allowed execution fields and has deterministic zero division', () => {
+	it('calculates tonnage from its registered formula', () => {
+		const tonnage = definition('tonnage');
 		const curr = createZeroState();
-		executeFormula('curr.total = curr.total + rpe + prescribedRpe', curr, {
-			rpe: 8,
-			prescribedRpe: 7,
-		});
-		expect(curr.total).toBe(15);
-		expect(evaluateValueFormula('curr.total / curr.none', curr)).toBe(0);
-	});
-
-	it('calculates the seeded aggregate formula shapes', () => {
-		const tonnage = createZeroState();
 		for (const item of [
 			{ peso: 100, repeticoes: 5 },
 			{ peso: 80, repeticoes: 8 },
 		])
-			executeFormula('curr.total = curr.total + peso * repeticoes', tonnage, item);
-		expect(evaluateValueFormula('curr.total', tonnage)).toBe(1140);
+			executeFormula(tonnage.formula, curr, item);
 
-		const pace = createZeroState();
+		expect(evaluateValueFormula(tonnage.valueFormula, curr)).toBe(1140);
+	});
+
+	it('calculates pace from its registered formula', () => {
+		const pace = definition('average-pace');
+		const curr = createZeroState();
 		for (const item of [
 			{ distancia: 1000, tempo: 300 },
 			{ distancia: 2000, tempo: 660 },
 		])
-			executeFormula(
-				'curr.distance = curr.distance + distancia; curr.duration = curr.duration + tempo',
-				pace,
-				item,
-			);
-		expect(
-			evaluateValueFormula('curr.duration / curr.distance', pace),
-		).toBeCloseTo(0.32);
+			executeFormula(pace.formula, curr, item);
 
-		const adherence = createZeroState();
-		for (const metricsMatch of [true, false, true])
-			executeFormula(
-				'curr.points = curr.points + completed * (1 + metricsMatch); curr.count = curr.count + 1',
-				adherence,
-				{ completed: true, metricsMatch },
-			);
-		expect(
-			evaluateValueFormula('(curr.points / (2 * curr.count)) * 100', adherence),
-		).toBeCloseTo(83.333);
+		expect(evaluateValueFormula(pace.valueFormula, curr)).toBeCloseTo(0.32);
 	});
 
-	it('includes skipped sets in workout adherence count', () => {
-		const adherence = createZeroState();
-		const formula =
-			'curr.points = curr.points + completed * (1 + metricsMatch); curr.count = curr.count + 1';
-		executeFormula(formula, adherence, {
-			completed: true,
-			metricsMatch: true,
-		});
-		executeFormula(formula, adherence, {
-			completed: false,
-			metricsMatch: false,
-		});
-		expect(adherence.count).toBe(2);
-		expect(adherence.points).toBe(2);
-		expect(
-			evaluateValueFormula('(curr.points / (2 * curr.count)) * 100', adherence),
-		).toBe(50);
+	it('calculates duration and average RPE using their registered formulas', () => {
+		const duration = definition('duration');
+		const durationState = createZeroState();
+		executeFormula(duration.formula, durationState, { duration: 120 });
+		expect(evaluateValueFormula(duration.valueFormula, durationState)).toBe(120);
+
+		const averageRpe = definition('average-rpe');
+		const rpeState = createZeroState();
+		for (const rpe of [8, 6])
+			executeFormula(averageRpe.formula, rpeState, { rpe });
+		expect(evaluateValueFormula(averageRpe.valueFormula, rpeState)).toBe(7);
 	});
 
-	it('scores matching sets two, mismatched sets one, and skipped sets zero', () => {
-		const adherence = createZeroState();
-		const formula =
-			'curr.points = curr.points + completed * (1 + metricsMatch); curr.count = curr.count + 1';
+	it('calculates effort adherence using its registered formula', () => {
+		const effortAdherence = definition('effort-adherence');
+		const curr = createZeroState();
+		for (const [rpe, prescribedRpe] of [
+			[7, 7],
+			[9, 7],
+			[6, null],
+		])
+			executeFormula(effortAdherence.formula, curr, { rpe, prescribedRpe });
+
+		expect(evaluateValueFormula(effortAdherence.valueFormula, curr)).toBeCloseTo(
+			100 / 3,
+		);
+	});
+
+	it('counts all sets, including unprescribed skipped sets', () => {
+		const adherence = definition('workout-adherence');
+		const curr = createZeroState();
 		const sets = [
-			...Array.from({ length: 3 }, () => ({
-				completed: true,
-				metricsMatch: true,
-			})),
-			{
-				completed: true,
-				metricsMatch: false,
-			},
-			{
-				completed: false,
-				metricsMatch: true,
-			},
+			{ completed: true, metricsMatch: true, prescribedMetric1: 8 },
+			{ completed: true, metricsMatch: false, prescribedMetric1: 8 },
+			{ completed: false, metricsMatch: false, prescribedMetric1: 8 },
+			{ completed: false, metricsMatch: false, prescribedMetric1: null },
 		];
 
-		for (const set of sets) executeFormula(formula, adherence, set);
+		for (const set of sets) executeFormula(adherence.formula, curr, set);
 
-		expect(adherence.count).toBe(5);
-		expect(adherence.points).toBe(7);
-		expect(
-			evaluateValueFormula('(curr.points / (2 * curr.count)) * 100', adherence),
-		).toBe(70);
+		expect(curr.count).toBe(3);
+		expect(curr.points).toBe(3);
+		expect(evaluateValueFormula(adherence.valueFormula, curr)).toBe(50);
 	});
 
-	it('rejects unsafe and malformed formulas', () => {
+	it('returns zero for average RPE with no values and rejects unsafe formulas', () => {
+		const averageRpe = definition('average-rpe');
+		expect(evaluateValueFormula(averageRpe.valueFormula, createZeroState())).toBe(
+			0,
+		);
 		expect(() => validateFormula('curr.__proto__ = 1', ['peso'], true)).toThrow();
 		expect(() => validateFormula('process.exit', ['peso'], true)).toThrow();
 		expect(() =>

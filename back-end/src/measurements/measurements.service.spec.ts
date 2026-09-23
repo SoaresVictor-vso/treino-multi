@@ -5,11 +5,13 @@ import { Workout } from '../workouts/entities/workout.entity';
 import { Metric } from '../metrics/entities/metric.entity';
 import { Measurement } from './entities/measurement.entity';
 import { WorkoutMeasurement } from './entities/workout-measurement.entity';
+import { MEASUREMENT_DEFINITIONS } from './measurements.constants';
+import { agacho3WorkoutFixture } from './fixtures/agacho-3.fixture';
 import { MeasurementsService } from './measurements.service';
 
-const formula =
-	'curr.points = curr.points + completed * (1 + metricsMatch); curr.count = curr.count + 1';
-const valueFormula = '(curr.points / (2 * curr.count)) * 100';
+const workoutAdherenceDefinition = MEASUREMENT_DEFINITIONS.find(
+	(item) => item.key === 'workout-adherence',
+)!;
 
 function set(overrides: Partial<Execution> = {}): Execution {
 	return {
@@ -30,13 +32,10 @@ function set(overrides: Partial<Execution> = {}): Execution {
 
 describe('workout adherence measurement', () => {
 	const measurement = {
-		key: 'workout-adherence',
-		formula,
-		valueFormula,
+		...workoutAdherenceDefinition,
 		metric1: null,
 		metric2: null,
-		staticWeight: 4,
-		dynamicWeight: 1,
+		active: true,
 	} as Measurement;
 	const service = new MeasurementsService(
 		{} as Repository<Measurement>,
@@ -81,5 +80,47 @@ describe('workout adherence measurement', () => {
 		expect(
 			await service.calculateForWorkout(manager('athlete'), 'workout'),
 		).toEqual([]);
+	});
+
+	it('calculates adherence from the Agacho 3 workout data', async () => {
+		const definition = MEASUREMENT_DEFINITIONS.find(
+			(item) => item.key === 'workout-adherence',
+		)!;
+		const seededMeasurement = {
+			...definition,
+			metric1: null,
+			metric2: null,
+			active: true,
+		} as unknown as Measurement;
+		const fixtureManager = {
+			getRepository: (entity: unknown) => {
+				if (entity === Measurement)
+					return { find: () => Promise.resolve([seededMeasurement]) };
+				if (entity === Execution)
+					return {
+						find: () => Promise.resolve(agacho3WorkoutFixture.executions),
+					};
+				return {
+					findOneByOrFail: () =>
+						Promise.resolve({
+							athleteId: agacho3WorkoutFixture.athleteId,
+							createdBy: agacho3WorkoutFixture.createdBy,
+							performedAt: agacho3WorkoutFixture.performedAt,
+							finishedAt: agacho3WorkoutFixture.finishedAt,
+						}),
+				};
+			},
+		} as unknown as EntityManager;
+
+		const results = await service.calculateForWorkout(
+			fixtureManager,
+			agacho3WorkoutFixture.id,
+		);
+		const adherence = results.find(
+			(result) => result.measurement.key === 'workout-adherence',
+		);
+		expect(adherence).toBeDefined();
+		expect(adherence?.compatibleExecutions).toBe(10);
+		expect(adherence?.value).toBe(30);
 	});
 });

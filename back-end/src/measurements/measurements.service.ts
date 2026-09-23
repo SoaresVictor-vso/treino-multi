@@ -109,7 +109,8 @@ export class MeasurementsService {
 			};
 		},
 	) {
-		// All registered sets contribute to the denominator; skipped sets score zero.
+		// Workout adherence counts every completed set and prescribed skipped sets.
+		// An unprescribed skipped set does not contribute to the denominator.
 		if (measurement.key === 'workout-adherence') return true;
 
 		// A prescribed, pending or skipped set has no training result and must not

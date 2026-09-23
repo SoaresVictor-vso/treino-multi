@@ -218,6 +218,7 @@ export default function ExecutionSet({
 						<RpeIndicator
 							prescribed={execution.prescribedPse}
 							performed={execution.performedPse}
+							showComparison={false}
 							disabled={fieldsDisabled}
 							onClick={() => {
 								setRpePickerOpen(true);
