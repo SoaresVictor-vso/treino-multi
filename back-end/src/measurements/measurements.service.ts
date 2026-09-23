@@ -25,6 +25,7 @@ const executionFields = [
 	'performedMetric2',
 	'prescribedMetric1',
 	'prescribedMetric2',
+	'hasMetric2',
 	'performedRestDuration',
 	'prescribedRestDuration',
 ];
@@ -80,6 +81,7 @@ export class MeasurementsService {
 			performedMetric2: execution.performedMetric2,
 			prescribedMetric1: execution.prescribedMetric1,
 			prescribedMetric2: execution.prescribedMetric2,
+			hasMetric2: execution.exercise.metric2 !== null,
 			performedRestDuration: execution.performedRestDuration,
 			prescribedRestDuration: execution.prescribedRestDuration,
 		};
@@ -98,6 +100,12 @@ export class MeasurementsService {
 			};
 		},
 	) {
+		// Workout adherence intentionally considers every registered set. The
+		// denominator must include prescribed, added, skipped and unresolved sets;
+		// the formula itself counts only completed sets whose performed metrics
+		// match the prescribed metrics in the numerator.
+		if (measurement.key === 'workout-adherence') return true;
+
 		// A prescribed, pending or skipped set has no training result and must not
 		// participate in any aggregate metric (tonnage, adherence, pace, etc.).
 		if (execution.status !== ExecutionStatus.COMPLETED) return false;

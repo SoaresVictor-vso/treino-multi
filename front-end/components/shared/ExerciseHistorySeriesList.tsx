@@ -20,6 +20,8 @@ export default function ExerciseHistorySeriesList({
 	metric1Label,
 	metric2Label,
 }: ExerciseHistorySeriesListProps) {
+	const gridClass = (rm: number | null) =>
+		typeof rm == 'number' ? 'grid-cols-3' : 'grid-cols-2';
 	return (
 		<div className="space-y-3">
 			{series.map((set, index) => (
@@ -33,22 +35,23 @@ export default function ExerciseHistorySeriesList({
 						>
 							{set.position ?? index + 1}
 						</span>
-						<b className="text-sm">
-							{set.setType !== 'padrao' && set.setType.toUpperCase()}
-						</b>
 					</div>
-					<div className="mt-3 grid grid-cols-3 gap-2 col-span-5">
+					<div
+						className={`mt-3 grid gap-2 col-span-5 ${gridClass(set.predictedRm)}`}
+					>
 						<HistoryValue label={metric1Label} value={set.metric1} />
 						{metric2Label && (
 							<HistoryValue label={metric2Label} value={set.metric2} />
 						)}
-						<HistoryValue
-							label="1RM"
-							value={
-								set.predictedRm === null ? null : Number(set.predictedRm.toFixed(1))
-							}
-							accent
-						/>
+						{set.predictedRm && (
+							<HistoryValue
+								label={`1RM`}
+								value={
+									set.predictedRm === null ? null : Number(set.predictedRm.toFixed(1))
+								}
+								highlight
+							/>
+						)}
 					</div>
 					{set.note && (
 						<p className="mt-3 text-sm text-on-surface-variant">Obs.: {set.note}</p>
@@ -63,20 +66,35 @@ function HistoryValue({
 	label,
 	value,
 	accent = false,
+	highlight = false,
+	old = false,
 }: {
 	label: string;
 	value: number | null;
 	accent?: boolean;
+	highlight?: boolean;
+	old?: boolean;
 }) {
+	if (old)
+		return (
+			<div
+				className={`rounded-lg border px-2 py-2 text-center ${highlight || accent ? 'border-primary-fixed-dim/50 bg-primary-fixed-dim/10 text-primary-fixed' : 'border-outline-variant bg-surface-variant'}`}
+			>
+				<p className="text-[0.65rem] font-semibold uppercase tracking-wide">
+					{label}
+				</p>
+				<p className="mt-0.5 font-mono text-sm font-bold">
+					{value === null ? '—' : `${value}${accent ? ' kg' : ''}`}
+				</p>
+			</div>
+		);
+
 	return (
 		<div
-			className={`rounded-lg border px-2 py-2 text-center ${accent ? 'border-primary-fixed-dim/50 bg-primary-fixed-dim/10 text-primary-fixed' : 'border-outline-variant bg-surface-variant'}`}
+			className={`rounded-lg border px-2 py-2 text-center ${highlight || accent ? 'border-primary-fixed-dim/50 bg-primary-fixed-dim/10 text-primary-fixed' : 'border-outline-variant bg-surface-variant'}`}
 		>
-			<p className="text-[0.65rem] font-semibold uppercase tracking-wide">
-				{label}
-			</p>
-			<p className="mt-0.5 font-mono text-sm font-bold">
-				{value === null ? '—' : `${value}${accent ? ' kg' : ''}`}
+			<p className="mt-0.5 font-mono text-[10px] font-bold">
+				{value === null ? '—' : `${value} ${label}`}
 			</p>
 		</div>
 	);

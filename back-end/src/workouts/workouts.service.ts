@@ -917,7 +917,7 @@ export class WorkoutsService {
 			workout.performedAt = new Date();
 			workout.updatedBy = actor.sub;
 			await manager.save(workout);
-			await this.startNextExecution(manager, id, workout.performedAt);
+			await this.startPendingExecutions(manager, id, workout.performedAt);
 		});
 		return this.findWorkout(id, actor);
 	}
@@ -1016,7 +1016,7 @@ export class WorkoutsService {
 				});
 				await manager.save(entity);
 			}
-			await this.startNextExecution(manager, id);
+			await this.startPendingExecutions(manager, id);
 			if (dto.exerciseNotes?.length) {
 				const currentNotes = await manager.find(WorkoutExerciseNote, {
 					where: { workoutId: id },
@@ -1108,6 +1108,7 @@ export class WorkoutsService {
 			workout.finishedAt = finishedAt;
 			workout.updatedBy = actor.sub;
 			await manager.save(workout);
+			await this.measurementsService.persistForWorkout(manager, id);
 		});
 		return this.findWorkout(id, actor);
 	}
@@ -1212,7 +1213,7 @@ export class WorkoutsService {
 				Execution,
 				activities.map((activity) => this.createExecution(manager, created.id, activity)),
 			);
-			if (startedAt) await this.startNextExecution(manager, created.id, startedAt);
+			if (startedAt) await this.startPendingExecutions(manager, created.id, startedAt);
 			const notes = this.createExerciseNotes(
 				manager,
 				created.id,
@@ -1583,22 +1584,20 @@ export class WorkoutsService {
 		});
 	}
 
-	private async startNextExecution(
+	private async startPendingExecutions(
 		manager: EntityManager,
 		workoutId: string,
 		startedAt = new Date(),
 	): Promise<void> {
-		const executions = manager.getRepository(Execution);
-		if (await executions.existsBy({ workoutId, status: ExecutionStatus.IN_PROGRESS })) return;
-		const next = await executions.findOne({
-			where: { workoutId, status: ExecutionStatus.PENDING },
-			order: { position: 'ASC' },
-		});
-		if (!next) return;
-		next.status = ExecutionStatus.IN_PROGRESS;
-		next.startedAt = startedAt;
-		next.finishedAt = null;
-		await executions.save(next);
+		await manager
+			.createQueryBuilder()
+			.update(Execution)
+			.set({ status: ExecutionStatus.IN_PROGRESS, startedAt })
+			.where('workout_id = :workoutId AND status = :status', {
+				workoutId,
+				status: ExecutionStatus.PENDING,
+			})
+			.execute();
 	}
 
 	private createExerciseNotes(

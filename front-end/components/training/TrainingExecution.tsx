@@ -81,6 +81,10 @@ function preloadPrescribedValues(workout: WorkoutDetail): WorkoutDetail {
 				return {
 					...execution,
 					position: index + 1,
+					status:
+						workout.status === 'in_progress' && execution.status === 'pending'
+							? 'in_progress'
+							: execution.status,
 					prescribedRestDuration,
 					performedMetric1:
 						execution.performedMetric1 ?? execution.prescribedMetric1,
@@ -212,6 +216,46 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const workoutRef = useRef<WorkoutDetail | null>(null);
 	const savingRef = useRef(false);
 	const dirtyRef = useRef(false);
+	const exerciseHistoryCacheRef = useRef<
+		Map<
+			string,
+			NonNullable<typeof exerciseHistory>['rows']
+		>
+	>(new Map());
+
+	const openExerciseHistory = (
+		exerciseId: number,
+		execution: WorkoutExecution,
+	) => {
+		if (!workout) return;
+
+		const cacheKey = `${workout.athleteId}:${exerciseId}`;
+		const cachedRows = exerciseHistoryCacheRef.current.get(cacheKey);
+		const history = {
+			name: execution.exercise.name,
+			id: exerciseId,
+			metric1Label: `${execution.exercise.metric_1.name} (${execution.exercise.metric_1.symbol})`,
+			metric2Label: execution.exercise.metric_2
+				? `${execution.exercise.metric_2.name} (${execution.exercise.metric_2.symbol})`
+				: null,
+			rows: cachedRows ?? null,
+		};
+
+		setHistoryOpen(true);
+		setExerciseHistory(history);
+		if (cachedRows !== undefined) return;
+
+		void exerciseReviewsService
+			.latest(workout.athleteId, exerciseId)
+			.then((response) => {
+				const rows = response.data?.item ?? [];
+				if (response.success)
+					exerciseHistoryCacheRef.current.set(cacheKey, rows);
+				setExerciseHistory((previous) =>
+					previous?.id === exerciseId ? { ...previous, rows } : previous,
+				);
+			});
+	};
 
 	const load = useCallback(
 		async (background = false) => {
@@ -411,7 +455,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 				performedNote: null,
 				setType: 'padrao',
 				finishedAt: null,
-				status: 'pending',
+				status: 'in_progress',
 				exercise,
 				referenceGroup: null,
 				referencePersonalRecord: null,
@@ -473,7 +517,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 						performedNote: null,
 						setType: previousSetType,
 						finishedAt: null,
-						status: 'pending' as const,
+						status: 'in_progress' as const,
 						exercise,
 						referenceGroup: null,
 						referencePersonalRecord: null,
@@ -803,27 +847,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 					<WorkoutMeasurements measurements={workout.measurements} />
 					<WorkoutComparison
 						executions={workout.executions}
-						onExerciseClick={(exerciseId, execution) => {
-							setHistoryOpen(true);
-							setExerciseHistory({
-								name: execution.exercise.name,
-								id: exerciseId,
-								metric1Label: `${execution.exercise.metric_1.name} (${execution.exercise.metric_1.symbol})`,
-								metric2Label: execution.exercise.metric_2
-									? `${execution.exercise.metric_2.name} (${execution.exercise.metric_2.symbol})`
-									: null,
-								rows: null,
-							});
-							void exerciseReviewsService
-								.latest(workout.athleteId, exerciseId)
-								.then((response) =>
-									setExerciseHistory((previous) =>
-										previous
-											? { ...previous, rows: response.data?.item ?? [] }
-											: previous,
-									),
-								);
-						}}
+						onExerciseClick={openExerciseHistory}
 					/>
 				</>
 			) : (
@@ -897,27 +921,9 @@ export default function TrainingExecution({ id }: { id: string }) {
 									onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
 									onAddSeries={() => addSeries(sets[0].exercise, 'after')}
 									onTitleLongPress={() => setReorderOpen(true)}
-									onTitleClick={() => {
-										setHistoryOpen(true);
-										setExerciseHistory({
-											name: sets[0].exercise.name,
-											id: exerciseId,
-											metric1Label: `${sets[0].exercise.metric_1.name} (${sets[0].exercise.metric_1.symbol})`,
-											metric2Label: sets[0].exercise.metric_2
-												? `${sets[0].exercise.metric_2.name} (${sets[0].exercise.metric_2.symbol})`
-												: null,
-											rows: null,
-										});
-										void exerciseReviewsService
-											.latest(workout.athleteId, exerciseId)
-											.then((response) =>
-												setExerciseHistory((previous) =>
-													previous
-														? { ...previous, rows: response.data?.item ?? [] }
-														: previous,
-												),
-											);
-									}}
+									onTitleClick={() =>
+										openExerciseHistory(exerciseId, sets[0])
+									}
 									onRestClick={openRest}
 								/>
 							);

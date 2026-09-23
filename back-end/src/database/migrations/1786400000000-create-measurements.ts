@@ -16,7 +16,7 @@ export class CreateMeasurements1786400000000 implements MigrationInterface {
 			('average-pace','Pace médio',(SELECT id FROM metrics WHERE name = 'distancia'),(SELECT id FROM metrics WHERE name = 'tempo'),'curr.distance = curr.distance + distancia; curr.duration = curr.duration + tempo','curr.duration / curr.distance',3,1,'gauge',$1),
 			('average-rpe','RPE médio',NULL,NULL,'curr.total = curr.total + rpe; curr.count = curr.count + 1','curr.total / curr.count',2,1,'activity',$1),
 			('effort-adherence','Aderência de esforço',NULL,NULL,'curr.total = curr.total + (rpe / prescribedRpe) * 100; curr.count = curr.count + 1','curr.total / curr.count',4,1,'target',$1),
-			('workout-adherence','Aderência no treino',NULL,NULL,'curr.completed = curr.completed + completed; curr.count = curr.count + 1','(curr.completed / curr.count) * 100',4,1,'check-circle',$1)`, [presentation]);
+			('workout-adherence','Aderência no treino',NULL,NULL,'curr.completed = curr.completed + (completed === 1) * (prescribedMetric1 > 0) * (performedMetric1 === prescribedMetric1) * (((hasMetric2 === 0) + ((hasMetric2 === 1) * (prescribedMetric2 > 0) * (performedMetric2 === prescribedMetric2))) > 0); curr.count = curr.count + 1','(curr.completed / curr.count) * 100',4,1,'check-circle',$1)`, [presentation]);
 	}
 	async down(queryRunner: QueryRunner): Promise<void> {
 		await queryRunner.query(`DROP TABLE "workout_measurements"`);

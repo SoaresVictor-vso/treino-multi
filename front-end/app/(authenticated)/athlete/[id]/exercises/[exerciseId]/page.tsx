@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RiArrowDownSLine, RiArrowLeftLine } from 'react-icons/ri';
 import ErrorBox from '@/components/ui/ErrorBox';
@@ -16,6 +16,13 @@ const numberFormat = new Intl.NumberFormat('pt-BR', {
 });
 const format = (value: number | null, suffix = '') =>
 	value === null ? '—' : `${numberFormat.format(value)}${suffix}`;
+const formatPace = (value: number) => {
+	const totalSeconds = Math.round(value * 1000);
+	const minutes = Math.floor(totalSeconds / 60);
+	const seconds = totalSeconds % 60;
+	return `${minutes}:${String(seconds).padStart(2, '0')}`;
+};
+const formatDistance = (value: number) => numberFormat.format(value / 1000);
 const date = (value: string) =>
 	new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(
 		new Date(value),
@@ -122,7 +129,9 @@ export default function ExerciseReviewPage({
 											? 'Duração'
 											: 'Repetições'
 							}
-							unit={isWeightReps ? 'kg' : undefined}
+							unit={
+								isWeightReps ? 'kg' : metrics.includes('distancia') ? 'km' : undefined
+							}
 							points={summary.charts}
 							field={primaryField}
 						/>
@@ -141,7 +150,13 @@ export default function ExerciseReviewPage({
 										? 'Pace'
 										: 'Peso'
 							}
-							unit={isWeightReps ? 'kg' : undefined}
+							unit={
+								isWeightReps
+									? 'kg'
+									: metrics.includes('distancia')
+										? 'min/km'
+										: undefined
+							}
 							points={summary.charts}
 							field={secondaryField}
 						/>
@@ -197,8 +212,27 @@ function Chart({
 	points: ExerciseReviewSummary['charts'];
 	field: keyof ExerciseReviewSummary['charts'][number];
 }) {
-	const values = points.filter((point) => typeof point[field] === 'number');
+	const values = points.map((point) => ({
+		...point,
+		chartValue: typeof point[field] === 'number' ? Number(point[field]) : 0,
+	}));
 	const [selected, setSelected] = useState<number | null>(null);
+	const chartRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (selected === null) return;
+		const closeOnOutsidePointerDown = (event: PointerEvent) => {
+			if (
+				event.target instanceof Node &&
+				!chartRef.current?.contains(event.target)
+			)
+				setSelected(null);
+		};
+		document.addEventListener('pointerdown', closeOnOutsidePointerDown);
+		return () =>
+			document.removeEventListener('pointerdown', closeOnOutsidePointerDown);
+	}, [selected]);
+
 	if (values.length < 2)
 		return (
 			<div className="rounded-xl border border-outline-variant p-4">
@@ -208,9 +242,11 @@ function Chart({
 				</p>
 			</div>
 		);
-	const maximum = Math.max(...values.map((point) => Number(point[field])));
+	const maximum = Math.max(...values.map((point) => point.chartValue));
 	const chartMaximum = maximum || 1;
 	const scale = [maximum, maximum / 2, 0];
+	const isPace = field === 'pace';
+	const isDistance = field === 'distance';
 	const barThemes = [
 		{
 			bar: 'border-1 bg-foreground border-primary-fixed-dim',
@@ -225,22 +261,26 @@ function Chart({
 			label: 'text-tertiary-fixed',
 		},
 	];
-	const valueWithUnit = (value: number) =>
-		`${format(value)}${unit ? ` ${unit}` : ''}`;
+	const formatChartValue = (value: number) =>
+		isPace
+			? formatPace(value)
+			: isDistance
+				? formatDistance(value)
+				: format(value);
 	return (
-		<div className="rounded-xl border border-outline-variant p-4">
+		<div ref={chartRef} className="rounded-xl border border-outline-variant p-4">
 			<h2 className="font-bold">{title}</h2>
 			<p className="mt-1 text-xs text-on-surface-variant">
 				Métrica: {metric}
 				{unit ? ` (${unit})` : ''} · toque em um índice para ver os detalhes
 			</p>
-			<div className="mt-4 grid grid-cols-[auto_1fr] gap-2">
+			<div className="mt-8 grid grid-cols-[auto_1fr] gap-2">
 				<div
 					className="flex h-44 flex-col justify-between pb-6 text-right text-[10px] text-on-surface-variant"
 					aria-label={`Escala de ${metric}`}
 				>
 					{scale.map((value) => (
-						<span key={value}>{valueWithUnit(value)}</span>
+						<span key={value}>{formatChartValue(value)}</span>
 					))}
 				</div>
 				<div className="relative h-44 border-b border-l border-outline-variant">
@@ -248,7 +288,7 @@ function Chart({
 					<div className="flex h-full items-end justify-around gap-1">
 						{values.map((point, index) => {
 							const theme = barThemes[0];
-							const value = valueWithUnit(Number(point[field]));
+							const value = formatChartValue(point.chartValue);
 							return (
 								<button
 									key={`${point.date}-${index}`}
@@ -259,7 +299,7 @@ function Chart({
 								>
 									<span
 										style={{
-											height: `${Math.max(5, (Number(point[field]) / chartMaximum) * 100)}%`,
+											height: `${point.chartValue === 0 ? 0 : Math.max(5, (point.chartValue / chartMaximum) * 100)}%`,
 										}}
 										className={`relative block w-full rounded-t transition-colors ${selected === index ? 'bg-primary-container' : `${theme.bar} group-hover:brightness-125`}`}
 									>
@@ -282,7 +322,7 @@ function Chart({
 							className="absolute right-1 top-1 rounded-lg bg-inverse-surface px-2 py-1 text-xs text-inverse-on-surface shadow-lg"
 						>
 							{date(values[selected].date)} ·{' '}
-							{valueWithUnit(Number(values[selected][field]))}
+							{formatChartValue(values[selected].chartValue)}
 						</div>
 					)}
 				</div>
@@ -304,9 +344,7 @@ function WorkoutAccordion({
 				<div>
 					<b>{workout.workoutName}</b>
 					<p className="mt-1 text-sm text-on-surface-variant">
-						{date(workout.performedAt)} · {workout.sets} séries · melhor{' '}
-						{format(workout.bestPredictedRm, ' 1RM')} · tonelagem{' '}
-						{format(workout.tonnage, ' kg')}
+						{date(workout.performedAt)}
 					</p>
 				</div>
 				<RiArrowDownSLine className="shrink-0 text-xl transition-transform group-open:rotate-180" />
@@ -314,8 +352,8 @@ function WorkoutAccordion({
 			<div className="border-t border-outline-variant p-4">
 				<ExerciseHistorySeriesList
 					series={workout.series}
-					metric1Label={`${labels[0]?.name ?? 'Métrica'} (${labels[0]?.symbol ?? ''})`}
-					metric2Label={labels[1] ? `${labels[1].name} (${labels[1].symbol})` : null}
+					metric1Label={`${labels[0]?.symbol ?? 'Métrica'}`}
+					metric2Label={labels[1].symbol || null}
 				/>
 			</div>
 		</details>

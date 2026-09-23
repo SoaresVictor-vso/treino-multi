@@ -34,6 +34,77 @@ describe('formula engine', () => {
 		expect(evaluateValueFormula('(curr.completed / curr.count) * 100', adherence)).toBeCloseTo(66.666);
 	});
 
+	it('includes skipped sets in workout adherence count', () => {
+		const adherence = createZeroState();
+		const formula =
+			'curr.completed = curr.completed + (completed === 1) * (prescribedMetric1 > 0) * (performedMetric1 === prescribedMetric1) * (((hasMetric2 === 0) + ((hasMetric2 === 1) * (prescribedMetric2 > 0) * (performedMetric2 === prescribedMetric2))) > 0); curr.count = curr.count + 1';
+		executeFormula(formula, adherence, {
+			completed: true,
+			prescribedMetric1: 10,
+			performedMetric1: 10,
+			prescribedMetric2: null,
+			performedMetric2: null,
+			hasMetric2: 0,
+		});
+		executeFormula(formula, adherence, {
+			completed: false,
+			prescribedMetric1: 10,
+			performedMetric1: null,
+			prescribedMetric2: null,
+			performedMetric2: null,
+			hasMetric2: 0,
+		});
+		expect(adherence.count).toBe(2);
+		expect(adherence.completed).toBe(1);
+		expect(evaluateValueFormula('(curr.completed / curr.count) * 100', adherence)).toBe(50);
+	});
+
+	it('calculates the adherence example with 3 of 8 sets', () => {
+		const adherence = createZeroState();
+		const formula =
+			'curr.completed = curr.completed + (completed === 1) * (prescribedMetric1 > 0) * (performedMetric1 === prescribedMetric1) * (((hasMetric2 === 0) + ((hasMetric2 === 1) * (prescribedMetric2 > 0) * (performedMetric2 === prescribedMetric2))) > 0); curr.count = curr.count + 1';
+		const sets = [
+			...Array.from({ length: 3 }, () => ({
+				completed: true,
+				prescribedMetric1: 5,
+				performedMetric1: 5,
+				prescribedMetric2: 40,
+				performedMetric2: 40,
+				hasMetric2: 1,
+			})),
+			{
+				completed: true,
+				prescribedMetric1: 5,
+				performedMetric1: 5,
+				prescribedMetric2: 40,
+				performedMetric2: 50,
+				hasMetric2: 1,
+			},
+			{
+				completed: false,
+				prescribedMetric1: 5,
+				performedMetric1: 5,
+				prescribedMetric2: 40,
+				performedMetric2: 40,
+				hasMetric2: 1,
+			},
+			...Array.from({ length: 3 }, () => ({
+				completed: true,
+				prescribedMetric1: null,
+				performedMetric1: 8,
+				prescribedMetric2: null,
+				performedMetric2: 300,
+				hasMetric2: 1,
+			})),
+		];
+
+		for (const set of sets) executeFormula(formula, adherence, set);
+
+		expect(adherence.count).toBe(8);
+		expect(adherence.completed).toBe(3);
+		expect(evaluateValueFormula('(curr.completed / curr.count) * 100', adherence)).toBe(37.5);
+	});
+
 	it('rejects unsafe and malformed formulas', () => {
 		expect(() => validateFormula('curr.__proto__ = 1', ['peso'], true)).toThrow();
 		expect(() => validateFormula('process.exit', ['peso'], true)).toThrow();
