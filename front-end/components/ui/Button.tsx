@@ -1,6 +1,6 @@
 import { ButtonHTMLAttributes } from 'react';
 
-type ButtonVariant = 'default' | 'outline' | 'ghost';
+type ButtonVariant = 'default' | 'outline' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'icon';
 
 export default function Button(
@@ -30,6 +30,8 @@ export default function Button(
 			'border border-outline-variant bg-transparent text-on-surface-variant hover:border-primary-fixed-dim/40 hover:bg-surface-variant/60 hover:text-primary',
 		ghost:
 			'bg-transparent text-on-surface-variant hover:bg-surface-variant/50 hover:text-primary',
+		danger:
+			'border border-error bg-transparent text-error hover:bg-error-container/20 focus:ring-error/30',
 	};
 
 	const sizeClasses: Record<ButtonSize, string> = {

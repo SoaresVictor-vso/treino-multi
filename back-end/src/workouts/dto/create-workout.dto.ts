@@ -3,12 +3,21 @@ import {
 	IsArray,
 	IsBoolean,
 	IsDateString,
+	IsInt,
+	IsEnum,
 	IsOptional,
 	IsString,
 	MaxLength,
+	Min,
 	ValidateNested,
 } from 'class-validator';
 import { ActivityDto } from '../../workout-templates/dto/activity.dto';
+import { ExecutionSetType } from '../../common/enums/execution-set-type.enum';
+
+class WorkoutActivityDto extends ActivityDto {
+	@IsEnum(ExecutionSetType)
+	setType!: ExecutionSetType;
+}
 
 export class CreateWorkoutDto {
 	@IsOptional()
@@ -23,16 +32,35 @@ export class CreateWorkoutDto {
 
 	@IsOptional()
 	@IsDateString()
-	scheduledDate?: string;
+	scheduledDate?: string | null;
 
 	/** Cria o treino diretamente em execução; permitido apenas ao próprio atleta. */
 	@IsOptional()
 	@IsBoolean()
 	startImmediately?: boolean;
 
+	/** Registra como concluído um treino realizado em data passada. */
+	@IsOptional()
+	@IsBoolean()
+	recordAsCompleted?: boolean;
+
+	/** Instante local convertido pelo cliente para UTC, para registrar à meia-noite do atleta. */
+	@IsOptional()
+	@IsDateString()
+	performedAt?: string;
+
+	@IsOptional()
+	@IsInt()
+	@Min(1)
+	durationSeconds?: number;
+
+	@IsOptional()
+	@IsString()
+	clientTimeZone?: string;
+
 	@IsOptional()
 	@IsArray()
 	@ValidateNested({ each: true })
-	@Type(() => ActivityDto)
-	activities?: ActivityDto[];
+	@Type(() => WorkoutActivityDto)
+	activities?: WorkoutActivityDto[];
 }

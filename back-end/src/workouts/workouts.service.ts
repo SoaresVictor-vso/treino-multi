@@ -1,5 +1,6 @@
 import {
 	BadRequestException,
+	ConflictException,
 	ForbiddenException,
 	Injectable,
 	NotFoundException,
@@ -28,6 +29,9 @@ import { UpdateWorkoutExecutionsDto } from './dto/update-workout-executions.dto'
 import { Execution } from './entities/execution.entity';
 import { WorkoutExerciseNote } from './entities/workout-exercise-note.entity';
 import { Workout } from './entities/workout.entity';
+import { MeasurementsService } from '../measurements/measurements.service';
+import { Exercise } from '../exercises/entities/exercise.entity';
+import { predictedRmForExecution } from '../exercise-reviews/predicted-rm';
 
 export interface GenerateWorkoutFromTemplateInput {
 	template: WorkoutTemplate;
@@ -42,6 +46,8 @@ type WorkoutExecutionRow = {
 	templateName: string;
 	templateDescription: string;
 	scheduledDate: string | null;
+	performedAt: string | null;
+	workoutFinishedAt: string | null;
 	workoutStatus: WorkoutStatus;
 	canRead: boolean;
 	executionId: string | number | null;
@@ -55,6 +61,7 @@ type WorkoutExecutionRow = {
 	prescribedRestDuration: string | number | null;
 	performedMetric1: string | number | null;
 	performedMetric2: string | number | null;
+	predictedRm: string | number | null;
 	performedPse: string | number | null;
 	performedRestDuration: string | number | null;
 	performedNote: string | null;
@@ -79,6 +86,21 @@ type WorkoutExecutionRow = {
 	recordId: string | null;
 	recordValue: string | number | null;
 	recordMeasuredAt: string | null;
+	measurementResultId: string | null;
+	measurementId: string | null;
+	measurementValue: string | number | null;
+	measurementScore: string | number | null;
+	measurementKey: string | null;
+	measurementName: string | null;
+	measurementIcon: string | null;
+	measurementPresentation: WorkoutMeasurementPresentation | null;
+};
+
+type WorkoutMeasurementPresentation = {
+	containerClass: string;
+	iconClass: string;
+	valueClass: string;
+	labelClass: string;
 };
 
 type WorkoutActivityInput = {
@@ -89,6 +111,7 @@ type WorkoutActivityInput = {
 	type1: 'v';
 	type2?: 'p' | 'v' | null;
 	pse?: number | null;
+	setType?: ExecutionSetType;
 	restDuration?: number | null;
 	note?: string | null;
 };
@@ -155,6 +178,7 @@ export class WorkoutsService {
 		@InjectRepository(WorkoutTemplate)
 		private readonly templates: Repository<WorkoutTemplate>,
 		private readonly usersService: UsersService,
+		private readonly measurementsService: MeasurementsService,
 	) {}
 
 	async findMyWorkouts(actor: JwtPayload) {
@@ -460,6 +484,12 @@ export class WorkoutsService {
 								timeZone,
 								referenceMonth,
 							},
+						)
+						.orWhere(
+							'workout.status IN (:...unscheduledStatuses) AND workout.scheduled_date IS NULL',
+							{
+								unscheduledStatuses: [WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED],
+							},
 						),
 				),
 			)
@@ -521,6 +551,8 @@ export class WorkoutsService {
 				workout.template_description AS "templateDescription",
 				workout.scheduled_date AS "scheduledDate",
 				workout.performed_at AS "performedAt",
+				workout.finished_at AS "workoutFinishedAt",
+				workout.performed_at AS "performedAt",
 				workout.status AS status
 			FROM workouts workout
 			LEFT JOIN athlete_trainer_associations association
@@ -569,6 +601,8 @@ export class WorkoutsService {
 				workout.template_name AS "templateName",
 				workout.template_description AS "templateDescription",
 				workout.scheduled_date AS "scheduledDate",
+				workout.performed_at AS "performedAt",
+				workout.finished_at AS "workoutFinishedAt",
 				workout.status AS "workoutStatus",
 				(
 					workout.athlete_id = $2
@@ -596,6 +630,7 @@ export class WorkoutsService {
 				execution.prescribed_rest_duration AS "prescribedRestDuration",
 				execution.performed_metric_1 AS "performedMetric1",
 				execution.performed_metric_2 AS "performedMetric2",
+				execution.predicted_rm AS "predictedRm",
 				execution.performed_pse AS "performedPse",
 				execution.performed_rest_duration AS "performedRestDuration",
 				execution.performed_note AS "performedNote",
@@ -604,6 +639,14 @@ export class WorkoutsService {
 				workout_exercise_note.note AS "note",
 				workout_exercise_note.athlete_note AS "athleteNote",
 				execution.status AS "executionStatus",
+				workout_measurement.id AS "measurementResultId",
+				workout_measurement.measurement_id AS "measurementId",
+				workout_measurement.value AS "measurementValue",
+				workout_measurement.score AS "measurementScore",
+				workout_measurement.snapshot->>'key' AS "measurementKey",
+				workout_measurement.snapshot->>'name' AS "measurementName",
+				workout_measurement.snapshot->>'icon' AS "measurementIcon",
+				workout_measurement.snapshot->'presentation' AS "measurementPresentation",
 				exercise.id AS "exerciseIdReference",
 				exercise.name AS "exerciseName",
 				exercise.description AS "exerciseDescription",
@@ -625,6 +668,8 @@ export class WorkoutsService {
 			LEFT JOIN workout_exercise_notes workout_exercise_note
 				ON workout_exercise_note.workout_id = workout.id
 				AND workout_exercise_note.exercise_id = execution.exercise_id
+			LEFT JOIN workout_measurements workout_measurement
+				ON workout_measurement.workout_id = workout.id
 			LEFT JOIN exercises exercise ON exercise.id = execution.exercise_id
 			LEFT JOIN metrics metric_1 ON metric_1.id = exercise.metric_1_id
 			LEFT JOIN metrics metric_2 ON metric_2.id = exercise.metric_2_id
@@ -633,14 +678,39 @@ export class WorkoutsService {
 				FROM exercise_group_exercises membership
 				WHERE membership.exercise_id = execution.exercise_id
 					AND membership.deleted_at IS NULL
+					AND EXISTS (
+						SELECT 1
+						FROM exercise_groups exercise_group
+						WHERE exercise_group.id = membership.exercise_group_id
+							AND exercise_group.tenant_id = workout.tenant_id
+							AND exercise_group.deleted_at IS NULL
+					)
 				ORDER BY membership.id
 				LIMIT 1
 			) membership ON true
 			LEFT JOIN exercise_groups exercise_group ON exercise_group.id = membership.exercise_group_id
 				AND exercise_group.deleted_at IS NULL
-			LEFT JOIN personal_records group_record ON group_record.athlete_id = workout.athlete_id
-				AND group_record.exercise_group_id = exercise_group.id
-				AND group_record.deleted_at IS NULL
+			LEFT JOIN LATERAL (
+				SELECT record.*
+				FROM personal_records record
+				WHERE record.athlete_id = workout.athlete_id
+					AND record.deleted_at IS NULL
+					AND record.exercise_group_id IN (
+						SELECT membership.exercise_group_id
+						FROM exercise_group_exercises membership
+						WHERE membership.exercise_id = execution.exercise_id
+							AND membership.deleted_at IS NULL
+							AND EXISTS (
+								SELECT 1
+								FROM exercise_groups exercise_group
+								WHERE exercise_group.id = membership.exercise_group_id
+									AND exercise_group.tenant_id = workout.tenant_id
+									AND exercise_group.deleted_at IS NULL
+							)
+					)
+				ORDER BY record.measured_at DESC, record.updated_at DESC
+				LIMIT 1
+			) group_record ON TRUE
 			LEFT JOIN personal_records exercise_record ON exercise_record.athlete_id = workout.athlete_id
 				AND exercise_record.exercise_id = execution.exercise_id
 				AND exercise_record.exercise_group_id IS NULL
@@ -660,79 +730,119 @@ export class WorkoutsService {
 		if (!rows[0].canRead)
 			throw new ForbiddenException('Você não pode visualizar este treino.');
 		const workout = rows[0];
+		let measurements = Array.from(
+			new Map(
+				rows
+					.filter(
+						(row) =>
+							workout.workoutStatus === WorkoutStatus.COMPLETED &&
+							row.measurementResultId !== null,
+					)
+					.map((row) => [
+						row.measurementResultId!,
+						{
+							id: row.measurementResultId!,
+							measurementId: row.measurementId!,
+							value: Number(row.measurementValue),
+							score: Number(row.measurementScore),
+							key: row.measurementKey!,
+							name: row.measurementName!,
+							icon: row.measurementIcon!,
+							presentation: row.measurementPresentation!,
+						},
+					]),
+			).values(),
+		);
+		if (workout.workoutStatus === WorkoutStatus.COMPLETED && !measurements.length) {
+			await this.dataSource.transaction(async (manager) => {
+				// Evita que duas revisões abertas simultaneamente gerem o mesmo snapshot.
+				await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [id]);
+				if (!(await this.measurementsService.findForWorkout(id)).length)
+					await this.measurementsService.persistForWorkout(manager, id);
+			});
+			measurements = await this.measurementsService.findForWorkout(id);
+		}
 		return {
 			id: workout.workoutId,
 			athleteId: workout.athleteId,
 			templateName: workout.templateName,
 			templateDescription: workout.templateDescription,
 			scheduledDate: workout.scheduledDate,
+			performedAt: workout.performedAt,
+			finishedAt: workout.workoutFinishedAt,
 			status: workout.workoutStatus,
-			executions: rows
-				.filter((row) => row.executionId !== null)
-				.map((execution) => ({
-					id: Number(execution.executionId),
-					exerciseId: Number(execution.exerciseId),
-					position: Number(execution.position),
-					prescribedMetric1: numberOrNull(execution.prescribedMetric1),
-					prescribedMetric2:
-						execution.metric2Type === 'p' &&
-						execution.recordId !== null &&
-						execution.prescribedMetric2 !== null
-							? (Number(execution.prescribedMetric2) * Number(execution.recordValue)) /
-								100
-							: numberOrNull(execution.prescribedMetric2),
-					metric1Type: execution.metric1Type,
-					metric2Type:
-						execution.metric2Type === 'p' && execution.recordId !== null
-							? 'v'
-							: execution.metric2Type,
-					prescribedPse: numberOrNull(execution.prescribedPse),
-					prescribedRestDuration: numberOrNull(execution.prescribedRestDuration),
-					performedMetric1: numberOrNull(execution.performedMetric1),
-					performedMetric2: numberOrNull(execution.performedMetric2),
-					performedPse: numberOrNull(execution.performedPse),
-					performedRestDuration: numberOrNull(execution.performedRestDuration),
-					performedNote: execution.performedNote,
-					setType: execution.setType,
-					finishedAt: execution.finishedAt,
-					status: execution.executionStatus,
-					exercise: {
-						id: Number(execution.exerciseIdReference),
-						name: execution.exerciseName,
-						description: execution.exerciseDescription,
-						metric_1: {
-							id: Number(execution.metric1Id),
-							name: execution.metric1Name,
-							symbol: execution.metric1Symbol,
-							fieldType: execution.metric1FieldType,
-						},
-						...(execution.metric2Id === null
-							? {}
-							: {
-									metric_2: {
-										id: Number(execution.metric2Id),
-										name: execution.metric2Name!,
-										symbol: execution.metric2Symbol!,
-										fieldType: execution.metric2FieldType!,
-									},
-								}),
+			measurements,
+			executions: Array.from(
+				new Map(
+					rows
+						.filter((row) => row.executionId !== null)
+						.map((row) => [row.executionId!, row]),
+				).values(),
+			).map((execution) => ({
+				id: Number(execution.executionId),
+				exerciseId: Number(execution.exerciseId),
+				position: Number(execution.position),
+				prescribedMetric1: numberOrNull(execution.prescribedMetric1),
+				prescribedMetric2:
+					execution.metric2Type === 'p' &&
+					execution.recordId !== null &&
+					execution.prescribedMetric2 !== null
+						? (Number(execution.prescribedMetric2) * Number(execution.recordValue)) /
+							100
+						: numberOrNull(execution.prescribedMetric2),
+				metric1Type: execution.metric1Type,
+				metric2Type:
+					execution.metric2Type === 'p' && execution.recordId !== null
+						? 'v'
+						: execution.metric2Type,
+				prescribedPse: numberOrNull(execution.prescribedPse),
+				prescribedRestDuration: numberOrNull(execution.prescribedRestDuration),
+				performedMetric1: numberOrNull(execution.performedMetric1),
+				performedMetric2: numberOrNull(execution.performedMetric2),
+				predictedRm: numberOrNull(execution.predictedRm),
+				performedPse: numberOrNull(execution.performedPse),
+				performedRestDuration: numberOrNull(execution.performedRestDuration),
+				performedNote: execution.performedNote,
+				setType: execution.setType,
+				finishedAt: execution.finishedAt,
+				status: execution.executionStatus,
+				exercise: {
+					id: Number(execution.exerciseIdReference),
+					name: execution.exerciseName,
+					description: execution.exerciseDescription,
+					metric_1: {
+						id: Number(execution.metric1Id),
+						name: execution.metric1Name,
+						symbol: execution.metric1Symbol,
+						fieldType: execution.metric1FieldType,
 					},
-					referencePersonalRecord:
-						execution.metric2Type === 'p' && execution.recordId
-							? {
-									id: execution.recordId,
-									value: Number(execution.recordValue),
-									measuredAt: execution.recordMeasuredAt!,
-								}
-							: null,
-					referenceGroup:
-						execution.referenceGroupId === null
-							? null
-							: {
-									id: Number(execution.referenceGroupId),
-									name: execution.referenceGroupName!,
+					...(execution.metric2Id === null
+						? {}
+						: {
+								metric_2: {
+									id: Number(execution.metric2Id),
+									name: execution.metric2Name!,
+									symbol: execution.metric2Symbol!,
+									fieldType: execution.metric2FieldType!,
 								},
-				})),
+							}),
+				},
+				referencePersonalRecord:
+					execution.metric2Type === 'p' && execution.recordId
+						? {
+								id: execution.recordId,
+								value: Number(execution.recordValue),
+								measuredAt: execution.recordMeasuredAt!,
+							}
+						: null,
+				referenceGroup:
+					execution.referenceGroupId === null
+						? null
+						: {
+								id: Number(execution.referenceGroupId),
+								name: execution.referenceGroupName!,
+							},
+			})),
 			exerciseNotes: Array.from(
 				new Map(
 					rows
@@ -761,9 +871,10 @@ export class WorkoutsService {
 			await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
 				workout.athleteId,
 			]);
-			const missingPersonalRecords = await manager.query(
-				`SELECT 1
+			const missingPersonalRecords: { name: string }[] = await manager.query(
+				`SELECT DISTINCT exercise.name AS name
 				FROM executions execution
+				INNER JOIN exercises exercise ON exercise.id = execution.exercise_id
 				WHERE execution.workout_id = $1
 					AND execution.metric2_type = 'p'
 					AND NOT EXISTS (
@@ -773,22 +884,27 @@ export class WorkoutsService {
 							AND record.deleted_at IS NULL
 							AND (
 								record.exercise_id = execution.exercise_id
-								OR record.exercise_group_id = (
+								OR record.exercise_group_id IN (
 									SELECT membership.exercise_group_id
 									FROM exercise_group_exercises membership
 									WHERE membership.exercise_id = execution.exercise_id
 										AND membership.deleted_at IS NULL
-									ORDER BY membership.id
-									LIMIT 1
+										AND EXISTS (
+											SELECT 1
+											FROM exercise_groups exercise_group
+											WHERE exercise_group.id = membership.exercise_group_id
+												AND exercise_group.tenant_id = $3
+												AND exercise_group.deleted_at IS NULL
+										)
 								)
 							)
 					)
-					LIMIT 1`,
-				[id, workout.athleteId],
+				ORDER BY name`,
+				[id, workout.athleteId, workout.tenantId],
 			);
 			if (missingPersonalRecords?.length)
 				throw new BadRequestException(
-					'Cadastre os RPs necessários antes de iniciar o treino.',
+					`Cadastre os RPs necessários antes de iniciar o treino: ${missingPersonalRecords.map((record) => record.name).join(', ')}.`,
 				);
 			const hasWorkoutInProgress = await manager.getRepository(Workout).existsBy({
 				athleteId: workout.athleteId,
@@ -802,15 +918,7 @@ export class WorkoutsService {
 			workout.performedAt = new Date();
 			workout.updatedBy = actor.sub;
 			await manager.save(workout);
-			await manager
-				.createQueryBuilder()
-				.update(Execution)
-				.set({ status: ExecutionStatus.IN_PROGRESS, startedAt: new Date() })
-				.where('workout_id = :id AND status = :status', {
-					id,
-					status: ExecutionStatus.PENDING,
-				})
-				.execute();
+			await this.startPendingExecutions(manager, id, workout.performedAt);
 		});
 		return this.findWorkout(id, actor);
 	}
@@ -834,8 +942,6 @@ export class WorkoutsService {
 			const currentIdSet = new Set(current.map((execution) => execution.id));
 			if (deletedIds.some((executionId) => !currentIdSet.has(executionId)))
 				throw new BadRequestException('Série removida não pertence a este treino.');
-			if (deletedIds.length)
-				await manager.delete(Execution, { workoutId: id, id: In(deletedIds) });
 			const activeCurrent = current.filter(
 				(execution) => !deletedIds.includes(execution.id),
 			);
@@ -846,9 +952,13 @@ export class WorkoutsService {
 				throw new BadRequestException('Uma série só pode ser enviada uma vez.');
 			const submittedIdSet = new Set(submittedIds);
 			if (activeCurrent.some((execution) => !submittedIdSet.has(execution.id)))
-				throw new BadRequestException(
-					'Todas as séries existentes devem ser enviadas para preservar a ordem.',
-				);
+				throw new ConflictException({
+					message:
+						'Todas as séries existentes devem ser enviadas para preservar a ordem.',
+					currentState: await this.findWorkout(id, actor),
+				});
+			if (deletedIds.length)
+				await manager.delete(Execution, { workoutId: id, id: In(deletedIds) });
 			if (activeCurrent.length) {
 				const temporaryPositionOffset =
 					Math.max(...activeCurrent.map((execution) => execution.position)) +
@@ -876,21 +986,45 @@ export class WorkoutsService {
 						position: input.position,
 						metric1Type: 'v',
 						metric2Type: null,
-						status: ExecutionStatus.IN_PROGRESS,
-						startedAt: new Date(),
+						status: ExecutionStatus.PENDING,
+						startedAt: null,
 					});
 				const previousStatus = entity.status;
 				Object.assign(entity, input);
 				if (
+					entity.status === ExecutionStatus.COMPLETED &&
+					(entity.performedPse === null || entity.performedPse === undefined)
+				)
+					entity.performedPse = entity.prescribedPse;
+				if (
 					entity.status === ExecutionStatus.COMPLETED ||
 					entity.status === ExecutionStatus.SKIPPED
 				) {
+					if (!entity.startedAt) {
+						const previous = current
+							.filter((item) => item.position < entity.position && item.finishedAt)
+							.toSorted((left, right) => right.position - left.position)[0];
+						entity.startedAt = previous?.finishedAt ?? workout.performedAt ?? new Date();
+					}
 					if (previousStatus !== entity.status || !entity.finishedAt)
 						entity.finishedAt = new Date();
 				} else if (entity.status === ExecutionStatus.IN_PROGRESS)
 					entity.finishedAt = null;
+				const exercise = await manager.findOne(Exercise, {
+					where: { id: entity.exerciseId },
+					relations: { metric1: true, metric2: true },
+				});
+				if (!exercise) throw new BadRequestException('Exercício não encontrado.');
+				entity.predictedRm = predictedRmForExecution({
+					metric1Name: exercise.metric1.name,
+					metric2Name: exercise.metric2?.name,
+					metric1: entity.performedMetric1,
+					metric2: entity.performedMetric2,
+					completed: entity.status === ExecutionStatus.COMPLETED,
+				});
 				await manager.save(entity);
 			}
+			await this.startPendingExecutions(manager, id);
 			if (dto.exerciseNotes?.length) {
 				const currentNotes = await manager.find(WorkoutExerciseNote, {
 					where: { workoutId: id },
@@ -947,9 +1081,14 @@ export class WorkoutsService {
 			throw new BadRequestException(
 				'Conclua ou pule todas as séries antes de finalizar o treino.',
 			);
-		workout.status = WorkoutStatus.COMPLETED;
-		workout.updatedBy = actor.sub;
-		await this.dataSource.getRepository(Workout).save(workout);
+		await this.dataSource.transaction(async (manager) => {
+			const finishedAt = new Date();
+			workout.status = WorkoutStatus.COMPLETED;
+			workout.finishedAt = finishedAt;
+			workout.updatedBy = actor.sub;
+			await manager.save(workout);
+			await this.measurementsService.persistForWorkout(manager, id);
+		});
 		return this.findWorkout(id, actor);
 	}
 
@@ -974,8 +1113,10 @@ export class WorkoutsService {
 				.execute();
 			workout.status = WorkoutStatus.CANCELLED;
 			workout.performedAt = finishedAt;
+			workout.finishedAt = finishedAt;
 			workout.updatedBy = actor.sub;
 			await manager.save(workout);
+			await this.measurementsService.persistForWorkout(manager, id);
 		});
 		return this.findWorkout(id, actor);
 	}
@@ -1046,15 +1187,87 @@ export class WorkoutsService {
 			);
 
 		const startImmediately = dto.startImmediately === true;
+		const recordAsCompleted = dto.recordAsCompleted === true;
+		const timeZone = dto.clientTimeZone || 'UTC';
+		let dateFormatter: Intl.DateTimeFormat;
+		try {
+			dateFormatter = new Intl.DateTimeFormat('en-GB', {
+				timeZone,
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit',
+				hour: '2-digit',
+				minute: '2-digit',
+				second: '2-digit',
+				hourCycle: 'h23',
+			});
+		} catch {
+			throw new BadRequestException('Fuso horário inválido.');
+		}
+		const localParts = (date: Date) =>
+			Object.fromEntries(
+				dateFormatter.formatToParts(date).map(({ type, value }) => [type, value]),
+			);
+		const nowParts = localParts(new Date());
+		const today = `${nowParts.year}-${nowParts.month}-${nowParts.day}`;
+		if (dto.scheduledDate && dto.scheduledDate < today && !recordAsCompleted)
+			throw new BadRequestException(
+				'Datas passadas só podem ser usadas ao registrar um treino realizado.',
+			);
+		const recordedAt = dto.performedAt ? new Date(dto.performedAt) : null;
+		const performedParts =
+			recordedAt && !Number.isNaN(recordedAt.getTime())
+				? localParts(recordedAt)
+				: null;
+		if (
+			recordAsCompleted &&
+			(!dto.scheduledDate ||
+				!recordedAt ||
+				Number.isNaN(recordedAt.getTime()) ||
+				dto.scheduledDate >= today ||
+				recordedAt.getTime() >= Date.now() ||
+				recordedAt.getUTCMilliseconds() !== 0 ||
+				`${performedParts?.year}-${performedParts?.month}-${performedParts?.day}` !==
+					dto.scheduledDate ||
+				performedParts?.hour !== '00' ||
+				performedParts?.minute !== '00' ||
+				performedParts?.second !== '00')
+		)
+			throw new BadRequestException(
+				'Informe uma data e hora passadas para registrar o treino realizado.',
+			);
+		if (recordAsCompleted && startImmediately)
+			throw new BadRequestException(
+				'Um treino realizado não pode ser iniciado novamente.',
+			);
 		const activities = (dto.activities ?? []).map((activity, index) => ({
 			...activity,
 			position: index + 1,
 			type1: 'v' as const,
 			type2: activity.type2 ?? 'v',
+			setType: activity.setType ?? ExecutionSetType.PADRAO,
 		}));
+		if (recordAsCompleted && activities.length === 0)
+			throw new BadRequestException(
+				'Adicione ao menos uma série para registrar um treino realizado.',
+			);
+		if (recordAsCompleted && activities.some((activity) => activity.type2 === 'p'))
+			throw new BadRequestException(
+				'Informe as métricas realizadas em valores absolutos, sem porcentagem.',
+			);
+		if (
+			recordAsCompleted &&
+			(!Number.isInteger(dto.durationSeconds) || dto.durationSeconds! < 1)
+		)
+			throw new BadRequestException(
+				'Informe uma duração válida para o treino realizado.',
+			);
 		const athlete = await this.usersService.findOne(actor.sub);
 		const defaultName = this.getDefaultWorkoutName(athlete.person.name);
 		const workout = await this.dataSource.transaction(async (manager) => {
+			const performedAt = recordAsCompleted
+				? recordedAt
+				: startImmediately ? new Date() : null;
 			const created = await manager.save(
 				Workout,
 				manager.create(Workout, {
@@ -1063,21 +1276,47 @@ export class WorkoutsService {
 					workoutTemplateId: null,
 					templateName: dto.name?.trim() || defaultName,
 					templateDescription: dto.description?.trim() ?? '',
-					scheduledDate: null,
-					performedAt: startImmediately ? new Date() : null,
-					status: startImmediately
-						? WorkoutStatus.IN_PROGRESS
-						: WorkoutStatus.PENDING,
+					scheduledDate: dto.scheduledDate ?? null,
+					performedAt,
+					finishedAt:
+						recordAsCompleted && performedAt
+							? new Date(performedAt.getTime() + dto.durationSeconds! * 1000)
+							: null,
+					excludeFromAchievements: recordAsCompleted,
+					status: recordAsCompleted
+						? WorkoutStatus.COMPLETED
+						: startImmediately
+							? WorkoutStatus.IN_PROGRESS
+						: dto.scheduledDate
+							? WorkoutStatus.SCHEDULED
+							: WorkoutStatus.PENDING,
 					createdBy: actor.sub,
 					updatedBy: actor.sub,
 				}),
 			);
-			await manager.save(
-				Execution,
-				activities.map((activity) =>
-					this.createExecution(manager, created.id, activity),
-				),
-			);
+			const executions = activities.map((activity) => {
+				const execution = this.createExecution(manager, created.id, activity);
+				if (recordAsCompleted && performedAt) {
+					execution.prescribedMetric1 = null;
+					execution.prescribedMetric2 = null;
+					execution.prescribedPse = null;
+					execution.prescribedRestDuration = null;
+					execution.metric2Type = null;
+					execution.status = ExecutionStatus.COMPLETED;
+					execution.performedMetric1 = activity.metric1 ?? null;
+					execution.performedMetric2 = activity.metric2 ?? null;
+					execution.performedPse = activity.pse ?? null;
+					execution.performedRestDuration = activity.restDuration ?? null;
+					execution.startedAt = performedAt;
+					execution.finishedAt = performedAt;
+				}
+				return execution;
+			});
+			await manager.save(Execution, executions);
+			if (recordAsCompleted)
+				await this.measurementsService.persistForWorkout(manager, created.id);
+			if (startImmediately && performedAt)
+				await this.startPendingExecutions(manager, created.id, performedAt);
 			const notes = this.createExerciseNotes(
 				manager,
 				created.id,
@@ -1096,9 +1335,11 @@ export class WorkoutsService {
 		const normalizedName = name.trim();
 		if (!normalizedName)
 			throw new BadRequestException('Informe o nome do treino.');
-		if (workout.status === WorkoutStatus.CANCELLED)
+		if (
+			[WorkoutStatus.COMPLETED, WorkoutStatus.CANCELLED].includes(workout.status)
+		)
 			throw new BadRequestException(
-				'Treinos cancelados não podem ser renomeados.',
+				'Treinos finalizados ou cancelados não podem ser renomeados.',
 			);
 
 		workout.templateName = normalizedName;
@@ -1167,9 +1408,11 @@ export class WorkoutsService {
 			await manager.delete(Execution, { workoutId: workout.id });
 			workout.templateName = dto.name!.trim();
 			workout.templateDescription = dto.description?.trim() ?? '';
-			if (dto.scheduledDate) {
-				workout.scheduledDate = dto.scheduledDate;
-				workout.status = WorkoutStatus.SCHEDULED;
+			if (dto.scheduledDate !== undefined) {
+				workout.scheduledDate = dto.scheduledDate ?? null;
+				workout.status = dto.scheduledDate
+					? WorkoutStatus.SCHEDULED
+					: WorkoutStatus.PENDING;
 			}
 			workout.updatedBy = actor.sub;
 			await manager.save(workout);
@@ -1178,6 +1421,7 @@ export class WorkoutsService {
 				position: index + 1,
 				type1: 'v' as const,
 				type2: activity.type2 ?? 'v',
+				setType: activity.setType,
 			}));
 			await manager.save(
 				Execution,
@@ -1201,15 +1445,41 @@ export class WorkoutsService {
 			.getRepository(Workout)
 			.findOne({ where: { id } });
 		if (!workout) throw new NotFoundException('Treino não encontrado.');
-		await this.ensureCanManageAthleteWorkout(workout.athleteId, actor);
+		if (actor.sub !== workout.athleteId)
+			await this.ensureCanManageAthleteWorkout(workout.athleteId, actor);
 		if (
 			![WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED].includes(workout.status)
 		)
 			throw new BadRequestException(
 				'Apenas treinos pendentes ou agendados podem ser cancelados.',
 			);
+		const scheduledDate = workout.scheduledDate;
 		workout.status = WorkoutStatus.CANCELLED;
-		workout.performedAt = new Date();
+		workout.performedAt = scheduledDate
+			? new Date(`${scheduledDate}T12:00:00.000Z`)
+			: null;
+		workout.updatedBy = actor.sub;
+		await this.dataSource.getRepository(Workout).save(workout);
+		return this.findWorkout(id, actor);
+	}
+
+	async rescheduleWorkout(id: string, scheduledDate: string, actor: JwtPayload) {
+		const workout = await this.dataSource
+			.getRepository(Workout)
+			.findOne({ where: { id } });
+		if (!workout) throw new NotFoundException('Treino não encontrado.');
+		if (actor.sub !== workout.athleteId)
+			throw new ForbiddenException(
+				'Somente o atleta deste treino pode reagendá-lo.',
+			);
+		if (
+			![WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED].includes(workout.status)
+		)
+			throw new BadRequestException(
+				'Apenas treinos pendentes ou agendados podem ser reagendados.',
+			);
+		workout.scheduledDate = scheduledDate;
+		workout.status = WorkoutStatus.SCHEDULED;
 		workout.updatedBy = actor.sub;
 		await this.dataSource.getRepository(Workout).save(workout);
 		return this.findWorkout(id, actor);
@@ -1226,6 +1496,7 @@ export class WorkoutsService {
 			position: index + 1,
 			type1: 'v' as const,
 			type2: activity.type2 ?? 'v',
+			setType: activity.setType ?? ExecutionSetType.PADRAO,
 		}));
 		return this.dataSource.transaction(async (manager) => {
 			const workout = await manager.save(
@@ -1325,7 +1596,7 @@ export class WorkoutsService {
 					templateName: template.name,
 					templateDescription: template.description,
 					scheduledDate,
-					performedAt: undefined,
+					performedAt: null,
 					status: scheduledDate ? WorkoutStatus.SCHEDULED : WorkoutStatus.PENDING,
 					createdBy: input.createdBy,
 					updatedBy: input.createdBy,
@@ -1409,11 +1680,27 @@ export class WorkoutsService {
 			performedPse: null,
 			performedRestDuration: null,
 			performedNote: null,
-			setType: ExecutionSetType.PADRAO,
+			setType: activity.setType ?? ExecutionSetType.PADRAO,
 			status: ExecutionStatus.PENDING,
 			startedAt: null,
 			finishedAt: null,
 		});
+	}
+
+	private async startPendingExecutions(
+		manager: EntityManager,
+		workoutId: string,
+		startedAt = new Date(),
+	): Promise<void> {
+		await manager
+			.createQueryBuilder()
+			.update(Execution)
+			.set({ status: ExecutionStatus.IN_PROGRESS, startedAt })
+			.where('workout_id = :workoutId AND status = :status', {
+				workoutId,
+				status: ExecutionStatus.PENDING,
+			})
+			.execute();
 	}
 
 	private createExerciseNotes(

@@ -9,6 +9,7 @@ export type ExecutionStatus =
 	| 'skipped';
 export type WorkoutStatus = ExecutionStatus | 'scheduled' | 'cancelled';
 export type ExecutionSetType = 'padrao' | 'aquecimento' | 'dropset' | 'falha';
+export type TrainingActivity = Activity & { setType: ExecutionSetType };
 
 export type WorkoutExecution = {
 	id: number;
@@ -22,6 +23,7 @@ export type WorkoutExecution = {
 	prescribedRestDuration: number | null;
 	performedMetric1: number | null;
 	performedMetric2: number | null;
+	predictedRm?: number | null;
 	performedPse: number | null;
 	performedRestDuration: number | null;
 	performedNote: string | null;
@@ -50,9 +52,29 @@ export type WorkoutDetail = {
 	templateName: string;
 	templateDescription: string;
 	scheduledDate: string | null;
+	performedAt: string | null;
+	finishedAt: string | null;
 	status: WorkoutStatus;
 	executions: WorkoutExecution[];
 	exerciseNotes: WorkoutExerciseNote[];
+	measurements: WorkoutMeasurement[];
+};
+
+export type WorkoutMeasurement = {
+	id: string;
+	measurementId: string;
+	value: number;
+	/** Internal ranking value; intentionally never rendered. */
+	score: number;
+	key: string;
+	name: string;
+	icon: string;
+	presentation: {
+		containerClass: string;
+		iconClass: string;
+		valueClass: string;
+		labelClass: string;
+	};
 };
 
 export type MyWorkout = {
@@ -61,30 +83,6 @@ export type MyWorkout = {
 	templateDescription: string;
 	scheduledDate: string | null;
 	status: 'pending' | 'scheduled' | 'in_progress';
-};
-
-export type CompletedWorkout = Omit<MyWorkout, 'status'> & {
-	status: 'completed';
-	performedAt: string | null;
-};
-
-export type CompletedWorkoutsPage = {
-	workouts: CompletedWorkout[];
-	total: number;
-	nextCursor: string | null;
-};
-
-export type AgendaWorkoutsPage = {
-	workouts: MyWorkout[];
-	total: number;
-	inProgress: MyWorkout | null;
-	nextCursor: string | null;
-};
-
-export type CompletedWorkoutsCalendar = {
-	period: 'week' | 'month';
-	referenceDate: string;
-	workouts: CompletedWorkout[];
 };
 
 export type CalendarWorkout = {
@@ -117,9 +115,14 @@ export type GenerateWorkoutsFromTemplateResponse = { count: number };
 export type CreateMyWorkoutDto = {
 	name?: string;
 	description?: string;
-	activities?: Activity[];
-	scheduledDate?: string;
+	activities?: TrainingActivity[];
+	scheduledDate?: string | null;
 	startImmediately?: boolean;
+	/** Registra um treino já realizado em uma data anterior. */
+	recordAsCompleted?: boolean;
+	performedAt?: string;
+	durationSeconds?: number;
+	clientTimeZone?: string;
 };
 
 export type AthleteWorkout = {
@@ -144,30 +147,13 @@ export type UpdateWorkoutExecution = Omit<
 	| 'referencePersonalRecord'
 	| 'metric1Type'
 	| 'metric2Type'
+	| 'predictedRm'
 	| 'finishedAt'
 	| 'pendingRemoval'
 > & { id?: number };
 
 export const workoutsService = {
 	findMine: () => authenticatedRequest<MyWorkout[]>('workouts/me'),
-	findMyAgenda: (cursor?: string) =>
-		authenticatedRequest<AgendaWorkoutsPage>(
-			`workouts/me/agenda${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
-		),
-	findMyCompleted: (cursor?: string) =>
-		authenticatedRequest<CompletedWorkoutsPage>(
-			`workouts/me/completed${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
-		),
-	findMyCompletedForCalendar: (
-		period: 'week' | 'month',
-		date?: string,
-	) => {
-		const params = new URLSearchParams({ period });
-		if (date) params.set('date', date);
-		return authenticatedRequest<CompletedWorkoutsCalendar>(
-			`workouts/me/completed/calendar?${params.toString()}`,
-		);
-	},
 	findMyCalendar: (date: string, timeZone: string) => {
 		const params = new URLSearchParams({ date, timeZone });
 		return authenticatedRequest<WorkoutsCalendar>(
@@ -236,5 +222,10 @@ export const workoutsService = {
 	cancel: (id: string) =>
 		authenticatedRequest<WorkoutDetail>(`workouts/${id}/cancel`, {
 			method: 'PATCH',
+		}),
+	reschedule: (id: string, scheduledDate: string) =>
+		authenticatedRequest<WorkoutDetail>(`workouts/${id}/schedule`, {
+			method: 'PATCH',
+			body: JSON.stringify({ scheduledDate }),
 		}),
 };

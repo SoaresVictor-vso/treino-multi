@@ -152,6 +152,33 @@ describe('WorkoutsService', () => {
 		);
 	});
 
+	it('cria um treino próprio agendado com a data informada', async () => {
+		Object.assign((service as any).usersService, {
+			findOne: jest.fn().mockResolvedValue({ person: { name: 'Atleta' } }),
+		});
+		manager.save.mockResolvedValueOnce({ id: 'workout-id' });
+		jest
+			.spyOn(service, 'findWorkout')
+			.mockResolvedValue({ id: 'workout-id' } as never);
+
+		await service.createMyWorkout(
+			{ scheduledDate: '2026-08-10' },
+			{
+				sub: input.athleteId,
+				tenantId: input.template.tenantId,
+				roles: [Role.TENANT_CLIENT],
+			},
+		);
+
+		expect(manager.save).toHaveBeenCalledWith(
+			Workout,
+			expect.objectContaining({
+				scheduledDate: '2026-08-10',
+				status: WorkoutStatus.SCHEDULED,
+			}),
+		);
+	});
+
 	it('inclui treinos pendentes e agendados na agenda do atleta', async () => {
 		dataSource.query.mockResolvedValueOnce([
 			{ workouts: [], total: '0', inProgress: null },
@@ -295,7 +322,7 @@ describe('WorkoutsService', () => {
 			query: jest
 				.fn()
 				.mockResolvedValueOnce(undefined)
-				.mockResolvedValueOnce([{ missing: true }]),
+				.mockResolvedValueOnce([{ name: 'SUPINO RETO' }]),
 			getRepository: jest.fn().mockReturnValue(workoutRepository),
 		});
 		jest.spyOn(service as any, 'findWritableWorkout').mockResolvedValue(workout);
@@ -306,7 +333,9 @@ describe('WorkoutsService', () => {
 				tenantId: input.template.tenantId,
 				roles: [Role.TENANT_CLIENT],
 			}),
-		).rejects.toThrow('Cadastre os RPs necessários antes de iniciar o treino.');
+		).rejects.toThrow(
+			'Cadastre os RPs necessários antes de iniciar o treino: SUPINO RETO.',
+		);
 
 		expect(workoutRepository.existsBy).not.toHaveBeenCalled();
 		expect(manager.save).not.toHaveBeenCalled();
@@ -397,6 +426,7 @@ describe('WorkoutsService', () => {
 			id: 'workout-id',
 			athleteId: input.athleteId,
 			status: WorkoutStatus.SCHEDULED,
+			scheduledDate: '2026-09-21',
 			performedAt: null,
 		} as Workout;
 		const repository = {
@@ -420,10 +450,10 @@ describe('WorkoutsService', () => {
 		});
 
 		expect(workout.status).toBe(WorkoutStatus.CANCELLED);
-		expect(workout.performedAt).toBeInstanceOf(Date);
+		expect(workout.performedAt).toEqual(new Date('2026-09-21T12:00:00.000Z'));
 		expect(repository.save).toHaveBeenCalledWith(
 			expect.objectContaining({
-				performedAt: expect.any(Date),
+				performedAt: new Date('2026-09-21T12:00:00.000Z'),
 				updatedBy: input.createdBy,
 			}),
 		);

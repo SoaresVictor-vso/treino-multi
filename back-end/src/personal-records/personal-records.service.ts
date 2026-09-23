@@ -36,11 +36,13 @@ export class PersonalRecordsService {
 		const exerciseId = dto.exerciseId ?? null;
 		this.ensureExactlyOneReference(exerciseGroupId, exerciseId);
 
-		const [group, exercise, athlete] = await Promise.all([
-			exerciseGroupId ? this.ensureGroup(exerciseGroupId) : null,
+		const [exercise, athlete] = await Promise.all([
 			exerciseId ? this.ensureExercise(exerciseId) : null,
 			this.findAthlete(dto.athleteId),
 		]);
+		const group = exerciseGroupId
+			? await this.ensureGroup(exerciseGroupId, athlete.tenantId)
+			: null;
 
 		if (actor.tenantId && actor.tenantId !== athlete.tenantId)
 			throw new ForbiddenException('O atleta não pertence ao seu tenant.');
@@ -74,11 +76,24 @@ export class PersonalRecordsService {
 	async findByAthlete(athleteId: string, actor: JwtPayload) {
 		const athlete = await this.findAthlete(athleteId);
 		await this.assertCanReadAthlete(athlete, actor);
-		return this.records.find({
-			where: { athleteId, deletedAt: IsNull() },
-			relations: ['exerciseGroup', 'exercise'],
-			order: { updatedAt: 'DESC' },
-		});
+		return this.records
+			.createQueryBuilder('record')
+			.leftJoinAndSelect('record.exerciseGroup', 'exerciseGroup')
+			.leftJoinAndSelect('record.exercise', 'exercise')
+			.where('record.athlete_id = :athleteId', { athleteId })
+			.andWhere('record.deleted_at IS NULL')
+			.andWhere(
+				`(
+					record.exercise_group_id IS NULL
+					OR (
+						exerciseGroup.tenant_id = :tenantId
+						AND exerciseGroup.deleted_at IS NULL
+					)
+				)`,
+				{ tenantId: athlete.tenantId },
+			)
+			.orderBy('record.updated_at', 'DESC')
+			.getMany();
 	}
 
 	async getLastByAthleteExercise(
@@ -86,6 +101,8 @@ export class PersonalRecordsService {
 		exerciseId?: number | null,
 		exerciseGroupId?: number | null,
 	): Promise<PersonalRecord | null> {
+		const athlete = await this.users.findOne({ where: { id: athleteId } });
+		if (!athlete) return null;
 		const normalizedExerciseId = exerciseId ?? null;
 		const normalizedExerciseGroupId = exerciseGroupId ?? null;
 		this.ensureExactlyOneReference(
@@ -94,24 +111,33 @@ export class PersonalRecordsService {
 		);
 		const order = { measuredAt: 'DESC' as const, updatedAt: 'DESC' as const };
 		if (normalizedExerciseGroupId) {
-			return this.records.findOne({
-				where: {
-					athleteId,
+			return this.records
+				.createQueryBuilder('record')
+				.innerJoin('record.exerciseGroup', 'exerciseGroup')
+				.where('record.athlete_id = :athleteId', { athleteId })
+				.andWhere('record.exercise_group_id = :exerciseGroupId', {
 					exerciseGroupId: normalizedExerciseGroupId,
-					deletedAt: IsNull(),
-				},
-				order,
-			});
+				})
+				.andWhere('record.deleted_at IS NULL')
+				.andWhere('exerciseGroup.tenant_id = :tenantId', {
+					tenantId: athlete.tenantId,
+				})
+				.andWhere('exerciseGroup.deleted_at IS NULL')
+				.orderBy('record.measured_at', order.measuredAt)
+				.addOrderBy('record.updated_at', order.updatedAt)
+				.getOne();
 		}
 		if (normalizedExerciseId === null) {
 			throw new BadRequestException(
 				'Informe exatamente um: exerciseGroupId ou exerciseId.',
 			);
 		}
+		if (athlete.tenantId === null) return null;
 		return this.records.findOne({
 			where: {
 				athleteId,
 				exerciseId: normalizedExerciseId,
+				tenantId: athlete.tenantId,
 				deletedAt: IsNull(),
 			},
 			order,
@@ -151,8 +177,13 @@ export class PersonalRecordsService {
 		await this.records.softRemove(record);
 	}
 
-	private async ensureGroup(groupId: number): Promise<ExerciseGroup> {
-		const group = await this.groups.findOne({ where: { id: groupId } });
+	private async ensureGroup(
+		groupId: number,
+		tenantId: string | null,
+	): Promise<ExerciseGroup> {
+		const group = await this.groups.findOne({
+			where: { id: groupId, ...(tenantId && { tenantId }) },
+		});
 		if (!group) {
 			throw new NotFoundException('Grupo de exercícios não encontrado.');
 		}

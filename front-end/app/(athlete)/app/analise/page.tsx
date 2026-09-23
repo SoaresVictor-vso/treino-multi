@@ -1,13 +1,8 @@
-import ComingSoon from '@/components/athlete-app/ComingSoon';
-import { RiBarChartBoxLine } from 'react-icons/ri';
+import AnalysisDashboard from '@/components/analysis/AnalysisDashboard';
+import { getServerSessionUser } from '@/lib/auth.server';
 
-export default function AnalisePage() {
-	return (
-		<ComingSoon
-			eyebrow="Dados que fazem sentido"
-			title="Sua análise está chegando"
-			description="Estamos preparando um painel para visualizar conquistas, registrar PRs e entender sua evolução sem ruído."
-			icon={RiBarChartBoxLine}
-		/>
-	);
+export default async function AnalisePage() {
+	const user = await getServerSessionUser();
+	if (!user) return null;
+	return <AnalysisDashboard athleteId={user.sub} />;
 }

@@ -48,6 +48,9 @@ export class Workout {
 	@Column({ name: 'performed_at', type: 'timestamptz', nullable: true })
 	performedAt!: Date | null;
 
+	@Column({ name: 'finished_at', type: 'timestamptz', nullable: true, default: () => 'CURRENT_TIMESTAMP' })
+	finishedAt!: Date | null;
+
 	@Column({
 		type: 'enum',
 		enum: WorkoutStatus,
@@ -55,6 +58,9 @@ export class Workout {
 		default: WorkoutStatus.SCHEDULED,
 	})
 	status!: WorkoutStatus;
+
+	@Column({ name: 'exclude_from_achievements', type: 'boolean', default: false })
+	excludeFromAchievements!: boolean;
 
 	@Column({ name: 'created_by', type: 'uuid' })
 	createdBy!: string;

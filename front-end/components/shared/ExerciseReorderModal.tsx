@@ -21,10 +21,16 @@ export default function ExerciseReorderModal({
 	const [orderedExercises, setOrderedExercises] = useState(exercises);
 	const [draggedId, setDraggedId] = useState<number | null>(null);
 	const draggedExerciseId = useRef<number | null>(null);
+	const lastPointerTargetId = useRef<number | null>(null);
+	const pointerDragActive = useRef(false);
 
 	useEffect(() => {
 		if (isOpen) setOrderedExercises(exercises);
-	}, [exercises, isOpen]);
+	// Parent components often build this array inline, giving it a new identity
+	// on every render. Resetting on that identity change discards an in-progress
+	// reorder, so only take the source order when the modal opens.
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isOpen]);
 
 	const moveExercise = (draggedExerciseId: number, targetExerciseId: number) => {
 		if (draggedExerciseId === targetExerciseId) return;
@@ -40,6 +46,8 @@ export default function ExerciseReorderModal({
 	};
 	const endDrag = () => {
 		draggedExerciseId.current = null;
+		lastPointerTargetId.current = null;
+		pointerDragActive.current = false;
 		setDraggedId(null);
 	};
 
@@ -69,18 +77,29 @@ export default function ExerciseReorderModal({
 							endDrag();
 						}}
 						onDragEnd={endDrag}
-						onPointerDown={() => {
+						onPointerDown={(event) => {
+							if (event.pointerType === 'mouse') return;
+							pointerDragActive.current = true;
 							draggedExerciseId.current = exercise.id;
 							setDraggedId(exercise.id);
 						}}
 						onPointerMove={(event) => {
+							if (!pointerDragActive.current) return;
 							const sourceId = draggedExerciseId.current;
 							if (sourceId === null) return;
 							const target = document
 								.elementFromPoint(event.clientX, event.clientY)
 								?.closest<HTMLElement>('[data-exercise-id]');
 							const targetId = Number(target?.dataset.exerciseId);
-							if (targetId) moveExercise(sourceId, targetId);
+							if (!targetId) {
+								lastPointerTargetId.current = null;
+								return;
+							}
+							// The dragged row moves beneath a stationary pointer. Ignore
+							// repeated events over the same row to avoid undoing the move.
+							if (lastPointerTargetId.current === targetId) return;
+							lastPointerTargetId.current = targetId;
+							moveExercise(sourceId, targetId);
 						}}
 						onPointerUp={endDrag}
 						onPointerCancel={endDrag}

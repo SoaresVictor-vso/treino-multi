@@ -6,10 +6,12 @@ import { RiCloseLine } from 'react-icons/ri';
 
 type ModalProps = {
 	isOpen: boolean;
-	title: string;
+	title: React.ReactNode;
 	description?: string;
 	onClose: () => void;
 	children: React.ReactNode;
+	closeOnBackdrop?: boolean;
+	closeOnEscape?: boolean;
 };
 
 export default function Modal({
@@ -18,6 +20,8 @@ export default function Modal({
 	description,
 	onClose,
 	children,
+	closeOnBackdrop = true,
+	closeOnEscape = true,
 }: ModalProps) {
 	React.useEffect(() => {
 		if (!isOpen) return;
@@ -26,7 +30,7 @@ export default function Modal({
 		document.body.style.overflow = 'hidden';
 
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') {
+			if (closeOnEscape && event.key === 'Escape') {
 				onClose();
 			}
 		};
@@ -37,14 +41,14 @@ export default function Modal({
 			document.body.style.overflow = previousOverflow;
 			window.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [isOpen, onClose]);
+	}, [isOpen, onClose, closeOnEscape]);
 
 	if (typeof document === 'undefined' || !isOpen) return null;
 
 	return createPortal(
 		<div
 			className="surface-scrollbar fixed inset-0 z-50 flex justify-center overflow-y-auto bg-black/72 px-4 py-6 backdrop-blur-sm sm:px-6 sm:py-8"
-			onClick={onClose}
+			onClick={closeOnBackdrop ? onClose : undefined}
 			role="presentation"
 		>
 			<div

@@ -88,6 +88,9 @@ export class Execution {
 	})
 	performedMetric2!: number | null;
 
+	@Column({ name: 'predicted_rm', type: 'numeric', nullable: true, transformer: numericTransformer })
+	predictedRm!: number | null;
+
 	@Column({
 		name: 'performed_pse',
 		type: 'numeric',

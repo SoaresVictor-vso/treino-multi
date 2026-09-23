@@ -4,6 +4,7 @@ import { clearAuthCookie, getAuthToken, setAuthCookie } from '@/lib/auth';
 export interface ApiResponse<T> {
 	success: boolean;
 	data?: T;
+	currentState?: T;
 	error?: string;
 	status: number;
 }
@@ -18,9 +19,14 @@ let refreshPromise: Promise<ApiResponse<{ accessToken: string }>> | null = null;
 let inMemoryRefreshToken: string | null = null;
 let sessionExpirationReported = false;
 
-export function storeSessionTokens(accessToken: string, refreshToken: string): void {
+export function storeSessionTokens(
+	accessToken: string,
+	refreshToken: string,
+): void {
 	setAuthCookie(accessToken);
 	inMemoryRefreshToken = refreshToken;
+	if (typeof sessionStorage !== 'undefined')
+		sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 	sessionExpirationReported = false;
 }
 
@@ -99,11 +105,17 @@ function reportSessionExpired(): void {
 }
 
 function reportApiError(response: ApiResponse<unknown>): void {
-	if (response.success || response.status === 401 || typeof window === 'undefined')
+	if (
+		response.success ||
+		response.status === 401 ||
+		typeof window === 'undefined'
+	)
 		return;
 	window.dispatchEvent(
 		new CustomEvent(API_ERROR_EVENT, {
-			detail: { message: response.error || 'Não foi possível realizar a operação.' },
+			detail: {
+				message: response.error || 'Não foi possível realizar a operação.',
+			},
 		}),
 	);
 }
@@ -114,10 +126,14 @@ export async function refreshAccessToken(): Promise<
 	if (!refreshPromise) {
 		const refreshToken = getRefreshToken();
 		refreshPromise = refreshToken
-			? apiRequest<{ accessToken: string }>('auth/refresh', {
-					method: 'POST',
-					body: JSON.stringify({ refreshToken }),
-				}, false)
+			? apiRequest<{ accessToken: string }>(
+					'auth/refresh',
+					{
+						method: 'POST',
+						body: JSON.stringify({ refreshToken }),
+					},
+					false,
+				)
 			: Promise.resolve({
 					success: false,
 					error: 'Sessão expirada. Faça login novamente.',
@@ -157,9 +173,10 @@ export async function apiRequest<T>(
 			const response = {
 				success: false,
 				error: data?.message || 'Não foi possível realizar a operação.',
+				currentState: data?.currentState,
 				status: res.status,
 			};
-			if (reportErrors) reportApiError(response);
+			if (reportErrors && res.status !== 409) reportApiError(response);
 			return response;
 		}
 
@@ -195,13 +212,17 @@ export async function authenticatedRequest<T>(
 	}
 
 	const requestWithToken = (accessToken: string) =>
-		apiRequest<T>(endpoint, {
-		...options,
-		headers: {
-			...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-			...options?.headers,
-		},
-		}, false);
+		apiRequest<T>(
+			endpoint,
+			{
+				...options,
+				headers: {
+					...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+					...options?.headers,
+				},
+			},
+			false,
+		);
 
 	const response = await requestWithToken(token || '');
 	if (response.status !== 401) {

@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { RiAddLine, RiPlayLine } from 'react-icons/ri';
 import {
 	workoutsService,
-	type CompletedWorkout,
 	type MyWorkout,
 } from '@/gateway/services/workouts';
 import ErrorBox from '@/components/ui/ErrorBox';
@@ -23,7 +22,7 @@ function formatScheduledDate(date: string | null) {
 
 	return new Intl.DateTimeFormat('pt-BR', {
 		dateStyle: 'long',
-	}).format(new Date(`${date}`));
+	}).format(new Date(`${date}T12:00:00`));
 }
 
 const workoutStatusPresentation = {
@@ -44,9 +43,6 @@ const workoutStatusPresentation = {
 export default function ClientWorkouts() {
 	const router = useRouter();
 	const [workouts, setWorkouts] = useState<MyWorkout[]>([]);
-	const [completedWorkouts, setCompletedWorkouts] = useState<CompletedWorkout[]>(
-		[],
-	);
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [createOpen, setCreateOpen] = useState(false);
@@ -113,16 +109,11 @@ export default function ClientWorkouts() {
 	useEffect(() => {
 		let isMounted = true;
 
-		void Promise.all([
-			workoutsService.findMine(),
-			workoutsService.findMyCompleted(),
-		]).then(([activeResponse, completedResponse]) => {
+		void workoutsService.findMine().then((activeResponse) => {
 			if (!isMounted) return;
-			if (activeResponse.error || completedResponse.error)
-				setError(activeResponse.error || completedResponse.error || null);
+			if (activeResponse.error) setError(activeResponse.error);
 			else {
 				setWorkouts(activeResponse.data ?? []);
-				setCompletedWorkouts(completedResponse.data?.workouts ?? []);
 			}
 			setIsLoading(false);
 		});
@@ -231,50 +222,6 @@ export default function ClientWorkouts() {
 								);
 							})}
 						</div>
-					)}
-					{completedWorkouts.length > 0 && (
-						<section
-							className="space-y-3 pt-3"
-							aria-labelledby="completed-workouts-title"
-						>
-							<div>
-								<p className="type-label-caps text-on-surface-variant">
-									Histórico recente
-								</p>
-								<h2 id="completed-workouts-title" className="mt-1 text-xl font-bold">
-									Últimos treinos finalizados
-								</h2>
-							</div>
-							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
-								{completedWorkouts.map((workout) => (
-									<Link
-										key={workout.id}
-										href={`/training/${workout.id}`}
-										className="flex min-w-0 flex-col rounded-lg border border-outline-variant bg-surface-container-low p-4 transition-colors hover:border-primary-fixed hover:bg-surface-container sm:p-5"
-										aria-label={`Abrir treino finalizado ${workout.templateName}`}
-									>
-										<div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
-											<h3 className="type-headline-md break-words">
-												{workout.templateName}
-											</h3>
-											<span className="type-label-caps shrink-0 rounded-full bg-surface-variant px-2 py-1 text-on-surface-variant">
-												Finalizado
-											</span>
-										</div>
-										{workout.templateDescription && (
-											<p className="type-body-md mt-3 break-words text-on-surface-variant">
-												{workout.templateDescription}
-											</p>
-										)}
-										<p className="type-body-md mt-5 pt-1 text-on-surface-variant sm:mt-auto sm:pt-5">
-											{workout.performedAt
-												? `Finalizado em ${new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(new Date(workout.performedAt))}`
-												: 'Finalizado'}
-										</p>
-									</Link>
-								))}
-							</div>
-						</section>
 					)}
 				</>
 			)}

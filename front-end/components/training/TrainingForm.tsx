@@ -13,23 +13,29 @@ import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';
 import Textarea from '@/components/ui/Textarea';
 import ExercisePicker from '@/components/shared/ExercisePicker';
-import { ActivityBlock } from '@/components/workout-template/ActivityBlock';
-import type { Activity } from '@/gateway/services/workout-templates';
+import TrainingActivityBlock from './TrainingActivityBlock';
+import type { TrainingActivity } from '@/gateway/services/workouts';
 import type { Exercise } from '@/gateway/services/parametro';
 
 export type TrainingFormValues = {
 	name: string;
 	description: string;
-	activities: Activity[];
+	activities: TrainingActivity[];
+	scheduledDate?: string | null;
+	recordAsCompleted?: boolean;
+	performedAt?: string;
+	durationSeconds?: number;
+	clientTimeZone?: string;
 };
 
-const initialActivity = (exerciseId: number): Activity => ({
+const initialActivity = (exerciseId: number): TrainingActivity => ({
 	exerciseId,
 	metric1: 0,
 	metric2: 0,
 	type1: 'v',
 	type2: 'v',
 	pse: 0,
+	setType: 'padrao',
 	restDuration: 0,
 	note: '',
 });
@@ -42,6 +48,12 @@ export default function TrainingForm({
 	isSubmitting = false,
 	submitLabel = 'Criar treino',
 	noteLabel = 'Anotações',
+	recordAsCompleted = false,
+	dateMin,
+	dateMax,
+	dateRequired = false,
+	dateLabel,
+	dateHint,
 }: {
 	initialValues?: Partial<TrainingFormValues>;
 	initialExercises?: Exercise[];
@@ -50,18 +62,28 @@ export default function TrainingForm({
 	isSubmitting?: boolean;
 	submitLabel?: string;
 	noteLabel?: string;
+	recordAsCompleted?: boolean;
+	dateMin?: string;
+	dateMax?: string;
+	dateRequired?: boolean;
+	dateLabel?: string;
+	dateHint?: string;
 }) {
 	const [name, setName] = useState(initialValues?.name ?? '');
 	const [description, setDescription] = useState(
 		initialValues?.description ?? '',
 	);
+	const [scheduledDate, setScheduledDate] = useState(
+		initialValues?.scheduledDate ?? '',
+	);
+	const [duration, setDuration] = useState('');
 	const [selected, setSelected] = useState<Exercise[]>(initialExercises ?? []);
-	const [activities, setActivities] = useState<Record<number, Activity[]>>(
+	const [activities, setActivities] = useState<Record<number, TrainingActivity[]>>(
 		() =>
 			Object.groupBy(
 				initialValues?.activities ?? [],
 				(activity) => activity.exerciseId,
-			) as Record<number, Activity[]>,
+			) as Record<number, TrainingActivity[]>,
 	);
 	const [pickerOpen, setPickerOpen] = useState(false);
 	const [openNotes, setOpenNotes] = useState<Record<number, boolean>>(() =>
@@ -75,6 +97,10 @@ export default function TrainingForm({
 	const [exerciseToRemove, setExerciseToRemove] = useState<number | null>(null);
 	const canSubmit =
 		!!name.trim() &&
+		(!dateRequired || !!scheduledDate) &&
+		(!recordAsCompleted || /^\d{2,}:([0-5]\d)(?::[0-5]\d)?$/.test(duration)) &&
+		(!scheduledDate || !dateMin || scheduledDate >= dateMin) &&
+		(!scheduledDate || !dateMax || scheduledDate <= dateMax) &&
 		selected.length > 0 &&
 		selected.every((exercise) => (activities[exercise.id] ?? []).length > 0);
 
@@ -83,10 +109,23 @@ export default function TrainingForm({
 		setActivities((current) => {
 			const nextActivities = Object.fromEntries(
 				Object.entries(current).filter(([id]) => ids.has(Number(id))),
-			) as Record<number, Activity[]>;
-			next.forEach((exercise) => {
-				if (!nextActivities[exercise.id])
-					nextActivities[exercise.id] = [initialActivity(exercise.id)];
+			) as Record<number, TrainingActivity[]>;
+			next.forEach((exercise, index) => {
+				if (!nextActivities[exercise.id]) {
+					const previousActivity = next
+						.slice(0, index)
+						.toReversed()
+						.map((previousExercise) =>
+							nextActivities[previousExercise.id]?.at(-1),
+						)
+						.find(Boolean);
+					nextActivities[exercise.id] = [
+						{
+							...initialActivity(exercise.id),
+							setType: previousActivity?.setType ?? 'padrao',
+						},
+					];
+				}
 			});
 			return nextActivities;
 		});
@@ -101,15 +140,15 @@ export default function TrainingForm({
 			(current) =>
 				Object.fromEntries(
 					Object.entries(current).filter(([id]) => Number(id) !== exerciseId),
-				) as Record<number, Activity[]>,
+			) as Record<number, TrainingActivity[]>,
 		);
 	};
 
 	const updateActivity = (
 		exerciseId: number,
 		index: number,
-		key: keyof Activity,
-		value: string | number | undefined,
+		key: keyof TrainingActivity,
+		value: string | number,
 	) =>
 		setActivities((current) => ({
 			...current,
@@ -132,7 +171,24 @@ export default function TrainingForm({
 		await onSubmit({
 			name: name.trim(),
 			description: description.trim(),
-			activities: selected.flatMap((exercise) => activities[exercise.id] ?? []),
+			// O input date já representa a data civil no fuso local. Envie o
+			// valor YYYY-MM-DD diretamente para não deslocá-lo com UTC.
+			scheduledDate: scheduledDate || null,
+			recordAsCompleted,
+			clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+			...(recordAsCompleted && scheduledDate
+				? { performedAt: new Date(`${scheduledDate}T00:00:00`).toISOString() }
+				: {}),
+			...(recordAsCompleted && duration
+				? {
+						durationSeconds: duration
+							.split(':')
+							.reduce((total, part) => total * 60 + Number(part), 0),
+					}
+				: {}),
+			activities: selected.flatMap((exercise) => activities[exercise.id] ?? []).map((activity) =>
+				recordAsCompleted ? { ...activity, type2: 'v' as const } : activity,
+			),
 		});
 	};
 
@@ -155,6 +211,25 @@ export default function TrainingForm({
 					placeholder="Descreva o objetivo do treino"
 					rows={3}
 				/>
+				<Input
+					label={dateLabel ?? 'Data de agendamento (opcional)'}
+					type="date"
+					value={scheduledDate}
+					min={dateMin}
+					max={dateMax}
+					required={dateRequired}
+					onChange={(event) => setScheduledDate(event.target.value)}
+					hint={dateHint ?? 'A data será considerada no seu fuso horário.'}
+				/>
+				{recordAsCompleted && <Input
+					label="Duração do treino"
+					type="time"
+					step={1}
+					value={duration}
+					required
+					onChange={(event) => setDuration(event.target.value)}
+					hint="Informe horas, minutos e segundos (HH:MM:SS)."
+				/>}
 			</div>
 
 			<section aria-labelledby="training-form-exercises">
@@ -235,10 +310,11 @@ export default function TrainingForm({
 							)}
 							<div className="mt-3 space-y-3">
 								{(activities[exercise.id] ?? []).map((activity, index) => (
-									<ActivityBlock
+									<TrainingActivityBlock
 										key={`${exercise.id}-${index}`}
 										exercise={exercise}
 										activity={activity}
+										recordedPerformance={recordAsCompleted}
 										index={index}
 										onChange={(key, value) =>
 											updateActivity(exercise.id, index, key, value)

@@ -30,7 +30,7 @@ const statusPresentation = {
 function formatDate(date: string | null, fallback: string) {
 	if (!date) return fallback;
 	return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' }).format(
-		new Date(date),
+		new Date(date.length === 10 ? `${date}T12:00:00` : date),
 	);
 }
 

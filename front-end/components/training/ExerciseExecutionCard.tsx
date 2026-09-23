@@ -22,6 +22,7 @@ type ExerciseExecutionCardProps = {
 	onAddWarmup: () => void;
 	onAddSeries: () => void;
 	onTitleLongPress?: () => void;
+	onTitleClick?: () => void;
 	exerciseNote?: WorkoutExerciseNote;
 	onAthleteNoteChange: (note: string) => void;
 	onRestClick: (execution: WorkoutExecution) => void;
@@ -36,6 +37,7 @@ export default function ExerciseExecutionCard({
 	onAddWarmup,
 	onAddSeries,
 	onTitleLongPress,
+	onTitleClick,
 	exerciseNote,
 	onAthleteNoteChange,
 	onRestClick,
@@ -55,10 +57,6 @@ export default function ExerciseExecutionCard({
 			reorderPressTimer.current = null;
 		}, 1000);
 	};
-	const startTouchReorderPress = (event: React.TouchEvent) => {
-		event.preventDefault();
-		startReorderPress();
-	};
 	useEffect(() => cancelReorderPress, []);
 	const visibleSets = sets.filter((set) => set.status !== 'skipped');
 	if (!visibleSets.length) return null;
@@ -71,15 +69,13 @@ export default function ExerciseExecutionCard({
 			<div className="mb-3 flex items-start justify-between gap-3">
 				<div>
 					<h2
-						className={`text-base font-bold leading-tight sm:text-lg ${editable ? 'cursor-pointer select-none touch-manipulation' : ''}`}
+						className="cursor-pointer select-none text-base font-bold leading-tight touch-manipulation sm:text-lg"
 						onPointerDown={startReorderPress}
 						onPointerUp={cancelReorderPress}
 						onPointerLeave={cancelReorderPress}
 						onPointerCancel={cancelReorderPress}
-						onTouchStart={startTouchReorderPress}
-						onTouchEnd={cancelReorderPress}
-						onTouchCancel={cancelReorderPress}
 						onContextMenu={(event) => event.preventDefault()}
+						onClick={onTitleClick}
 					>
 						{exercise.name}
 					</h2>
