@@ -147,7 +147,7 @@ function executionValues(
 					{
 						label: '1RM estimado',
 						value: Number(execution.predictedRm.toFixed(1)),
-						unit: 'kg',
+						unit: '1RM',
 					},
 				]
 			: []),
