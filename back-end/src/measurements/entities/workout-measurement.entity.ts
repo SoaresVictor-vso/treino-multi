@@ -27,6 +27,9 @@ export class WorkoutMeasurement {
 	@Column({ type: 'numeric' })
 	score!: number;
 
+	@Column({ name: 'considered_sets', type: 'integer', default: 0 })
+	consideredSets!: number;
+
 	@Column({ type: 'jsonb' })
 	snapshot!: MeasurementSnapshot;
 

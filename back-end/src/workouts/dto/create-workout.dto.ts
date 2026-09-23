@@ -3,10 +3,12 @@ import {
 	IsArray,
 	IsBoolean,
 	IsDateString,
+	IsInt,
 	IsEnum,
 	IsOptional,
 	IsString,
 	MaxLength,
+	Min,
 	ValidateNested,
 } from 'class-validator';
 import { ActivityDto } from '../../workout-templates/dto/activity.dto';
@@ -46,6 +48,11 @@ export class CreateWorkoutDto {
 	@IsOptional()
 	@IsDateString()
 	performedAt?: string;
+
+	@IsOptional()
+	@IsInt()
+	@Min(1)
+	durationSeconds?: number;
 
 	@IsOptional()
 	@IsString()

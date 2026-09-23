@@ -24,6 +24,7 @@ export type TrainingFormValues = {
 	scheduledDate?: string | null;
 	recordAsCompleted?: boolean;
 	performedAt?: string;
+	durationSeconds?: number;
 	clientTimeZone?: string;
 };
 
@@ -75,6 +76,7 @@ export default function TrainingForm({
 	const [scheduledDate, setScheduledDate] = useState(
 		initialValues?.scheduledDate ?? '',
 	);
+	const [duration, setDuration] = useState('');
 	const [selected, setSelected] = useState<Exercise[]>(initialExercises ?? []);
 	const [activities, setActivities] = useState<Record<number, TrainingActivity[]>>(
 		() =>
@@ -96,6 +98,7 @@ export default function TrainingForm({
 	const canSubmit =
 		!!name.trim() &&
 		(!dateRequired || !!scheduledDate) &&
+		(!recordAsCompleted || /^\d{2,}:([0-5]\d)(?::[0-5]\d)?$/.test(duration)) &&
 		(!scheduledDate || !dateMin || scheduledDate >= dateMin) &&
 		(!scheduledDate || !dateMax || scheduledDate <= dateMax) &&
 		selected.length > 0 &&
@@ -176,6 +179,13 @@ export default function TrainingForm({
 			...(recordAsCompleted && scheduledDate
 				? { performedAt: new Date(`${scheduledDate}T00:00:00`).toISOString() }
 				: {}),
+			...(recordAsCompleted && duration
+				? {
+						durationSeconds: duration
+							.split(':')
+							.reduce((total, part) => total * 60 + Number(part), 0),
+					}
+				: {}),
 			activities: selected.flatMap((exercise) => activities[exercise.id] ?? []).map((activity) =>
 				recordAsCompleted ? { ...activity, type2: 'v' as const } : activity,
 			),
@@ -211,6 +221,15 @@ export default function TrainingForm({
 					onChange={(event) => setScheduledDate(event.target.value)}
 					hint={dateHint ?? 'A data será considerada no seu fuso horário.'}
 				/>
+				{recordAsCompleted && <Input
+					label="Duração do treino"
+					type="time"
+					step={1}
+					value={duration}
+					required
+					onChange={(event) => setDuration(event.target.value)}
+					hint="Informe horas, minutos e segundos (HH:MM:SS)."
+				/>}
 			</div>
 
 			<section aria-labelledby="training-form-exercises">

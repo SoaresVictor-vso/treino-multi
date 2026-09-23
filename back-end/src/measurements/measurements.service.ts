@@ -35,6 +35,7 @@ export type CalculatedMeasurement = {
 	value: number;
 	score: number;
 	compatibleExecutions: number;
+	consideredSets: number;
 };
 
 @Injectable()
@@ -185,11 +186,19 @@ export class MeasurementsService {
 						for (const execution of compatible)
 							executeFormula(measurement.formula, curr, this.context(execution));
 					const value = evaluateValueFormula(measurement.valueFormula, curr);
+					const consideredSets = [
+						'average-rpe',
+					'effort-adherence',
+					'workout-adherence',
+				].includes(measurement.key)
+						? Math.max(0, Number(curr.count) || 0)
+						: compatible.length;
 					return [
 						{
 							measurement,
 							value,
 							compatibleExecutions: compatible.length,
+							consideredSets,
 							score:
 								Number(measurement.staticWeight) +
 								compatible.length * Number(measurement.dynamicWeight),
@@ -207,15 +216,15 @@ export class MeasurementsService {
 		workoutId: string,
 	): Promise<void> {
 		const calculated = await this.calculateForWorkout(manager, workoutId);
-		console.log(calculated);
 		await manager.getRepository(WorkoutMeasurement).delete({ workoutId });
 		await manager.getRepository(WorkoutMeasurement).save(
-			calculated.map(({ measurement, value, score }) =>
+			calculated.map(({ measurement, value, score, compatibleExecutions, consideredSets }) =>
 				manager.create(WorkoutMeasurement, {
 					workoutId,
 					measurementId: measurement.id,
 					value,
 					score,
+					consideredSets,
 					snapshot: {
 						key: measurement.key,
 						name: measurement.name,

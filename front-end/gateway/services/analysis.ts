@@ -8,13 +8,14 @@ export type AnalysisIndicators = {
 };
 export type MeasurementChartData = {
   measurementId: string;
+  key: string;
   name: string;
   icon: string | null;
   presentation: { containerClass: string; iconClass: string; valueClass: string; labelClass: string } | null;
   unit: string | null;
   aggregation: 'sum' | 'average';
-  currentPeriod: { day: string; value: number }[];
-  previousPeriod: { day: string; value: number }[];
+  currentPeriod: { day: string; value: number; consideredSets: number }[];
+  previousPeriod: { day: string; value: number; consideredSets: number }[];
   currentTotal: number | null;
   previousTotal: number | null;
 };
@@ -28,7 +29,6 @@ export type AthleteAnalysis = {
   athleteName: string;
   days: number;
   period: { currentStartDay: string; previousStartDay: string; endDay: string };
-  indicators: AnalysisIndicators;
   measurements: MeasurementChartData[];
   lifetime: LifetimeStats;
   exercises: { exerciseId: number; name: string; totalWorkouts: number }[];

@@ -1,7 +1,7 @@
 import { localDay, periodCte } from './period.sql';
 
-// A prescribed set counts in adherence's denominator even when skipped.
-// A valid RPE requires a completed set with a strictly positive performed RPE.
+// Workout adherence counts prescribed sets. Exercise-level RPE adherence
+// averages the valid sets for that exercise; athlete-level uses its measurement.
 const indicatorBody = (dateCondition: string, exerciseParameter: string) => `,
 eligible AS (
   SELECT p.period, e.status, e.prescribed_metric_1, e.prescribed_metric_2,
@@ -21,9 +21,10 @@ SELECT p.period, p.start_day::text AS "startDay", p.end_day::text AS "endDay",
       AND performed_metric_1 = prescribed_metric_1
       AND (NOT has_metric_2 OR (prescribed_metric_2 > 0 AND performed_metric_2 = prescribed_metric_2))
   ) / COUNT(e.status) END AS adherence,
-  AVG(LEAST(100.0, 100.0 * performed_pse / prescribed_pse)) FILTER (
+  CASE WHEN ${exerciseParameter}::int IS NULL THEN NULL::numeric
+    ELSE AVG(CASE WHEN performed_pse = prescribed_pse THEN 100.0 ELSE 0.0 END) FILTER (
     WHERE status = 'completed' AND performed_pse > 0 AND prescribed_pse > 0
-  ) AS "rpeAdherence"
+  ) END AS "rpeAdherence"
 FROM periods p LEFT JOIN eligible e USING (period)
 GROUP BY p.period, p.start_day, p.end_day`;
 

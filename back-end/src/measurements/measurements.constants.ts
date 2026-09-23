@@ -84,7 +84,7 @@ export const MEASUREMENT_DEFINITIONS = [
 	},
 	{
 		key: 'effort-adherence',
-		name: 'Aderência de esforço',
+		name: 'Aderência ao RPE',
 		metric1Name: null,
 		metric2Name: null,
 		formula:

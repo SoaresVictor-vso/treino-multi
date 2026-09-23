@@ -14,8 +14,33 @@ import {
 	mapIndicators,
 	mapLifetime,
 	mapMeasurements,
-	mapPeriod,
 } from './analysis.mapper';
+
+const localDayKey = (date: Date) => {
+	const parts = new Intl.DateTimeFormat('en-CA', {
+		timeZone: 'America/Sao_Paulo',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+	}).formatToParts(date);
+	const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+	return `${values.year}-${values.month}-${values.day}`;
+};
+
+const shiftDay = (dayKey: string, offset: number) => {
+	const date = new Date(`${dayKey}T12:00:00Z`);
+	date.setUTCDate(date.getUTCDate() + offset);
+	return date.toISOString().slice(0, 10);
+};
+
+const periodForDays = (days: number) => {
+	const today = localDayKey(new Date());
+	return {
+		currentStartDay: shiftDay(today, -(days - 1)),
+		previousStartDay: shiftDay(today, -(2 * days - 1)),
+		endDay: shiftDay(today, 1),
+	};
+};
 
 @Injectable()
 export class AnalysisService {
@@ -51,9 +76,8 @@ export class AnalysisService {
 	async athlete(athleteId: string, days: number, actor: JwtPayload) {
 		this.validateDays(days);
 		const athlete = await this.authorize(athleteId, actor);
-		const [indicatorRows, measurementRows, lifetimeRows, exerciseRows] =
+		const [measurementRows, lifetimeRows, exerciseRows] =
 			await Promise.all([
-				this.provider.indicators(athleteId, athlete.tenantId, days),
 				this.provider.measurements(athleteId, athlete.tenantId, days),
 				this.provider.lifetime(athleteId, athlete.tenantId),
 				this.provider.exercises(athleteId, athlete.tenantId),
@@ -61,8 +85,7 @@ export class AnalysisService {
 		return {
 			athleteName: athlete.name,
 			days,
-			period: mapPeriod(indicatorRows),
-			indicators: mapIndicators(indicatorRows),
+			period: periodForDays(days),
 			measurements: mapMeasurements(measurementRows),
 			lifetime: mapLifetime(lifetimeRows[0]),
 			exercises: mapExercises(exerciseRows),

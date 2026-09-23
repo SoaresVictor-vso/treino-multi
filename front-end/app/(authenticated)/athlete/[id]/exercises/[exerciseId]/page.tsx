@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useRef, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RiArrowDownSLine, RiArrowLeftLine } from 'react-icons/ri';
 import ErrorBox from '@/components/ui/ErrorBox';
@@ -10,6 +10,9 @@ import AnalysisPeriodFilter, {
 } from '@/components/analysis/AnalysisPeriodFilter';
 import AnalysisIndicators from '@/components/analysis/AnalysisIndicators';
 import LifetimeStats from '@/components/analysis/LifetimeStats';
+import MetricChart, {
+	type MetricChartCategory,
+} from '@/components/analysis/MetricChart';
 import {
 	analysisService,
 	type ExerciseAnalysis,
@@ -32,6 +35,16 @@ const formatPace = (value: number) => {
 	return `${minutes}:${String(seconds).padStart(2, '0')}`;
 };
 const formatDistance = (value: number) => numberFormat.format(value / 1000);
+const formatDuration = (value: number) => {
+	const totalSeconds = Math.round(value);
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+	if (hours > 0)
+		return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+	if (minutes > 0) return `${minutes}:${String(seconds).padStart(2, '0')}`;
+	return `0:${String(seconds).padStart(2, '0')}`;
+};
 const date = (value: string) =>
 	new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(
 		new Date(value),
@@ -264,121 +277,39 @@ function Chart({
 	points: ExerciseReviewSummary['charts'];
 	field: keyof ExerciseReviewSummary['charts'][number];
 }) {
-	const values = points.map((point) => ({
-		...point,
-		chartValue: typeof point[field] === 'number' ? Number(point[field]) : 0,
-	}));
-	const [selected, setSelected] = useState<number | null>(null);
-	const chartRef = useRef<HTMLDivElement>(null);
-
-	useEffect(() => {
-		if (selected === null) return;
-		const closeOnOutsidePointerDown = (event: PointerEvent) => {
-			if (
-				event.target instanceof Node &&
-				!chartRef.current?.contains(event.target)
-			)
-				setSelected(null);
-		};
-		document.addEventListener('pointerdown', closeOnOutsidePointerDown);
-		return () =>
-			document.removeEventListener('pointerdown', closeOnOutsidePointerDown);
-	}, [selected]);
-
-	if (values.length < 1)
-		return (
-			<div className="min-w-0 max-w-full rounded-xl border border-outline-variant p-4">
-				<h2 className="font-bold">{title}</h2>
-				<p className="mt-4 text-sm text-on-surface-variant">
-					Dados insuficientes para exibir o gráfico.
-				</p>
-			</div>
-		);
-	const maximum = Math.max(...values.map((point) => point.chartValue));
-	const chartMaximum = maximum || 1;
-	const scale = [maximum, maximum / 2, 0];
 	const isPace = field === 'pace';
 	const isDistance = field === 'distance';
-	const barThemes = [
-		{
-			bar: 'border-1 bg-foreground border-primary-fixed-dim',
-			label: 'text-primary-fixed',
-		},
-		{
-			bar: 'border-1 bg-foreground border-secondary-fixed-dim',
-			label: 'text-secondary-fixed',
-		},
-		{
-			bar: 'border-1 bg-foreground border-tertiary-fixed-dim',
-			label: 'text-tertiary-fixed',
-		},
-	];
+	const values = points.flatMap((point) => {
+		const value = point[field];
+		return typeof value === 'number'
+			? [{ label: shortDate(point.date), current: { date: point.date, value } }]
+			: [];
+	});
+	const categories: MetricChartCategory[] = values;
 	const formatChartValue = (value: number) =>
 		isPace
-			? formatPace(value)
+			? `${formatPace(value)} min/km`
 			: isDistance
 				? formatDistance(value)
-				: format(value);
+				: field === 'duration'
+					? formatDuration(value)
+					: format(value);
 	return (
-		<div ref={chartRef} className="min-w-0 max-w-full rounded-xl border border-outline-variant p-4">
+		<div className="min-w-0 max-w-full rounded-xl border border-outline-variant p-4">
 			<h2 className="font-bold">{title}</h2>
 			<p className="mt-1 text-xs text-on-surface-variant">
 				Métrica: {metric}
-				{unit ? ` (${unit})` : ''} · toque em um índice para ver os detalhes
+				{unit ? ` (${unit})` : ''} · toque em uma coluna para ver os detalhes
 			</p>
-			<div className="mt-8 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-2">
-				<div
-					className="flex h-44 flex-col justify-between pb-6 text-right text-[10px] text-on-surface-variant"
-					aria-label={`Escala de ${metric}`}
-				>
-					{scale.map((value) => (
-						<span key={value}>{formatChartValue(value)}</span>
-					))}
-				</div>
-				<div className="relative h-44 min-w-0 overflow-x-auto border-b border-l border-outline-variant">
-					<div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-outline-variant" />
-					<div className="flex h-full items-end justify-around gap-1">
-						{values.map((point, index) => {
-							const theme = barThemes[0];
-							const value = formatChartValue(point.chartValue);
-							return (
-								<button
-									key={`${point.date}-${index}`}
-									type="button"
-									aria-label={`${date(point.date)}: ${value}`}
-									onClick={() => setSelected(selected === index ? null : index)}
-									className="group flex h-full min-w-8 flex-1 flex-col justify-end focus:outline-none"
-								>
-									<span
-										style={{
-											height: `${point.chartValue === 0 ? 0 : Math.max(5, (point.chartValue / chartMaximum) * 100)}%`,
-										}}
-										className={`relative block w-full rounded-t transition-colors ${selected === index ? 'bg-primary-container' : `${theme.bar} group-hover:brightness-125`}`}
-									>
-										<span
-											className={`absolute inset-x-0 -top-4 whitespace-nowrap text-center text-[10px] font-semibold ${selected === index ? 'text-primary-fixed' : theme.label}`}
-										>
-											{value}
-										</span>
-									</span>
-									<span className="mt-1 whitespace-nowrap text-center text-[10px] text-on-surface-variant">
-										{shortDate(point.date)}
-									</span>
-								</button>
-							);
-						})}
-					</div>
-					{selected !== null && (
-						<div
-							role="status"
-							className="absolute right-1 top-1 rounded-lg bg-inverse-surface px-2 py-1 text-xs text-inverse-on-surface shadow-lg"
-						>
-							{date(values[selected].date)} ·{' '}
-							{formatChartValue(values[selected].chartValue)}
-						</div>
-					)}
-				</div>
-			</div>
+			<MetricChart
+				metric={metric}
+				categories={categories}
+				unit={field === 'duration' ? 's' : unit}
+				pace={isPace}
+				paceFactor={1000}
+				minimumHeight={isPace ? 600 : undefined}
+				formatValue={formatChartValue}
+			/>
 		</div>
 	);
 }

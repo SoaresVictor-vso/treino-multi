@@ -11,6 +11,7 @@ type ModalProps = {
 	onClose: () => void;
 	children: React.ReactNode;
 	closeOnBackdrop?: boolean;
+	closeOnEscape?: boolean;
 };
 
 export default function Modal({
@@ -20,6 +21,7 @@ export default function Modal({
 	onClose,
 	children,
 	closeOnBackdrop = true,
+	closeOnEscape = true,
 }: ModalProps) {
 	React.useEffect(() => {
 		if (!isOpen) return;
@@ -28,7 +30,7 @@ export default function Modal({
 		document.body.style.overflow = 'hidden';
 
 		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') {
+			if (closeOnEscape && event.key === 'Escape') {
 				onClose();
 			}
 		};
@@ -39,7 +41,7 @@ export default function Modal({
 			document.body.style.overflow = previousOverflow;
 			window.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [isOpen, onClose]);
+	}, [isOpen, onClose, closeOnEscape]);
 
 	if (typeof document === 'undefined' || !isOpen) return null;
 

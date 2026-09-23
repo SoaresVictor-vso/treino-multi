@@ -121,6 +121,7 @@ export type CreateMyWorkoutDto = {
 	/** Registra um treino já realizado em uma data anterior. */
 	recordAsCompleted?: boolean;
 	performedAt?: string;
+	durationSeconds?: number;
 	clientTimeZone?: string;
 };
 

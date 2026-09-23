@@ -77,17 +77,17 @@ describe('formula engine', () => {
 		expect(evaluateValueFormula(averageRpe.valueFormula, rpeState)).toBe(7);
 	});
 
-	it('calculates effort adherence using its registered formula', () => {
-		const effortAdherence = definition('effort-adherence');
+	it('calculates RPE adherence using its registered formula', () => {
+		const rpeAdherence = definition('effort-adherence');
 		const curr = createZeroState();
 		for (const [rpe, prescribedRpe] of [
 			[7, 7],
 			[9, 7],
 			[6, null],
 		])
-			executeFormula(effortAdherence.formula, curr, { rpe, prescribedRpe });
+			executeFormula(rpeAdherence.formula, curr, { rpe, prescribedRpe });
 
-		expect(evaluateValueFormula(effortAdherence.valueFormula, curr)).toBeCloseTo(
+		expect(evaluateValueFormula(rpeAdherence.valueFormula, curr)).toBeCloseTo(
 			100 / 3,
 		);
 	});

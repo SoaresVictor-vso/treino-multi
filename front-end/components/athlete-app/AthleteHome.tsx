@@ -171,7 +171,7 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 					/>
 				)}
 			</div>
-			<Modal isOpen={createOpen} title="Criar treino" description="Escolha se o treino será realizado no futuro ou se deseja registrar um treino já realizado." onClose={() => !creating && setCreateOpen(false)} closeOnBackdrop={false}>
+			<Modal isOpen={createOpen} title="Criar treino" description="Escolha se o treino será realizado no futuro ou se deseja registrar um treino já realizado." onClose={() => !creating && setCreateOpen(false)} closeOnBackdrop={false} closeOnEscape={false}>
 				<div className="space-y-5">
 					<fieldset className="space-y-2">
 						<legend className="text-sm font-semibold">O que deseja fazer?</legend>

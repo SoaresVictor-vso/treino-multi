@@ -1255,6 +1255,13 @@ export class WorkoutsService {
 			throw new BadRequestException(
 				'Informe as métricas realizadas em valores absolutos, sem porcentagem.',
 			);
+		if (
+			recordAsCompleted &&
+			(!Number.isInteger(dto.durationSeconds) || dto.durationSeconds! < 1)
+		)
+			throw new BadRequestException(
+				'Informe uma duração válida para o treino realizado.',
+			);
 		const athlete = await this.usersService.findOne(actor.sub);
 		const defaultName = this.getDefaultWorkoutName(athlete.person.name);
 		const workout = await this.dataSource.transaction(async (manager) => {
@@ -1271,7 +1278,10 @@ export class WorkoutsService {
 					templateDescription: dto.description?.trim() ?? '',
 					scheduledDate: dto.scheduledDate ?? null,
 					performedAt,
-					finishedAt: recordAsCompleted ? performedAt : null,
+					finishedAt:
+						recordAsCompleted && performedAt
+							? new Date(performedAt.getTime() + dto.durationSeconds! * 1000)
+							: null,
 					excludeFromAchievements: recordAsCompleted,
 					status: recordAsCompleted
 						? WorkoutStatus.COMPLETED
