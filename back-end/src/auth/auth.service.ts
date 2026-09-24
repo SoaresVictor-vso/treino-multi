@@ -27,6 +27,7 @@ import { GoogleIdTokenProvider } from './oauth-providers/google-id-token';
 import { OAuthIdentityProvider } from './interfaces/oauth-identity-provider.interface';
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';
 import { PasswordChangeLog } from '../audit-logs/entities/password-change-log.entity';
+import { AuthQueryProvider } from './auth-query.provider';
 
 const ACCESS_TTL_SECONDS = 15 * 60;
 const REMEMBER_REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
@@ -42,14 +43,7 @@ export interface AuthTokens {
 @Injectable()
 export class AuthService {
 	constructor(
-		@InjectRepository(Person) private readonly personRepo: Repository<Person>,
 		@InjectRepository(User) private readonly userRepo: Repository<User>,
-		@InjectRepository(UserRole)
-		private readonly userRoleRepo: Repository<UserRole>,
-		@InjectRepository(RefreshToken)
-		private readonly refreshTokenRepo: Repository<RefreshToken>,
-		@InjectRepository(SessionFamily)
-		private readonly familyRepo: Repository<SessionFamily>,
 		@InjectRepository(ExternalIdentity)
 		private readonly identityRepo: Repository<ExternalIdentity>,
 		private readonly dataSource: DataSource,
@@ -57,16 +51,14 @@ export class AuthService {
 		private readonly googleProvider: GoogleIdTokenProvider,
 		private readonly auditLogService: AuditLogService,
 		private readonly usersService: UsersService,
+		private readonly authQueries: AuthQueryProvider,
 	) {}
 
 	async validateUser(login: string, password: string): Promise<User | null> {
 		const normalized = login.trim().toLowerCase();
-		let person = await this.personRepo.findOne({ where: { email: normalized } });
-
-		if (!person) return null;
-		const users = await this.userRepo.find({
-			where: { personId: person.id, isActive: true },
-			relations: ['userRoles', 'person'],
+		const users = await this.authQueries.execute({
+			script: 'loginUsers',
+			email: normalized,
 		});
 		const standalone = users.filter((user) => user.context === 'standalone');
 		const selected =
@@ -215,36 +207,12 @@ export class AuthService {
 			const identity = await this.providerIdentity(provider).verify(credential);
 			const email = identity.email.trim().toLowerCase();
 			loginUsed = hash(email);
-			// Resolve identity, account and email collision in one round trip.
-			const [lookup] = await this.dataSource.query<
-				{
-					linkedUserId: string | null;
-					userId: string | null;
-					personId: string | null;
-					tenantId: string | null;
-					context: User['context'] | null;
-					name: string | null;
-					accountEmail: string | null;
-					roles: Role[];
-					emailExists: boolean;
-				}[]
-			>(
-				`
-        WITH linked AS (
-          SELECT ei.user_id FROM external_identities ei
-          WHERE ei.provider = $1::oauth_provider_enum AND ei.subject = $2
-        )
-        SELECT linked.user_id AS "linkedUserId", u.id AS "userId",
-          u.person_id AS "personId", u.tenant_id AS "tenantId", u.context,
-          p.name, p.email AS "accountEmail",
-          COALESCE((SELECT jsonb_agg(ur.role) FROM user_roles ur
-            WHERE ur.user_id = u.id AND ur.deleted_at IS NULL), '[]'::jsonb) AS roles,
-          EXISTS(SELECT 1 FROM persons owner WHERE owner.email = $3) AS "emailExists"
-        FROM (SELECT 1) anchor LEFT JOIN linked ON true
-        LEFT JOIN users u ON u.id = linked.user_id AND u.is_active = true AND u.deleted_at IS NULL
-        LEFT JOIN persons p ON p.id = u.person_id`,
-				[provider, identity.sub, email],
-			);
+			const lookup = await this.authQueries.execute({
+				script: 'oauthAccount',
+				provider,
+				subject: identity.sub,
+				email,
+			});
 			if (lookup.linkedUserId) {
 				if (!lookup.userId || lookup.accountEmail?.trim().toLowerCase() !== email)
 					throw new UnauthorizedException('Email do provider diverge da conta.');
@@ -335,15 +303,12 @@ export class AuthService {
 	}
 
 	async loginMethods(userId: string) {
-		const user = await this.userRepo.findOne({
-			where: { id: userId, isActive: true },
+		const methods = await this.authQueries.execute({
+			script: 'loginMethods',
+			userId,
 		});
-		if (!user) throw new UnauthorizedException('Conta inativa.');
-		const identities = await this.identityRepo.find({ where: { userId } });
-		return {
-			passwordAvailable: !!user.passwordHash,
-			providers: identities.map((i) => i.provider),
-		};
+		if (!methods) throw new UnauthorizedException('Conta inativa.');
+		return methods;
 	}
 
 	async linkProvider(
@@ -458,12 +423,11 @@ export class AuthService {
 				throw new ConflictException('A conta já possui senha.');
 			await manager.update(User, user.id, { passwordHash });
 			if (revokeAllSessions)
-				await manager
-					.createQueryBuilder()
-					.update(SessionFamily)
-					.set({ revokedAt: new Date() })
-					.where('user_id = :userId AND revoked_at IS NULL', { userId: user.id })
-					.execute();
+				await this.authQueries.execute({
+					script: 'revokeFamilies',
+					userId: user.id,
+					manager,
+				});
 			await manager.save(
 				PasswordChangeLog,
 				manager.create(PasswordChangeLog, {
@@ -491,15 +455,12 @@ export class AuthService {
 			if (!family || family.revokedAt)
 				return { error: 'Sessão revogada' } as const;
 			if (stored.consumedAt) {
-				await manager.update(SessionFamily, family.id, { revokedAt: new Date() });
-				await manager
-					.createQueryBuilder()
-					.update(RefreshToken)
-					.set({ revokedAt: new Date() })
-					.where('family_hash = :familyHash AND revoked_at IS NULL', {
-						familyHash: family.familyHash,
-					})
-					.execute();
+				await this.authQueries.execute({
+					script: 'revokeReusedSession',
+					familyId: family.id,
+					familyHash: family.familyHash,
+					manager,
+				});
 				return {
 					error: 'Reuso de refresh token detectado; sessão revogada',
 				} as const;
@@ -543,22 +504,11 @@ export class AuthService {
 	}
 
 	async logout(rawToken: string): Promise<void> {
-		const stored = await this.refreshTokenRepo.findOne({
-			where: { tokenHash: hash(rawToken) },
+		const found = await this.authQueries.execute({
+			script: 'logout',
+			tokenHash: hash(rawToken),
 		});
-		if (!stored?.familyHash) throw new NotFoundException('Sessão não encontrada');
-		await this.familyRepo.update(
-			{ familyHash: stored.familyHash },
-			{ revokedAt: new Date() },
-		);
-		await this.refreshTokenRepo
-			.createQueryBuilder()
-			.update()
-			.set({ revokedAt: new Date() })
-			.where('family_hash = :familyHash AND revoked_at IS NULL', {
-				familyHash: stored.familyHash,
-			})
-			.execute();
+		if (!found) throw new NotFoundException('Sessão não encontrada');
 	}
 
 	async impersonate(
@@ -571,15 +521,7 @@ export class AuthService {
 					where: { id: targetUserId, tenantId, isActive: true },
 					relations: ['userRoles', 'person'],
 				})
-			: await this.userRepo
-					.createQueryBuilder('u')
-					.innerJoinAndSelect('u.userRoles', 'ur')
-					.leftJoinAndSelect('u.person', 'person')
-					.where('u.tenant_id = :tenantId AND u.is_active = true', { tenantId })
-					.andWhere('ur.role = :role AND ur.deleted_at IS NULL', {
-						role: Role.TENANT_ADMIN,
-					})
-					.getOne();
+			: await this.authQueries.execute({ script: 'tenantAdmin', tenantId });
 		if (!target) throw new NotFoundException('Usuário alvo não encontrado');
 		const remaining = actor.exp
 			? actor.exp - Math.floor(Date.now() / 1000)

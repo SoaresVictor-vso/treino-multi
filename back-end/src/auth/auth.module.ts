@@ -16,13 +16,21 @@ import { UsersModule } from '../users/users.module';
 import { SessionFamily } from './entities/session-family.entity';
 import { ExternalIdentity } from './entities/external-identity.entity';
 import { GoogleIdTokenProvider } from './oauth-providers/google-id-token';
+import { AuthQueryProvider } from './auth-query.provider';
 
 @Module({
 	imports: [
 		PassportModule,
 		AuditLogsModule,
 		UsersModule,
-		TypeOrmModule.forFeature([Person, User, UserRole, RefreshToken, SessionFamily, ExternalIdentity]),
+		TypeOrmModule.forFeature([
+			Person,
+			User,
+			UserRole,
+			RefreshToken,
+			SessionFamily,
+			ExternalIdentity,
+		]),
 		JwtModule.registerAsync({
 			imports: [ConfigModule],
 			inject: [ConfigService],
@@ -33,7 +41,13 @@ import { GoogleIdTokenProvider } from './oauth-providers/google-id-token';
 		}),
 	],
 	controllers: [AuthController],
-	providers: [AuthService, LocalStrategy, JwtStrategy, GoogleIdTokenProvider],
+	providers: [
+		AuthService,
+		AuthQueryProvider,
+		LocalStrategy,
+		JwtStrategy,
+		GoogleIdTokenProvider,
+	],
 	exports: [AuthService],
 })
 export class AuthModule {}
