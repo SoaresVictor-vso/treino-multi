@@ -20,10 +20,12 @@ import { LoginService } from '@/gateway/services/login';
 import { getAuthToken } from '@/lib/auth';
 import { getLandingPathForRoles } from '@/lib/landing';
 import { getSessionUser } from '@/lib/auth';
+import { apiRequest } from '@/gateway/client';
+import { ATHLETE_SELF_REGISTRATION_ENABLED } from '@shared/constants';
+import Link from 'next/link';
+import GoogleCredentialButton from '@/components/auth/GoogleCredentialButton';
 
 const REMEMBER_ME_KEY = 'rememberMe';
-const REFRESH_TOKEN_KEY = 'refreshToken';
-const ACCESS_TOKEN_KEY = 'accessToken';
 
 export default function Login() {
 	const router = useRouter();
@@ -82,6 +84,10 @@ export default function Login() {
 		setLoading(true);
 
 		try {
+			if (!rememberMe) {
+				await apiRequest('auth/forget-browser', { method: 'POST' }, false);
+				clearSessionTokens();
+			}
 			const loginService = new LoginService();
 			const normalizedLogin = login.trim();
 			const res = await loginService.login(
@@ -89,6 +95,7 @@ export default function Login() {
 					? normalizedLogin.toLocaleLowerCase('en-US')
 					: normalizedLogin,
 				password,
+				rememberMe,
 			);
 			if (!res.success) {
 				setLoading(false);
@@ -98,17 +105,7 @@ export default function Login() {
 
 			const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
 				res.data!;
-			storeSessionTokens(newAccessToken, newRefreshToken);
-			if (rememberMe) {
-				localStorage.setItem(REMEMBER_ME_KEY, 'true');
-				localStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
-				sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-			} else {
-				localStorage.setItem(REMEMBER_ME_KEY, 'false');
-				localStorage.removeItem(REFRESH_TOKEN_KEY);
-				sessionStorage.setItem(REFRESH_TOKEN_KEY, newRefreshToken);
-			}
-			localStorage.removeItem(ACCESS_TOKEN_KEY);
+			storeSessionTokens(newAccessToken, newRefreshToken, rememberMe);
 
 			setLoading(false);
 			router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
@@ -116,6 +113,21 @@ export default function Login() {
 			setLoading(false);
 			setError('Não foi possível realizar o login.');
 		}
+	}
+
+	async function handleGoogleCredential(credential: string) {
+		setLoading(true); setError(null);
+		if (!rememberMe) {
+			await apiRequest('auth/forget-browser', { method: 'POST' }, false);
+			clearSessionTokens();
+		}
+		const result = await apiRequest<{ accessToken: string; refreshToken: string }>('auth/oauth/login', {
+			method: 'POST', body: JSON.stringify({ provider: 'google', credential, rememberMe }),
+		}, false);
+		setLoading(false);
+		if (!result.success || !result.data) { setError(result.error || 'Login Google indisponível.'); return; }
+		storeSessionTokens(result.data.accessToken, result.data.refreshToken, rememberMe);
+		router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
 	}
 
 	return (
@@ -170,7 +182,9 @@ export default function Login() {
 					<Button disabled={loading} className="w-full" type="submit">
 						<span>{loading ? 'Entrando…' : 'Entrar'}</span>
 					</Button>
-				</form>
+			</form>
+			<div className="flex justify-center"><GoogleCredentialButton onCredential={handleGoogleCredential} /></div>
+			{ATHLETE_SELF_REGISTRATION_ENABLED && <p className="text-center text-sm"><Link href="/cadastro" className="text-primary-fixed underline">Criar conta de atleta</Link></p>}
 			</div>
 		</main>
 	);

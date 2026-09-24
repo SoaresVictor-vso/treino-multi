@@ -22,6 +22,9 @@ import { FindUsersQueryDto, UserOrderBy } from './dto/find-users-query.dto';
 import { Role } from '../common/enums/role.enum';
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
+import { SessionFamily } from '../auth/entities/session-family.entity';
+import { AthleteTenantAssociation } from '../athlete/entities/athlete-tenant-association.entity';
+import { AthleteTenantStatus } from '../common/enums/athlete-tenant-status.enum';
 
 const USER_ORDERING = {
 	[UserOrderBy.ID]: {
@@ -70,6 +73,11 @@ export class UsersService {
 		actorUserId: string | null,
 		ipAddress: string,
 	): Promise<User> {
+		dto.email = dto.email.trim().toLowerCase();
+		if (dto.tenantFunction === 'client') {
+			dto.tenantId = null;
+			dto.context = 'standalone';
+		}
 		if (dto.tenantFunction !== 'client' && !dto.document?.trim()) {
 			throw new BadRequestException(
 				'Documento deve ser definido para usuários que não são clientes de tenant.',
@@ -78,7 +86,7 @@ export class UsersService {
 
 		const passwordHash = await bcrypt.hash(dto.password, 12);
 
-		if (!dto.tenantId && dto.tenantFunction)
+		if (!dto.tenantId && dto.tenantFunction && dto.tenantFunction !== 'client')
 			throw new BadRequestException(
 				'tenantFunction só pode ser definido para usuários externos à organização.',
 			);
@@ -164,7 +172,13 @@ export class UsersService {
 			throw new NotFoundException('Usuário não encontrado.');
 
 		if (tenantId !== null) {
-			const outOfTenant = users.find((user) => user.tenantId !== tenantId);
+			const athleteIds = users.filter((user) => user.tenantId !== tenantId &&
+				user.userRoles.some((role) => role.role === Role.TENANT_CLIENT && !role.deletedAt)).map((user) => user.id);
+			const active = athleteIds.length ? await this.dataSource.getRepository(AthleteTenantAssociation).find({
+				where: { athleteId: In(athleteIds), tenantId, status: AthleteTenantStatus.ACTIVE },
+			}) : [];
+			const activeIds = new Set(active.map((association) => association.athleteId));
+			const outOfTenant = users.find((user) => user.tenantId !== tenantId && !activeIds.has(user.id));
 			if (outOfTenant)
 				throw new ForbiddenException(
 					`Usuário ${outOfTenant.id} não pertence à equipe.`,
@@ -266,6 +280,8 @@ export class UsersService {
 	) {
 		const user = await this.findOne(userId);
 		const person = user.person;
+		if (dto.email !== undefined)
+			throw new ForbiddenException('O e-mail da conta não pode ser alterado.');
 
 		if (dto.email !== undefined || dto.document !== undefined) {
 			await this.ensurePersonUniqueness(
@@ -310,10 +326,9 @@ export class UsersService {
 		ipAddress?: string | null,
 	): Promise<void> {
 		const user = await this.findOne(userId);
-		const validPassword = await bcrypt.compare(
-			dto.currentPassword,
-			user.passwordHash,
-		);
+		const validPassword = user.passwordHash
+			? await bcrypt.compare(dto.currentPassword, user.passwordHash)
+			: false;
 		if (!validPassword) {
 			throw new UnauthorizedException('A senha atual está incorreta.');
 		}
@@ -322,6 +337,7 @@ export class UsersService {
 			isSession: true,
 			tenantId: user.tenantId,
 			ipAddress: ipAddress ?? null,
+			revokeAllSessions: dto.revokeAllSessions === true,
 		});
 	}
 
@@ -333,6 +349,8 @@ export class UsersService {
 		tenantId?: string | null,
 	): Promise<User> {
 		const user = await this.findOne(id);
+		if (dto.email !== undefined)
+			throw new ForbiddenException('O e-mail da conta não pode ser alterado.');
 
 		if (tenantId && user.tenantId !== tenantId)
 			throw new ForbiddenException(
@@ -489,7 +507,7 @@ export class UsersService {
 					: await repo.findOne({ where: whereByEmail });
 
 			if (existingByEmail) {
-				throw new ConflictException(`E-mail ${email} já está em uso.`);
+				throw new ConflictException('E-mail já está em uso.');
 			}
 		}
 
@@ -572,20 +590,29 @@ export class UsersService {
 			tenantId?: string | null;
 			ipAddress?: string | null;
 			usedToken?: string | null;
+			revokeAllSessions?: boolean;
 		},
 	): Promise<void> {
 		const hash = await bcrypt.hash(newPassword, 12);
-		await this.userRepo.update(userId, { passwordHash: hash });
-		await this.auditLogService.logPasswordChange({
-			tenantId: opts.tenantId ?? null,
-			userId,
-			isSession: opts.isSession,
-			ipAddress: opts.ipAddress ?? null,
-			usedToken: opts.usedToken ?? null,
+		await this.dataSource.transaction(async (manager) => {
+			await manager.update(User, userId, { passwordHash: hash });
+			if (opts.revokeAllSessions) {
+				await manager.createQueryBuilder().update(SessionFamily)
+					.set({ revokedAt: new Date() })
+					.where('user_id = :userId AND revoked_at IS NULL', { userId }).execute();
+			}
+			await this.auditLogService.logPasswordChange({
+				tenantId: opts.tenantId ?? null,
+				userId,
+				isSession: opts.isSession,
+				ipAddress: opts.ipAddress ?? null,
+				usedToken: opts.usedToken ?? null,
+			}, manager);
 		});
 	}
 
 	private prepareUserRoles(dto: CreateManagedUserDto): Role {
+		if (dto.tenantFunction === 'client') return Role.TENANT_CLIENT;
 		if (!dto.tenantId) return Role.ORG_ADMIN;
 		else if (dto.tenantFunction === 'admin') return Role.TENANT_ADMIN;
 		else if (dto.tenantFunction === 'trainer') return Role.TENANT_TRAINER;

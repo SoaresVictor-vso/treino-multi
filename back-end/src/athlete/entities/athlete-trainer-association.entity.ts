@@ -20,6 +20,9 @@ export class AthleteTrainerAssociation {
 	@Column({ name: 'treinador_id', type: 'uuid' })
 	trainerId!: string;
 
+	@Column({ name: 'athlete_tenant_association_id', type: 'uuid', nullable: true })
+	athleteTenantAssociationId!: string | null;
+
 	@Column({ name: 'data_inicio', type: 'date' })
 	startDate!: string;
 

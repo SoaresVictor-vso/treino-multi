@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
+import { AthleteTenantAssociation } from '../athlete/entities/athlete-tenant-association.entity';
 import { UsersService } from '../users/users.service';
 import { ExecutionStatus } from '../common/enums/execution-status.enum';
 import { Role } from '../common/enums/role.enum';
@@ -11,6 +12,7 @@ import { Execution } from './entities/execution.entity';
 import { WorkoutExerciseNote } from './entities/workout-exercise-note.entity';
 import { Workout } from './entities/workout.entity';
 import { WorkoutsService } from './workouts.service';
+import { MeasurementsService } from '../measurements/measurements.service';
 
 const input = {
 	template: {
@@ -28,6 +30,9 @@ describe('WorkoutsService', () => {
 	let service: WorkoutsService;
 	const manager = {
 		findOne: jest.fn(),
+		findOneByOrFail: jest.fn(),
+		query: jest.fn(),
+		createQueryBuilder: jest.fn(),
 		create: jest.fn((_: unknown, entity: unknown) => entity),
 		save: jest.fn(),
 	};
@@ -41,6 +46,11 @@ describe('WorkoutsService', () => {
 
 	beforeEach(async () => {
 		jest.clearAllMocks();
+		manager.query.mockResolvedValue([{ allowed: true }]);
+		manager.findOneByOrFail.mockResolvedValue({ id: 'episode-id' });
+		manager.createQueryBuilder = jest.fn(() => ({ update: () => ({ set: () => ({
+			where: () => ({ execute: jest.fn() }),
+		}) }) })) as any;
 		const module = await Test.createTestingModule({
 			providers: [
 				WorkoutsService,
@@ -51,6 +61,7 @@ describe('WorkoutsService', () => {
 				},
 				{ provide: getRepositoryToken(WorkoutTemplate), useValue: {} },
 				{ provide: UsersService, useValue: {} },
+				{ provide: MeasurementsService, useValue: { persistForWorkout: jest.fn() } },
 			],
 		}).compile();
 		service = module.get(WorkoutsService);
@@ -161,8 +172,9 @@ describe('WorkoutsService', () => {
 			.spyOn(service, 'findWorkout')
 			.mockResolvedValue({ id: 'workout-id' } as never);
 
+		const scheduledDate = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
 		await service.createMyWorkout(
-			{ scheduledDate: '2026-08-10' },
+			{ scheduledDate },
 			{
 				sub: input.athleteId,
 				tenantId: input.template.tenantId,
@@ -173,7 +185,7 @@ describe('WorkoutsService', () => {
 		expect(manager.save).toHaveBeenCalledWith(
 			Workout,
 			expect.objectContaining({
-				scheduledDate: '2026-08-10',
+				scheduledDate,
 				status: WorkoutStatus.SCHEDULED,
 			}),
 		);
@@ -225,7 +237,7 @@ describe('WorkoutsService', () => {
 		).resolves.toEqual(rows);
 		expect(query).toHaveBeenCalledWith(
 			expect.stringContaining("workout.status = 'completed'"),
-			[input.createdBy, input.template.tenantId, false],
+			[input.createdBy],
 		);
 	});
 
@@ -242,10 +254,8 @@ describe('WorkoutsService', () => {
 			});
 
 			expect(query).toHaveBeenCalledWith(
-				expect.stringContaining(
-					'$3::boolean OR association.athlete_id IS NOT NULL',
-				),
-				[input.createdBy, input.template.tenantId, true],
+				expect.stringContaining('can_read_athlete_workout(workout.id, $1)'),
+				[input.createdBy],
 			);
 		},
 	);
@@ -413,7 +423,7 @@ describe('WorkoutsService', () => {
 		expect(executionRepository.count).toHaveBeenCalled();
 		expect(workout.status).toBe(WorkoutStatus.COMPLETED);
 		expect(workout.performedAt).toBe(startedAt);
-		expect(workoutRepository.save).toHaveBeenCalledWith(
+		expect(manager.save).toHaveBeenCalledWith(
 			expect.objectContaining({
 				performedAt: expect.any(Date),
 				updatedBy: input.athleteId,
@@ -425,6 +435,9 @@ describe('WorkoutsService', () => {
 		const workout = {
 			id: 'workout-id',
 			athleteId: input.athleteId,
+			tenantId: input.template.tenantId,
+			origin: 'tenant',
+			athleteTenantAssociationId: 'episode-id',
 			status: WorkoutStatus.SCHEDULED,
 			scheduledDate: '2026-09-21',
 			performedAt: null,
@@ -434,7 +447,8 @@ describe('WorkoutsService', () => {
 			save: jest.fn().mockResolvedValue(workout),
 		};
 		Object.assign(dataSource, {
-			getRepository: jest.fn().mockReturnValue(repository),
+			getRepository: jest.fn((entity: unknown) => entity === AthleteTenantAssociation
+				? { findOneBy: jest.fn().mockResolvedValue({ id: 'episode-id' }) } : repository),
 		});
 		jest
 			.spyOn(service as any, 'ensureCanManageAthleteWorkout')

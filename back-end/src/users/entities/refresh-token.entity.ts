@@ -19,6 +19,12 @@ export class RefreshToken {
 	@Column({ name: 'token_hash', type: 'varchar' })
 	tokenHash: string;
 
+	@Column({ name: 'family_hash', type: 'varchar', nullable: true })
+	familyHash: string | null;
+
+	@Column({ name: 'consumed_at', type: 'timestamptz', nullable: true })
+	consumedAt: Date | null;
+
 	@Column({ name: 'expires_at', type: 'timestamptz' })
 	expiresAt: Date;
 

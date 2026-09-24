@@ -4,6 +4,9 @@ import { Repository } from 'typeorm';
 import { DatabaseSyncService } from './database-sync.service';
 import { UserRole } from '../users/entities/user-role.entity';
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';
+import { Measurement } from '../measurements/entities/measurement.entity';
+import { Metric } from '../metrics/entities/metric.entity';
+import { MEASUREMENT_DEFINITIONS } from '../measurements/measurements.constants';
 import { Role } from '../common/enums/role.enum';
 
 const makeUserRole = (overrides: Partial<UserRole> = {}): UserRole =>
@@ -31,6 +34,14 @@ describe('DatabaseSyncService', () => {
 				DatabaseSyncService,
 				{ provide: getRepositoryToken(UserRole), useFactory: mockRepo },
 				{ provide: getRepositoryToken(CriticalOperationLog), useFactory: mockRepo },
+				{ provide: getRepositoryToken(Measurement), useFactory: () => ({
+					...mockRepo(), find: jest.fn().mockResolvedValue([]),
+				}) },
+				{ provide: getRepositoryToken(Metric), useFactory: () => ({
+					...mockRepo(), find: jest.fn().mockResolvedValue(
+						[...new Set(MEASUREMENT_DEFINITIONS.flatMap(item =>
+							[item.metric1Name, item.metric2Name].filter(Boolean)))].map((name, id) => ({ name, id: id + 1 }))),
+				}) },
 			],
 		}).compile();
 

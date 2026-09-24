@@ -53,4 +53,5 @@ export enum Permission {
 	// Acompanhamento de atletas
 	ATHLETE_READ = 'athlete-follow-up:read',
 	ATHLETE_MANAGE = 'athlete-follow-up:manage',
+	ATHLETE_TENANT_ASSOCIATION_MANAGE = 'athlete-tenant-association:manage',
 }

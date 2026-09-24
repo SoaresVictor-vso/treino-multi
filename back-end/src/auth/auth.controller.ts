@@ -1,11 +1,13 @@
 import {
 	Body,
 	Controller,
+	Get,
 	HttpCode,
 	HttpStatus,
 	Ip,
 	Post,
 	Req,
+	Res,
 	UseGuards,
 } from '@nestjs/common';
 import {
@@ -30,16 +32,120 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { Role } from '../common/enums/role.enum';
 import { Permission } from '../common/enums/permission.enum';
+import {
+	IsBoolean,
+	IsEmail,
+	IsEnum,
+	IsOptional,
+	IsString,
+	MinLength,
+} from 'class-validator';
+import { OAuthProvider } from '../common/enums/oauth-provider.enum';
+
+class AthleteSignupDto {
+	@IsString() @MinLength(2) name!: string;
+	@IsEmail() email!: string;
+	@IsString() @MinLength(8) password!: string;
+	@IsOptional() @IsString() phone?: string;
+}
+class OAuthDto {
+	@IsEnum(OAuthProvider) provider!: OAuthProvider;
+	@IsString() credential!: string;
+	@IsOptional() @IsBoolean() rememberMe?: boolean;
+}
+class SetFirstPasswordDto extends OAuthDto {
+	@IsString() @MinLength(8) newPassword!: string;
+	@IsOptional() @IsBoolean() revokeAllSessions?: boolean;
+}
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
 	constructor(private readonly authService: AuthService) {}
 
+	@Public()
+	@Post('forget-browser')
+	@HttpCode(HttpStatus.NO_CONTENT)
+	async forgetBrowser(
+		@Req() req: express.Request,
+		@Res({ passthrough: true }) res: express.Response,
+	) {
+		const token = this.readRefreshCookie(req);
+		if (token) await this.authService.logout(token).catch(() => undefined);
+		this.setRefreshCookie(res, null);
+	}
+
+	@Public()
+	@Post('athlete-signup')
+	registerAthlete(@Body() dto: AthleteSignupDto, @Ip() ip: string) {
+		return this.authService.registerAthlete(dto, ip);
+	}
+
+	@Public()
+	@Post('oauth/login')
+	async oauthLogin(
+		@Body() dto: OAuthDto,
+		@Ip() ip: string,
+		@Req() req: express.Request,
+		@Res({ passthrough: true }) res: express.Response,
+	) {
+		const tokens = await this.authService.loginOAuth(
+			dto.provider,
+			dto.credential,
+			dto.rememberMe === true,
+			ip,
+			req.headers['user-agent'],
+		);
+		this.setRefreshCookie(res, tokens.rememberMe ? tokens.refreshToken : null);
+		return this.publicTokens(tokens);
+	}
+
+	@ApiBearerAuth('JWT')
+	@Get('methods')
+	methods(@CurrentUser() actor: jwtPayloadInterface.JwtPayload) {
+		return this.authService.loginMethods(actor.sub);
+	}
+
+	@ApiBearerAuth('JWT')
+	@Post('oauth/link')
+	link(
+		@CurrentUser() actor: jwtPayloadInterface.JwtPayload,
+		@Body() dto: OAuthDto,
+	) {
+		return this.authService.linkProvider(actor, dto.provider, dto.credential);
+	}
+
+	@ApiBearerAuth('JWT')
+	@Post('oauth/unlink')
+	unlink(
+		@CurrentUser() actor: jwtPayloadInterface.JwtPayload,
+		@Body() dto: OAuthDto,
+	) {
+		return this.authService.unlinkProvider(actor, dto.provider, dto.credential);
+	}
+
+	@ApiBearerAuth('JWT')
+	@Post('password/first')
+	@HttpCode(HttpStatus.NO_CONTENT)
+	setFirstPassword(
+		@CurrentUser() actor: jwtPayloadInterface.JwtPayload,
+		@Body() dto: SetFirstPasswordDto,
+		@Ip() ip: string,
+	) {
+		return this.authService.setFirstPassword(
+			actor,
+			dto.provider,
+			dto.credential,
+			dto.newPassword,
+			dto.revokeAllSessions === true,
+			ip,
+		);
+	}
+
 	/**
 	 * POST /auth/login
 	 * Rota pública — não exige JWT.
-	 * Retorna accessToken (15 min) + refreshToken (7 dias).
+	 * Retorna accessToken e, somente no modo em memória, refreshToken.
 	 */
 	@ApiOperation({ summary: 'Login com e-mail/document e senha' })
 	@ApiResponse({
@@ -55,9 +161,12 @@ export class AuthController {
 		@Body() dto: LoginDto,
 		@Ip() ip: string,
 		@Req() req: express.Request,
+		@Res({ passthrough: true }) res: express.Response,
 	) {
 		const userAgent = req.headers['user-agent'];
-		return this.authService.login(dto, ip, userAgent);
+		const tokens = await this.authService.login(dto, ip, userAgent);
+		this.setRefreshCookie(res, tokens.rememberMe ? tokens.refreshToken : null);
+		return this.publicTokens(tokens);
 	}
 
 	/**
@@ -73,8 +182,15 @@ export class AuthController {
 	@Public()
 	@Post('refresh')
 	@HttpCode(HttpStatus.OK)
-	async refresh(@Body() dto: RefreshTokenDto) {
-		return this.authService.refreshAccessToken(dto.refreshToken);
+	async refresh(
+		@Body() dto: RefreshTokenDto,
+		@Req() req: express.Request,
+		@Res({ passthrough: true }) res: express.Response,
+	) {
+		const rawToken = dto.refreshToken ?? this.readRefreshCookie(req);
+		const tokens = await this.authService.refreshAccessToken(rawToken);
+		if (tokens.rememberMe) this.setRefreshCookie(res, tokens.refreshToken);
+		return this.publicTokens(tokens);
 	}
 
 	/**
@@ -84,10 +200,50 @@ export class AuthController {
 	@ApiBearerAuth('JWT')
 	@ApiOperation({ summary: 'Revoga o refreshToken (logout)' })
 	@ApiResponse({ status: 204, description: 'Token revogado com sucesso' })
+	@Public()
 	@Post('logout')
 	@HttpCode(HttpStatus.NO_CONTENT)
-	async logout(@Body() dto: RefreshTokenDto) {
-		await this.authService.logout(dto.refreshToken);
+	async logout(
+		@Body() dto: RefreshTokenDto,
+		@Req() req: express.Request,
+		@Res({ passthrough: true }) res: express.Response,
+	) {
+		const rawToken = dto.refreshToken ?? this.readRefreshCookie(req);
+		await this.authService.logout(rawToken);
+		this.setRefreshCookie(res, null);
+	}
+
+	private readRefreshCookie(req: express.Request): string {
+		const cookie = req.headers.cookie
+			?.split(';')
+			.map((item) => item.trim())
+			.find((item) => item.startsWith('rememberRefreshToken='));
+		return cookie
+			? decodeURIComponent(cookie.slice('rememberRefreshToken='.length))
+			: '';
+	}
+
+	private publicTokens(tokens: {
+		accessToken: string;
+		refreshToken: string;
+		rememberMe: boolean;
+	}) {
+		return {
+			...tokens,
+			refreshToken: tokens.rememberMe ? '' : tokens.refreshToken,
+		};
+	}
+
+	private setRefreshCookie(res: express.Response, token: string | null): void {
+		const opts = {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'strict' as const,
+			path: '/auth',
+			maxAge: token ? 30 * 24 * 60 * 60 * 1000 : 0,
+		};
+		if (token) res.cookie('rememberRefreshToken', token, opts);
+		else res.clearCookie('rememberRefreshToken', opts);
 	}
 
 	/**
@@ -119,7 +275,7 @@ export class AuthController {
 		@CurrentUser() user: jwtPayloadInterface.JwtPayload,
 		@Body() dto: ImpersonateDto,
 	) {
-		return this.authService.impersonate(user.sub, dto.tenantId, dto.targetUserId);
+		return this.authService.impersonate(user, dto.tenantId, dto.targetUserId);
 	}
 
 	/**

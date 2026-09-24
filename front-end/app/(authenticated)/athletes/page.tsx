@@ -1,9 +1,10 @@
+'use client';
 import AthletesClient from './AthletesClient';
-import { getServerSessionUser } from '@/lib/auth.server';
+import { useSession } from '@/hooks/useSession';
 import { Role } from '@/lib/roles';
 
-export default async function AthletesPage() {
-	const user = await getServerSessionUser();
+export default function AthletesPage() {
+	const user = useSession();
 	const roles = user?.roles ?? [];
 
 	return (

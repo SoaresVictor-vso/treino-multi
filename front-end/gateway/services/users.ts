@@ -22,7 +22,6 @@ export type OwnProfileDto = {
 
 export type UpdateOwnProfileDto = {
 	name: string;
-	email: string | null;
 	phone: string | null;
 	document?: string | null;
 };
@@ -85,6 +84,7 @@ export class UsersService {
 	async changeMyPassword(payload: {
 		currentPassword: string;
 		newPassword: string;
+		revokeAllSessions?: boolean;
 	}) {
 		return authenticatedRequest<void>(`${this.apiUrl}/me/password`, {
 			method: 'PATCH',

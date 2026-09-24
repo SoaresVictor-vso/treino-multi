@@ -15,6 +15,9 @@ import { AuditLogService, AuditLogFilter } from './audit-logs.service';
 import { AuthenticationLog } from './entities/authentication-log.entity';
 import { CriticalOperationLog } from './entities/critical-operation-log.entity';
 import { PasswordChangeLog } from './entities/password-change-log.entity';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
 
 /** Parâmetros de query compartilhados por todos os endpoints de log */
 class LogQueryDto {
@@ -47,6 +50,8 @@ class LogQueryDto {
 @ApiBearerAuth('JWT')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @RequirePermissions(Permission.LOG_READ)
+@UseGuards(RolesGuard)
+@Roles(Role.ORG_ADMIN)
 @Controller('audit-logs')
 export class AuditLogsController {
 	constructor(private readonly auditLogService: AuditLogService) {}
@@ -84,6 +89,8 @@ export class AuditLogsController {
 	@ApiQuery({ name: 'limit', required: false, type: Number })
 	@ApiResponse({ status: 200, description: 'Lista paginada de logs críticos' })
 	@Get('critical-operations')
+	@UseGuards(RolesGuard)
+	@Roles(Role.ORG_ADMIN)
 	async getCriticalOperationLogs(@Query() q: LogQueryDto): Promise<{
 		data: CriticalOperationLog[];
 		total: number;

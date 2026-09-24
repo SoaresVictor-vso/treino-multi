@@ -1,8 +1,9 @@
+'use client';
 import AnalysisDashboard from '@/components/analysis/AnalysisDashboard';
-import { getServerSessionUser } from '@/lib/auth.server';
+import { useSession } from '@/hooks/useSession';
 
-export default async function AnalisePage() {
-	const user = await getServerSessionUser();
+export default function AnalisePage() {
+	const user = useSession();
 	if (!user) return null;
 	return <AnalysisDashboard athleteId={user.sub} />;
 }

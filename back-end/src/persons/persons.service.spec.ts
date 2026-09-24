@@ -5,7 +5,7 @@
  * Todas as operações de banco são simuladas com jest.fn().
  */
 
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -164,39 +164,20 @@ describe('PersonsService', () => {
 			).rejects.toThrow(NotFoundException);
 		});
 
-		it('deve lançar ConflictException ao tentar atualizar para e-mail já em uso', async () => {
-			const person = makePerson();
-			const personComEmailConflitante = makePerson({
-				id: 'outro-uuid',
-				email: 'outro@example.com',
-			});
-
-			// Primeira chamada: findOne pelo id → person encontrado
-			// Segunda chamada: findOne pelo e-mail → conflito encontrado
-			repo.findOne
-				.mockResolvedValueOnce(person)
-				.mockResolvedValueOnce(personComEmailConflitante);
-
+		it('deve rejeitar alteração de e-mail antes de consultar a pessoa', async () => {
 			await expect(
 				service.update('person-uuid-1', { email: 'outro@example.com' }),
-			).rejects.toThrow(ConflictException);
+			).rejects.toThrow(ForbiddenException);
 
+			expect(repo.findOne).not.toHaveBeenCalled();
 			expect(repo.save).not.toHaveBeenCalled();
 		});
 
-		it('deve permitir atualização de e-mail se for o mesmo já cadastrado', async () => {
-			const person = makePerson();
-			repo.findOne.mockResolvedValue(person);
-			repo.save.mockResolvedValue(person);
-
-			// Mesmo e-mail → não deve checar conflito
-			const result = await service.update('person-uuid-1', {
+		it('deve rejeitar o campo e-mail mesmo quando o valor é igual', async () => {
+			await expect(service.update('person-uuid-1', {
 				email: 'joao@example.com',
-			});
-
-			// findOne chamado apenas 1 vez (pelo id), não pelo e-mail
-			expect(repo.findOne).toHaveBeenCalledTimes(1);
-			expect(result).toEqual(person);
+			})).rejects.toThrow(ForbiddenException);
+			expect(repo.save).not.toHaveBeenCalled();
 		});
 	});
 

@@ -13,24 +13,27 @@ import { UserRole } from '../users/entities/user-role.entity';
 import { RefreshToken } from '../users/entities/refresh-token.entity';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { UsersModule } from '../users/users.module';
+import { SessionFamily } from './entities/session-family.entity';
+import { ExternalIdentity } from './entities/external-identity.entity';
+import { GoogleIdTokenProvider } from './oauth-providers/google-id-token';
 
 @Module({
 	imports: [
 		PassportModule,
 		AuditLogsModule,
 		UsersModule,
-		TypeOrmModule.forFeature([Person, User, UserRole, RefreshToken]),
+		TypeOrmModule.forFeature([Person, User, UserRole, RefreshToken, SessionFamily, ExternalIdentity]),
 		JwtModule.registerAsync({
 			imports: [ConfigModule],
 			inject: [ConfigService],
 			useFactory: (config: ConfigService) => ({
 				secret: config.get<string>('JWT_SECRET'),
-				signOptions: { expiresIn: config.get('JWT_EXPIRES_IN', '15m') },
+				signOptions: { expiresIn: '15m' },
 			}),
 		}),
 	],
 	controllers: [AuthController],
-	providers: [AuthService, LocalStrategy, JwtStrategy],
+	providers: [AuthService, LocalStrategy, JwtStrategy, GoogleIdTokenProvider],
 	exports: [AuthService],
 })
 export class AuthModule {}

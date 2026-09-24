@@ -1,51 +1,17 @@
 import { Role } from './roles';
 
-interface JwtPayload {
-	sub: string;
-	roles: Role[];
-	tenantId: string | null;
-	exp: number;
-}
+interface JwtPayload { sub: string; roles: Role[]; tenantId: string | null; exp: number }
+export interface SessionUser { sub: string; roles: Role[]; tenantId: string | null }
 
-export interface SessionUser {
-	sub: string;
-	roles: Role[];
-	tenantId: string | null;
-}
-
-let inMemoryAccessToken: string | null = null;
-
-/** Token fixo utilizado durante o desenvolvimento até o fluxo real de auth estar pronto. */
-export function setAuthCookie(token: string): void {
-	inMemoryAccessToken = token;
-	document.cookie = `accessToken=${encodeURIComponent(token)}; path=/; SameSite=Strict`;
-}
-
-export function clearAuthCookie(): void {
-	inMemoryAccessToken = null;
-	document.cookie = 'accessToken=; path=/; max-age=0; SameSite=Strict';
-}
-
-export function getAuthToken(): string | null {
-	if (inMemoryAccessToken) return inMemoryAccessToken;
-	if (typeof document === 'undefined') return null;
-	const match = document.cookie.match(/(?:^|;\s*)accessToken=([^;]*)/);
-	return match ? decodeURIComponent(match[1]) : null;
-}
-
+// The access token belongs to this JS runtime only. A new tab or reload starts empty.
+let accessToken: string | null = null;
+export function setAuthCookie(token: string): void { accessToken = token; }
+export function clearAuthCookie(): void { accessToken = null; }
+export function getAuthToken(): string | null { return accessToken; }
 export function getSessionUser(): SessionUser | null {
-	const token = getAuthToken();
-	if (!token) return null;
-	try {
-		const encodedPayload = token.split('.')[1];
-		const decodedPayload = atob(encodedPayload);
-		const payload = JSON.parse(decodedPayload) as JwtPayload;
-		return {
-			sub: payload.sub,
-			roles: payload.roles ?? [],
-			tenantId: payload.tenantId ?? null,
-		};
-	} catch {
-		return null;
-	}
+  if (!accessToken) return null;
+  try {
+    const payload = JSON.parse(atob(accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) as JwtPayload;
+    return { sub: payload.sub, roles: payload.roles ?? [], tenantId: payload.tenantId ?? null };
+  } catch { return null; }
 }

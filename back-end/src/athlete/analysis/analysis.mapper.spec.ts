@@ -50,7 +50,7 @@ describe('analysis mapper', () => {
 			},
 		]);
 		expect(result).toHaveLength(1);
-		expect(result[0].currentPeriod).toEqual([{ day: '2026-09-21', value: 0 }]);
+		expect(result[0].currentPeriod).toEqual([{ day: '2026-09-21', value: 0, consideredSets: 0 }]);
 		expect(result[0].previousTotal).toBe(3.5);
 	});
 

@@ -1,10 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { AppModule } from './app.module';
+import { config as loadEnv } from 'dotenv';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
+	// Load .env before importing modules that consume shared deployment constants.
+	loadEnv();
+	const { AppModule } = await import('./app.module.js');
 	const app = await NestFactory.create(AppModule);
 
 	// CORS configuration

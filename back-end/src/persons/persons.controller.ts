@@ -21,6 +21,10 @@ import { CreatePersonDto } from './dto/create-person.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
 import { Permission } from '../common/enums/permission.enum';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Role } from '../common/enums/role.enum';
+import { UseGuards } from '@nestjs/common';
 
 /**
  * CRUD de Person.
@@ -29,6 +33,8 @@ import { Permission } from '../common/enums/permission.enum';
  */
 @ApiTags('persons')
 @ApiBearerAuth('JWT')
+@UseGuards(RolesGuard)
+@Roles(Role.ORG_ADMIN)
 @Controller('persons')
 export class PersonsController {
 	constructor(private readonly personsService: PersonsService) {}

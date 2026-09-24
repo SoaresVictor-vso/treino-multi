@@ -10,7 +10,7 @@ daily AS (
       ELSE SUM(wm.value)
     END AS value,
     SUM(wm.considered_sets) AS "consideredSets"
-  FROM periods p JOIN workouts w ON w.athlete_id = $1 AND w.tenant_id = $2
+  FROM periods p JOIN workouts w ON w.athlete_id = $1 AND can_read_athlete_workout(w.id, $2::uuid)
     AND w.status = 'completed' AND ${localDay} >= p.start_day AND ${localDay} < p.end_day
   JOIN workout_measurements wm ON wm.workout_id = w.id
   JOIN measurements m ON m.id = wm.measurement_id

@@ -8,7 +8,7 @@ eligible AS (
     e.performed_metric_1, e.performed_metric_2, e.prescribed_pse, e.performed_pse,
     exercise.metric_2_id IS NOT NULL AS has_metric_2
   FROM periods p
-  JOIN workouts w ON w.athlete_id = $1 AND w.tenant_id = $2 AND w.status = 'completed'
+  JOIN workouts w ON w.athlete_id = $1 AND can_read_athlete_workout(w.id, $2::uuid) AND w.status = 'completed'
     AND ${dateCondition}
   JOIN executions e ON e.workout_id = w.id
   JOIN exercises exercise ON exercise.id = e.exercise_id
@@ -45,7 +45,7 @@ export const exerciseThreeMonthIndicatorsSql = `WITH bounds AS (
 )${indicatorBody('w.performed_at >= p.start_at AND w.performed_at < p.end_at', '$5')}`;
 
 export const lifetimeSql = `WITH completed_workouts AS (
-  SELECT id FROM workouts WHERE athlete_id = $1 AND tenant_id = $2 AND status = 'completed'
+  SELECT id FROM workouts WHERE athlete_id = $1 AND can_read_athlete_workout(id, $2::uuid) AND status = 'completed'
 ), completed_sets AS (
   SELECT e.*, m1.name AS metric_1_name, m2.name AS metric_2_name
   FROM completed_workouts w JOIN executions e ON e.workout_id = w.id AND e.status = 'completed'
@@ -64,7 +64,7 @@ SELECT
 export const exercisesSql = `WITH performed AS (
   SELECT e.exercise_id, e.workout_id FROM workouts w
   JOIN executions e ON e.workout_id = w.id AND e.status = 'completed'
-  WHERE w.athlete_id = $1 AND w.tenant_id = $2 AND w.status = 'completed'
+  WHERE w.athlete_id = $1 AND can_read_athlete_workout(w.id, $2::uuid) AND w.status = 'completed'
 )
 SELECT x.id AS "exerciseId", x.name, COUNT(DISTINCT p.workout_id) AS "totalWorkouts"
 FROM performed p JOIN exercises x ON x.id = p.exercise_id
@@ -73,7 +73,7 @@ GROUP BY x.id, x.name ORDER BY "totalWorkouts" DESC, x.name`;
 export const exerciseLifetimeSql = `WITH performed AS (
   SELECT w.id AS workout_id, e.performed_metric_1, e.performed_metric_2
   FROM workouts w JOIN executions e ON e.workout_id = w.id
-  WHERE w.athlete_id = $1 AND w.tenant_id = $2 AND w.status = 'completed'
+  WHERE w.athlete_id = $1 AND can_read_athlete_workout(w.id, $2::uuid) AND w.status = 'completed'
     AND e.status = 'completed' AND e.exercise_id = $3
 ), exercise_metrics AS (
   SELECT m1.name AS metric_1_name, m2.name AS metric_2_name

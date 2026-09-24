@@ -10,40 +10,51 @@ export interface ApiResponse<T> {
 }
 
 const MINIMUM_TOKEN_LIFETIME_SECONDS = 60;
-const ACCESS_TOKEN_KEY = 'accessToken';
-const REFRESH_TOKEN_KEY = 'refreshToken';
 const REMEMBER_ME_KEY = 'rememberMe';
 export const SESSION_EXPIRED_EVENT = 'auth:session-expired';
 export const API_ERROR_EVENT = 'api:error';
-let refreshPromise: Promise<ApiResponse<{ accessToken: string }>> | null = null;
+type Refreshed = { accessToken: string; refreshToken: string; rememberMe: boolean };
+let refreshPromise: Promise<ApiResponse<Refreshed>> | null = null;
 let inMemoryRefreshToken: string | null = null;
+let rememberCurrent = false;
 let sessionExpirationReported = false;
 
-export function storeSessionTokens(
-	accessToken: string,
-	refreshToken: string,
-): void {
-	setAuthCookie(accessToken);
-	inMemoryRefreshToken = refreshToken;
-	if (typeof sessionStorage !== 'undefined')
-		sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-	sessionExpirationReported = false;
+export function storeSessionTokens(accessToken: string, refreshToken: string, rememberMe: boolean): void {
+  setAuthCookie(accessToken);
+  rememberCurrent = rememberMe;
+  inMemoryRefreshToken = rememberMe ? null : refreshToken;
+  if (typeof localStorage !== 'undefined') {
+    if (rememberMe) localStorage.setItem(REMEMBER_ME_KEY, 'true');
+    else localStorage.removeItem(REMEMBER_ME_KEY);
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('accessToken');
+  }
+  if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('refreshToken');
+  sessionExpirationReported = false;
 }
 
 export function clearSessionTokens(): void {
-	inMemoryRefreshToken = null;
-	refreshPromise = null;
-	clearAuthCookie();
+  inMemoryRefreshToken = null;
+  rememberCurrent = false;
+  refreshPromise = null;
+  clearAuthCookie();
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(REMEMBER_ME_KEY);
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('accessToken');
+  }
+  if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('refreshToken');
+}
 
-	if (typeof localStorage !== 'undefined') {
-		localStorage.removeItem(ACCESS_TOKEN_KEY);
-		localStorage.removeItem(REFRESH_TOKEN_KEY);
-		localStorage.removeItem(REMEMBER_ME_KEY);
-	}
+export async function forgetBrowserSession(): Promise<void> {
+  await apiRequest('auth/forget-browser', { method: 'POST' }, false);
+  clearSessionTokens();
+}
 
-	if (typeof sessionStorage !== 'undefined') {
-		sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-	}
+export async function logoutSession(): Promise<void> {
+  const token = inMemoryRefreshToken;
+  await apiRequest('auth/logout', { method: 'POST', body: JSON.stringify(token ? { refreshToken: token } : {}) }, false);
+  clearSessionTokens();
 }
 
 export function tokenHasEnoughLifetime(token: string | null): boolean {
@@ -68,32 +79,9 @@ export function tokenHasEnoughLifetime(token: string | null): boolean {
 	}
 }
 
-function getRefreshToken(): string | null {
-	if (inMemoryRefreshToken) return inMemoryRefreshToken;
-	const persistedValue =
-		typeof localStorage !== 'undefined'
-			? localStorage.getItem(REFRESH_TOKEN_KEY)
-			: null;
-	const sessionValue =
-		typeof sessionStorage !== 'undefined'
-			? sessionStorage.getItem(REFRESH_TOKEN_KEY)
-			: null;
-	const value = persistedValue || sessionValue;
-	if (!value) return null;
-
-	// usePersistedState persists strings with JSON.stringify(), so older
-	// entries may be stored as `"token"` instead of `token`.
-	try {
-		const parsedValue: unknown = JSON.parse(value);
-		return typeof parsedValue === 'string' ? parsedValue : null;
-	} catch {
-		// Keep compatibility with values stored directly in localStorage.
-		return value;
-	}
-}
-
+function getRefreshToken(): string | null { return inMemoryRefreshToken; }
 export function hasStoredRefreshToken(): boolean {
-	return !!getRefreshToken();
+  return !!inMemoryRefreshToken || (typeof localStorage !== 'undefined' && localStorage.getItem(REMEMBER_ME_KEY) === 'true');
 }
 
 function reportSessionExpired(): void {
@@ -120,36 +108,25 @@ function reportApiError(response: ApiResponse<unknown>): void {
 	);
 }
 
-export async function refreshAccessToken(): Promise<
-	ApiResponse<{ accessToken: string }>
-> {
-	if (!refreshPromise) {
-		const refreshToken = getRefreshToken();
-		refreshPromise = refreshToken
-			? apiRequest<{ accessToken: string }>(
-					'auth/refresh',
-					{
-						method: 'POST',
-						body: JSON.stringify({ refreshToken }),
-					},
-					false,
-				)
-			: Promise.resolve({
-					success: false,
-					error: 'Sessão expirada. Faça login novamente.',
-					status: 401,
-				});
-	}
-
-	try {
-		const response = await refreshPromise;
-		if (response.success && response.data?.accessToken) {
-			setAuthCookie(response.data.accessToken);
-		}
-		return response;
-	} finally {
-		refreshPromise = null;
-	}
+export async function refreshAccessToken(): Promise<ApiResponse<Refreshed>> {
+  if (!refreshPromise) {
+    const rotate = async (): Promise<ApiResponse<Refreshed>> => {
+      const remembered = rememberCurrent || (typeof localStorage !== 'undefined' && localStorage.getItem(REMEMBER_ME_KEY) === 'true');
+      const refreshToken = getRefreshToken();
+      if (!remembered && !refreshToken) return { success: false, error: 'Sessão expirada.', status: 401 };
+      const result = await apiRequest<Refreshed>('auth/refresh', {
+        method: 'POST', body: JSON.stringify(refreshToken ? { refreshToken } : {}),
+      }, false);
+      if (result.success && result.data) storeSessionTokens(result.data.accessToken, result.data.refreshToken, result.data.rememberMe);
+      return result;
+    };
+    const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+    refreshPromise = locks
+      ? (locks.request('auth-refresh', rotate) as unknown as Promise<ApiResponse<Refreshed>>)
+      : rotate();
+  }
+  try { return await refreshPromise!; }
+  finally { refreshPromise = null; }
 }
 
 export async function apiRequest<T>(
@@ -160,7 +137,8 @@ export async function apiRequest<T>(
 	try {
 		const res = await fetch(`${API_URL}/${endpoint}`, {
 			...options,
-			headers: { 'Content-Type': 'application/json', ...options?.headers },
+			credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
 		});
 
 		const contentType = res.headers.get('Content-Type') || '';
