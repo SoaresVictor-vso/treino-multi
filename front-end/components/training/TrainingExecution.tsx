@@ -37,10 +37,6 @@ import {
 import { exerciseReviewsService } from '@/gateway/services/exercise-reviews';
 import type { Exercise } from '@/gateway/services/parametro';
 import {
-	secondsToTime,
-	timeToSeconds,
-} from '@/gateway/services/workout-templates';
-import {
 	DEFAULT_REST_DURATION,
 	WORKOUT_REFRESH_INTERVAL,
 } from '@/lib/constants';
@@ -1057,13 +1053,8 @@ export default function TrainingExecution({ id }: { id: string }) {
 					<Input
 						label="Tempo de descanso"
 						type="time"
-						min="00:00:00"
-						max="00:59:59"
-						step={1}
-						value={secondsToTime(restSeconds)}
-						onChange={(event) =>
-							setRestSeconds(Math.min(3599, timeToSeconds(event.target.value)))
-						}
+						value={restSeconds}
+						onTimeChange={setRestSeconds}
 					/>
 					<Checkbox
 						label="Aplicar às séries faltantes deste exercício"

@@ -9,6 +9,7 @@ import { RestDurationField } from '@/components/workout-template/RestDurationFie
 import SeriesIndicator, { seriesTypeClassName } from './SeriesIndicator';
 import SetTypePicker from './SetTypePicker';
 import RpePicker from './RpePicker';
+import RpeIndicator from './RpeIndicator';
 import { getVisualMetricOrder } from '@/lib/metricPresentation';
 
 export default function TrainingActivityBlock({
@@ -31,17 +32,41 @@ export default function TrainingActivityBlock({
 					<SeriesIndicator number={index + 1} completed={recordedPerformance} tooltip={`Abrir opções da série ${index + 1}`} onClick={() => setMenuOpen((open) => !open)} ariaExpanded={menuOpen} className={seriesTypeClassName[activity.setType]} />
 					{menuOpen && (
 						<div className="absolute left-0 top-full z-10 mt-1 w-52 rounded border border-outline-variant bg-surface-container p-2 shadow-xl">
-							<SetTypePicker value={activity.setType} number={index + 1} onChange={(value) => { onChange('setType', value); setMenuOpen(false); }} />
-							<button type="button" onClick={onRemove} className="mt-1 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-error hover:bg-error-container/20"><RiDeleteBinLine /> Remover</button>
+							{rpePickerOpen ? (
+								<>
+									<button type="button" onClick={() => setRpePickerOpen(false)} className="mb-2 text-xs font-semibold text-primary-fixed-dim">← Opções da série</button>
+									<p className="px-1 pb-2 text-xs font-semibold text-on-surface-variant">{recordedPerformance ? 'RPE realizado' : 'RPE prescrito'}</p>
+									<RpePicker value={activity.pse || null} onChange={(value) => { onChange('pse', value ?? 0); setMenuOpen(false); setRpePickerOpen(false); }} />
+								</>
+							) : (
+								<>
+									<SetTypePicker value={activity.setType} number={index + 1} onChange={(value) => { onChange('setType', value); setMenuOpen(false); }} />
+									{!activity.pse && <button type="button" onClick={() => setRpePickerOpen(true)} className="mt-1 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-on-surface-variant hover:bg-primary-fixed-dim/10">RPE</button>}
+									<button type="button" onClick={onRemove} className="mt-1 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-error hover:bg-error-container/20"><RiDeleteBinLine /> Remover</button>
+								</>
+							)}
 						</div>
 					)}
 				</div>
 				{visualMetrics.map(({ metric, key }) => <MetricField key={key} metric={metric} value={key === 1 ? activity.metric1 : activity.metric2} type={key === 1 ? activity.type1 : activity.type2} onChange={(value) => onChange(key === 1 ? 'metric1' : 'metric2', value)} onTypeChange={(value) => onChange(key === 1 ? 'type1' : 'type2', value)} allowPercent={key === 2 && !recordedPerformance} />)}
-				<div className="relative block min-w-0 text-xs font-semibold leading-none text-on-surface-variant">
-					<span className="block truncate">{recordedPerformance ? 'RPE realizado (opcional)' : 'RPE (opcional)'}</span>
-					<button type="button" onClick={() => setRpePickerOpen((open) => !open)} className="mt-1 flex h-8 w-full items-center justify-between rounded-lg border border-outline-variant bg-surface-container px-3 text-sm text-on-surface"><span>{activity.pse > 0 ? `RPE ${activity.pse}` : 'Selecionar'}</span><span aria-hidden="true">⌄</span></button>
-					{rpePickerOpen && <div className="absolute left-0 top-full z-20 mt-1 w-52 rounded border border-outline-variant bg-surface-container p-2 shadow-xl"><p className="px-1 pb-2 text-xs font-semibold text-on-surface-variant">{recordedPerformance ? 'RPE realizado' : 'RPE prescrito'}</p><RpePicker value={activity.pse || null} onChange={(value) => { onChange('pse', value ?? 0); setRpePickerOpen(false); }} /></div>}
-				</div>
+				{activity.pse > 0 ? (
+					<RpeIndicator
+						prescribed={recordedPerformance ? null : activity.pse}
+						performed={recordedPerformance ? activity.pse : null}
+						mode={recordedPerformance ? 'performed' : 'expected'}
+						showComparison={false}
+						onClick={() => { setRpePickerOpen(true); setMenuOpen(true); }}
+					/>
+				) : (
+					<button
+						type="button"
+						onClick={() => { setRpePickerOpen(true); setMenuOpen(true); }}
+						className="inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-md border border-outline-variant bg-surface-variant px-1.5 text-[10px] font-bold text-on-surface-variant hover:border-primary-fixed-dim hover:text-primary-fixed-dim"
+						title={recordedPerformance ? 'Selecionar RPE realizado' : 'Selecionar RPE prescrito'}
+					>
+						RPE
+					</button>
+				)}
 				<RestDurationField value={activity.restDuration || 0} onChange={(value) => onChange('restDuration', value)} />
 			</div>
 		</div>

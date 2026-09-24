@@ -2,7 +2,6 @@
 import Input from '@/components/ui/Input';
 import { Metric, MetricFieldType } from '@/gateway/services/parametro';
 import type { RegisterType } from '@/gateway/services/workout-templates';
-import { secondsToTime, timeToSeconds } from '@/lib/tools';
 
 export function MetricField({
 	metric,
@@ -33,6 +32,7 @@ export function MetricField({
 	allowPercent?: boolean;
 }) {
 	const isPercent = type === 'p';
+	const isTime = metric.fieldType === MetricFieldType.TIME && !isPercent;
 
 	const getType = (fieldType: MetricFieldType) => {
 		if (isPercent) return 'number';
@@ -51,9 +51,6 @@ export function MetricField({
 
 	const handleValue = (value?: string | number) => {
 		value = value ?? '';
-		if (metric.fieldType === MetricFieldType.TIME && !isPercent) {
-			return secondsToTime(value as number);
-		}
 		return value;
 	};
 
@@ -67,10 +64,6 @@ export function MetricField({
 			inputValue = inputValue === '' ? '' : Number(inputValue);
 		}
 
-		if (metric.fieldType === MetricFieldType.TIME && !isPercent) {
-			inputValue = timeToSeconds(String(inputValue) || '0');
-		}
-
 		if (isPercent) {
 			inputValue = inputValue === '' ? '' : Number(inputValue);
 		}
@@ -78,7 +71,9 @@ export function MetricField({
 	};
 
 	return (
-		<div className={`block min-w-0 font-semibold leading-none text-on-surface-variant ${compact ? 'text-[10px]' : 'text-xs'}`}>
+		<div
+			className={`block min-w-0 font-semibold leading-none text-on-surface-variant ${isTime ? '' : ''} ${compact ? 'text-[10px]' : 'text-xs'}`}
+		>
 			<span className="block truncate">
 				{label}
 				{unit ? ` (${unit})` : ''}
@@ -98,8 +93,9 @@ export function MetricField({
 					}
 					min={min}
 					max={max}
-					value={handleValue(value)}
-					onChange={handleChange}
+					value={isTime ? Number(value ?? 0) : handleValue(value)}
+					onChange={isTime ? undefined : handleChange}
+					onTimeChange={isTime ? onChange : undefined}
 					disabled={disabled}
 					className={inputClassName}
 					sideComponent={allowPercent ? 'right' : 'none'}

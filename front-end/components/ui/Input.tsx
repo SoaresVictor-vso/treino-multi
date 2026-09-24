@@ -1,3 +1,5 @@
+'use client';
+
 import {
 	ChangeEvent,
 	ReactNode,
@@ -7,6 +9,7 @@ import {
 	useEffect,
 	useState,
 } from 'react';
+import TimeInput from './TimeInput';
 
 // ignora máscara se acima de maxLength, ou abaixo de minLength
 export type InputMask = {
@@ -26,9 +29,11 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 	trailingContent?: ReactNode;
 	selectOnClick?: boolean;
 	sideComponent?: 'right' | 'left' | 'both' | 'none';
+	/** Emits the selected or typed duration as total seconds when type="time". */
+	onTimeChange?: (seconds: number) => void;
 }
 
-const Input = forwardRef<HTMLInputElement, InputProps>(
+const NativeInput = forwardRef<HTMLInputElement, InputProps>(
 	(
 		{
 			label,
@@ -48,6 +53,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 			trailingContent,
 			selectOnClick = true,
 			sideComponent = 'none',
+			onTimeChange: _onTimeChange,
 			...props
 		},
 		ref,
@@ -200,6 +206,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 		);
 	},
 );
+
+NativeInput.displayName = 'NativeInput';
+
+const Input = forwardRef<HTMLInputElement, InputProps>((props, ref) => {
+	if (props.type === 'time') {
+		return <TimeInput {...props} ref={ref} />;
+	}
+	return <NativeInput {...props} ref={ref} />;
+});
 
 Input.displayName = 'Input';
 

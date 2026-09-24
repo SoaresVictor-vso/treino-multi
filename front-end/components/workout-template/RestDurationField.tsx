@@ -1,9 +1,5 @@
 'use client';
 import Input from '@/components/ui/Input';
-import {
-	secondsToTime,
-	timeToSeconds,
-} from '@/gateway/services/workout-templates';
 export function RestDurationField({
 	value,
 	onChange,
@@ -21,9 +17,8 @@ export function RestDurationField({
 					aria-label="Duração do descanso"
 					sizeVariant="sm"
 					type="time"
-					step={1}
-					value={secondsToTime(value)}
-					onChange={(event) => onChange(timeToSeconds(event.target.value))}
+					value={value}
+					onTimeChange={onChange}
 					disabled={disabled}
 				/>
 			</div>

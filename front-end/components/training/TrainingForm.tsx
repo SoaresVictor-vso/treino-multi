@@ -76,7 +76,7 @@ export default function TrainingForm({
 	const [scheduledDate, setScheduledDate] = useState(
 		initialValues?.scheduledDate ?? '',
 	);
-	const [duration, setDuration] = useState('');
+	const [duration, setDuration] = useState<number | null>(null);
 	const [selected, setSelected] = useState<Exercise[]>(initialExercises ?? []);
 	const [activities, setActivities] = useState<Record<number, TrainingActivity[]>>(
 		() =>
@@ -98,7 +98,7 @@ export default function TrainingForm({
 	const canSubmit =
 		!!name.trim() &&
 		(!dateRequired || !!scheduledDate) &&
-		(!recordAsCompleted || /^\d{2,}:([0-5]\d)(?::[0-5]\d)?$/.test(duration)) &&
+		(!recordAsCompleted || duration !== null) &&
 		(!scheduledDate || !dateMin || scheduledDate >= dateMin) &&
 		(!scheduledDate || !dateMax || scheduledDate <= dateMax) &&
 		selected.length > 0 &&
@@ -179,11 +179,9 @@ export default function TrainingForm({
 			...(recordAsCompleted && scheduledDate
 				? { performedAt: new Date(`${scheduledDate}T00:00:00`).toISOString() }
 				: {}),
-			...(recordAsCompleted && duration
+			...(recordAsCompleted && duration !== null
 				? {
-						durationSeconds: duration
-							.split(':')
-							.reduce((total, part) => total * 60 + Number(part), 0),
+						durationSeconds: duration,
 					}
 				: {}),
 			activities: selected.flatMap((exercise) => activities[exercise.id] ?? []).map((activity) =>
@@ -224,11 +222,10 @@ export default function TrainingForm({
 				{recordAsCompleted && <Input
 					label="Duração do treino"
 					type="time"
-					step={1}
-					value={duration}
+					value={duration ?? 0}
 					required
-					onChange={(event) => setDuration(event.target.value)}
-					hint="Informe horas, minutos e segundos (HH:MM:SS)."
+					onTimeChange={setDuration}
+						hint="Informe horas, minutos e segundos (hhh:mm:ss)."
 				/>}
 			</div>
 
