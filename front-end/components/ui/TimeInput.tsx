@@ -29,7 +29,8 @@ type TimeInputProps = InputHTMLAttributes<HTMLInputElement> & {
 
 const MAX_TIME_SECONDS = 999 * 3600 + 59 * 60 + 59;
 
-function parseSeconds(value: string | number | undefined): number {
+function parseSeconds(value: string | number | readonly string[] | undefined): number {
+	if (typeof value !== 'string' && typeof value !== 'number') value = value?.[0];
 	if (typeof value === 'number') return Number.isFinite(value) ? Math.min(MAX_TIME_SECONDS, Math.max(0, Math.floor(value))) : 0;
 	if (!value) return 0;
 	if (/^\d+:\d{2}:\d{2}$/.test(value)) {
