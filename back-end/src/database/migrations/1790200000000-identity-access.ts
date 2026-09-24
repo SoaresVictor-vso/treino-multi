@@ -27,12 +27,12 @@ export class IdentityAccess1790200000000 implements MigrationInterface {
       FOR EACH ROW EXECUTE FUNCTION reject_person_email_change()`);
     await q.query(`CREATE TYPE oauth_provider_enum AS ENUM ('google')`);
     await q.query(`CREATE TABLE external_identities (
-      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       provider oauth_provider_enum NOT NULL, subject varchar NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
       UNIQUE(provider, subject), UNIQUE(user_id, provider)
     )`);
     await q.query(`CREATE TABLE session_families (
-      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       family_hash varchar NOT NULL UNIQUE, remember_me boolean NOT NULL,
       absolute_expires_at timestamptz, revoked_at timestamptz, created_at timestamptz NOT NULL DEFAULT now()
     )`);
@@ -43,7 +43,7 @@ export class IdentityAccess1790200000000 implements MigrationInterface {
     await q.query(`CREATE TYPE athlete_tenant_status_enum AS ENUM ('pending','active','rejected','expired','cancelled')`);
     await q.query(`CREATE TYPE athlete_read_scope_enum AS ENUM ('PRESCRIBED_BY_TENANT','PRESCRIBED_BY_TENANT_LIFETIME','TENANT_AND_ATHLETE','ALL_WORKOUTS')`);
     await q.query(`CREATE TABLE athlete_tenant_associations (
-      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), athlete_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), athlete_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
       tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
       invited_email varchar,
       status athlete_tenant_status_enum NOT NULL, scope athlete_read_scope_enum NOT NULL DEFAULT 'PRESCRIBED_BY_TENANT',
@@ -57,7 +57,7 @@ export class IdentityAccess1790200000000 implements MigrationInterface {
     await q.query(`CREATE UNIQUE INDEX uq_athlete_tenant_open ON athlete_tenant_associations(athlete_id,tenant_id) WHERE status IN ('pending','active')`);
     await q.query(`CREATE INDEX ix_athlete_tenant_history ON athlete_tenant_associations(tenant_id, invited_at DESC)`);
     await q.query(`CREATE TABLE athlete_invite_attempts (
-      id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), operator_id uuid NOT NULL REFERENCES users(id),
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), operator_id uuid NOT NULL REFERENCES users(id),
       tenant_id uuid NOT NULL REFERENCES tenants(id), origin_ip varchar,
       email_hmac varchar NOT NULL, result varchar NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
     )`);
@@ -72,6 +72,13 @@ export class IdentityAccess1790200000000 implements MigrationInterface {
     await q.query(`UPDATE athlete_trainer_associations a SET athlete_tenant_association_id = ata.id
       FROM athlete_tenant_associations ata WHERE ata.athlete_id=a.athlete_id
       AND ata.tenant_id=(SELECT tenant_id FROM users WHERE id=a.treinador_id) AND ata.status='active'`);
+    // Legacy active trainer links without a matching active episode cannot be
+    // represented by the new model. Drop only those links; retain workouts and records.
+    const orphanedTrainerLinks = await q.query(`DELETE FROM athlete_trainer_associations
+      WHERE data_fim IS NULL AND athlete_tenant_association_id IS NULL RETURNING id`);
+    if (orphanedTrainerLinks.length) {
+      console.warn(`Removed ${orphanedTrainerLinks.length} unmappable legacy trainer association(s)`);
+    }
     await q.query(`DROP INDEX IF EXISTS "UQ_athlete_trainer_active"`);
     await q.query(`CREATE UNIQUE INDEX uq_trainer_athlete_episode_active ON athlete_trainer_associations(athlete_tenant_association_id,treinador_id) WHERE data_fim IS NULL`);
     await q.query(`ALTER TABLE workouts ADD COLUMN origin varchar NOT NULL DEFAULT 'tenant'`);
