@@ -1,31 +1,41 @@
 import { localDay, periodCte } from './period.sql';
 
-// Workout adherence counts prescribed sets. Exercise-level RPE adherence
-// averages the valid sets for that exercise; athlete-level uses its measurement.
+// Exercise analysis averages the stored measurements from tenant-generated
+// workouts, weighted by their considered sets. Athlete-created workouts are
+// excluded before aggregation.
 const indicatorBody = (dateCondition: string, exerciseParameter: string) => `,
+eligible_workouts AS (
+  SELECT p.period, w.id AS workout_id
+  FROM periods p
+  JOIN workouts w ON w.athlete_id = $1 AND w.origin = 'tenant'
+    AND can_read_athlete_workout(w.id, $2::uuid) AND w.status = 'completed'
+    AND ${dateCondition}
+),
 eligible AS (
   SELECT p.period, e.status, e.prescribed_metric_1, e.prescribed_metric_2,
     e.performed_metric_1, e.performed_metric_2, e.prescribed_pse, e.performed_pse,
     exercise.metric_2_id IS NOT NULL AS has_metric_2
   FROM periods p
-  JOIN workouts w ON w.athlete_id = $1 AND w.tenant_id = $2 AND w.status = 'completed'
+  JOIN workouts w ON w.athlete_id = $1 AND w.origin = 'tenant'
+    AND can_read_athlete_workout(w.id, $2::uuid) AND w.status = 'completed'
     AND ${dateCondition}
   JOIN executions e ON e.workout_id = w.id
   JOIN exercises exercise ON exercise.id = e.exercise_id
   WHERE (${exerciseParameter}::int IS NULL OR e.exercise_id = ${exerciseParameter})
 )
 SELECT p.period, p.start_day::text AS "startDay", p.end_day::text AS "endDay",
-  AVG(performed_pse) FILTER (WHERE status = 'completed' AND performed_pse > 0) AS "averageRpe",
-  CASE WHEN COUNT(e.status) = 0 THEN NULL ELSE 100.0 * COUNT(*) FILTER (
-    WHERE status = 'completed' AND prescribed_metric_1 > 0
-      AND performed_metric_1 = prescribed_metric_1
-      AND (NOT has_metric_2 OR (prescribed_metric_2 > 0 AND performed_metric_2 = prescribed_metric_2))
-  ) / COUNT(e.status) END AS adherence,
+  SUM(wm.value * wm.considered_sets) FILTER (WHERE m.key = 'average-rpe')
+    / NULLIF(SUM(wm.considered_sets) FILTER (WHERE m.key = 'average-rpe'), 0) AS "averageRpe",
+  AVG(wm.value) FILTER (WHERE m.key = 'workout-adherence') AS adherence,
   CASE WHEN ${exerciseParameter}::int IS NULL THEN NULL::numeric
-    ELSE AVG(CASE WHEN performed_pse = prescribed_pse THEN 100.0 ELSE 0.0 END) FILTER (
-    WHERE status = 'completed' AND performed_pse > 0 AND prescribed_pse > 0
-  ) END AS "rpeAdherence"
-FROM periods p LEFT JOIN eligible e USING (period)
+    ELSE SUM(wm.value * wm.considered_sets) FILTER (WHERE m.key = 'effort-adherence')
+      / NULLIF(SUM(wm.considered_sets) FILTER (WHERE m.key = 'effort-adherence'), 0)
+  END AS "rpeAdherence"
+FROM periods p
+LEFT JOIN eligible_workouts ew USING (period)
+LEFT JOIN workout_measurements wm ON wm.workout_id = ew.workout_id
+LEFT JOIN measurements m ON m.id = wm.measurement_id
+LEFT JOIN eligible e ON e.period = p.period
 GROUP BY p.period, p.start_day, p.end_day`;
 
 export const indicatorsSql = `${periodCte}${indicatorBody(`${localDay} >= p.start_day AND ${localDay} < p.end_day`, '$4')}`;
@@ -45,7 +55,7 @@ export const exerciseThreeMonthIndicatorsSql = `WITH bounds AS (
 )${indicatorBody('w.performed_at >= p.start_at AND w.performed_at < p.end_at', '$5')}`;
 
 export const lifetimeSql = `WITH completed_workouts AS (
-  SELECT id FROM workouts WHERE athlete_id = $1 AND tenant_id = $2 AND status = 'completed'
+  SELECT id FROM workouts WHERE athlete_id = $1 AND can_read_athlete_workout(id, $2::uuid) AND status = 'completed'
 ), completed_sets AS (
   SELECT e.*, m1.name AS metric_1_name, m2.name AS metric_2_name
   FROM completed_workouts w JOIN executions e ON e.workout_id = w.id AND e.status = 'completed'
@@ -64,7 +74,7 @@ SELECT
 export const exercisesSql = `WITH performed AS (
   SELECT e.exercise_id, e.workout_id FROM workouts w
   JOIN executions e ON e.workout_id = w.id AND e.status = 'completed'
-  WHERE w.athlete_id = $1 AND w.tenant_id = $2 AND w.status = 'completed'
+  WHERE w.athlete_id = $1 AND can_read_athlete_workout(w.id, $2::uuid) AND w.status = 'completed'
 )
 SELECT x.id AS "exerciseId", x.name, COUNT(DISTINCT p.workout_id) AS "totalWorkouts"
 FROM performed p JOIN exercises x ON x.id = p.exercise_id
@@ -73,7 +83,7 @@ GROUP BY x.id, x.name ORDER BY "totalWorkouts" DESC, x.name`;
 export const exerciseLifetimeSql = `WITH performed AS (
   SELECT w.id AS workout_id, e.performed_metric_1, e.performed_metric_2
   FROM workouts w JOIN executions e ON e.workout_id = w.id
-  WHERE w.athlete_id = $1 AND w.tenant_id = $2 AND w.status = 'completed'
+  WHERE w.athlete_id = $1 AND can_read_athlete_workout(w.id, $2::uuid) AND w.status = 'completed'
     AND e.status = 'completed' AND e.exercise_id = $3
 ), exercise_metrics AS (
   SELECT m1.name AS metric_1_name, m2.name AS metric_2_name

@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RiAddLine, RiCloseLine, RiPlayFill, RiRunLine, RiTimeLine } from 'react-icons/ri';
+import { RiAddLine, RiCloseLine, RiPlayFill, RiTimeLine } from 'react-icons/ri';
+import InviteNotifications from './InviteNotifications';
 import TrainingForm, { type TrainingFormValues } from '@/components/training/TrainingForm';
 import Calendar, { localDateKey } from '@/components/ui/Calendar';
 import Button from '@/components/ui/Button';
 import ErrorBox from '@/components/ui/ErrorBox';
 import Modal from '@/components/ui/Modal';
+import { useSession } from '@/hooks/useSession';
 import {
 	workoutsService,
 	type CalendarWorkout,
@@ -48,8 +50,9 @@ function formatScheduledDate(date: string | null) {
 	}).format(parsed);
 }
 
-export default function AthleteHome({ athleteName }: { athleteName?: string }) {
+export default function AthleteHome() {
 	const router = useRouter();
+	const user = useSession();
 	const [calendarMonth, setCalendarMonth] = useState(
 		() => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
 	);
@@ -146,7 +149,7 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 			<header className="flex items-start justify-between gap-4">
 				<div>
 				<h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-					Olá, {firstName(athleteName)}.
+					Olá, {firstName(user?.name ?? undefined)}.
 				</h1>
 				<p className="mt-1 text-sm leading-6 text-on-surface-variant sm:text-base">
 					{inProgress ? 'Seu treino está esperando por você.' : nextWorkout
@@ -154,7 +157,7 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 						: 'Tudo em dia por aqui.'}
 				</p>
 				</div>
-				<div className="hidden h-12 w-12 shrink-0 place-items-center rounded-2xl border border-primary-container/25 bg-primary-container/10 text-primary-fixed sm:grid"><RiRunLine size={24} aria-hidden /></div>
+				<InviteNotifications />
 			</header>
 			{loading ? <Skeleton /> : inProgress ? <FeaturedWorkout workout={inProgress} label="Em andamento" action="Retomar treino" icon={<RiPlayFill size={18} />} starting={starting} onAction={() => void startWorkout(inProgress)} /> : nextWorkout ? <FeaturedWorkout workout={nextWorkout} label="Próximo treino" action="Iniciar treino" icon={<RiPlayFill size={18} />} starting={starting} onAction={() => void startWorkout(nextWorkout)} /> : <AllCaughtUp onCreate={() => { setCreationMode('future'); setCreateOpen(true); }} />}
 			{!loading && (inProgress || nextWorkout) && <button type="button" onClick={() => { setCreationMode('future'); setCreateOpen(true); }} className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-primary-container/40 px-4 text-sm font-bold text-primary-fixed hover:bg-primary-container hover:text-on-primary-fixed"><RiAddLine size={19} /> Criar treino</button>}

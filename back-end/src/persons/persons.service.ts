@@ -1,5 +1,6 @@
 import {
 	ConflictException,
+	ForbiddenException,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
@@ -23,6 +24,7 @@ export class PersonsService {
 		actorUserId?: string | null,
 		ipAddress?: string | null,
 	): Promise<Person> {
+		dto.email = dto.email.trim().toLowerCase();
 		const existing = await this.personRepo.findOne({
 			where: { email: dto.email },
 		});
@@ -59,16 +61,9 @@ export class PersonsService {
 		actorUserId?: string | null,
 		ipAddress?: string | null,
 	): Promise<Person> {
+		if (dto.email !== undefined)
+			throw new ForbiddenException('O e-mail da conta não pode ser alterado.');
 		const person = await this.findOne(id);
-
-		if (dto.email && dto.email !== person.email) {
-			const conflict = await this.personRepo.findOne({
-				where: { email: dto.email },
-			});
-			if (conflict) {
-				throw new ConflictException(`E-mail ${dto.email} já está em uso.`);
-			}
-		}
 
 		Object.assign(person, dto);
 		const saved = await this.personRepo.save(person);

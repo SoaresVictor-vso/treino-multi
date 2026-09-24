@@ -15,8 +15,9 @@ export type Athlete = {
 export type TrainerOption = { id: string; person: { name: string } };
 
 export class AthleteService {
-	async findAthletes() {
-		return authenticatedRequest<Athlete[]>('athlete/athletes', {
+	async findAthletes(tenantId?: string) {
+		const query = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
+		return authenticatedRequest<Athlete[]>(`athlete/athletes${query}`, {
 			method: 'GET',
 		});
 	}

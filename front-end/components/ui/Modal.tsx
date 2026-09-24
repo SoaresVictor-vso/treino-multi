@@ -8,6 +8,8 @@ type ModalProps = {
 	isOpen: boolean;
 	title: React.ReactNode;
 	description?: string;
+	eyebrow?: string;
+	size?: 'default' | 'sm';
 	onClose: () => void;
 	children: React.ReactNode;
 	closeOnBackdrop?: boolean;
@@ -18,6 +20,8 @@ export default function Modal({
 	isOpen,
 	title,
 	description,
+	eyebrow = 'Cadastro guiado',
+	size = 'default',
 	onClose,
 	children,
 	closeOnBackdrop = true,
@@ -52,7 +56,7 @@ export default function Modal({
 			role="presentation"
 		>
 			<div
-				className="my-auto w-full max-w-4xl flex-none overflow-hidden rounded-[28px] border border-outline-variant bg-surface-container shadow-[0_32px_100px_rgba(0,0,0,0.45)]"
+				className={`my-auto w-full ${size === 'sm' ? 'max-w-lg' : 'max-w-4xl'} flex-none overflow-hidden rounded-[28px] border border-outline-variant bg-surface-container shadow-[0_32px_100px_rgba(0,0,0,0.45)]`}
 				onClick={(event) => event.stopPropagation()}
 				role="dialog"
 				aria-modal="true"
@@ -64,7 +68,7 @@ export default function Modal({
 						<div className="mb-6 flex items-start justify-between gap-4">
 							<div>
 								<p className="type-label-caps text-secondary-fixed-dim">
-									Cadastro guiado
+									{eyebrow}
 								</p>
 								<h3
 									id="modal-title"

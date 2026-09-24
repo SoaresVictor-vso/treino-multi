@@ -14,8 +14,6 @@ export const configValidationSchema = Joi.object({
 
 	JWT_SECRET: Joi.string().required(),
 	JWT_EXPIRES_IN: Joi.string().default('15m'),
-	JWT_REFRESH_SECRET: Joi.string().required(),
-	JWT_REFRESH_EXPIRES_IN: Joi.string().default('7d'),
 
 	PASSWORD_RESET_SECRET: Joi.string().required(),
 
@@ -40,8 +38,6 @@ export default () => ({
 	jwt: {
 		secret: process.env.JWT_SECRET,
 		expiresIn: process.env.JWT_EXPIRES_IN,
-		refreshSecret: process.env.JWT_REFRESH_SECRET,
-		refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN,
 		passwordResetSecret: process.env.PASSWORD_RESET_SECRET,
 	},
 	org: {

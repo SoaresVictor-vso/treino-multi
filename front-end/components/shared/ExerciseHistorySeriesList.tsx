@@ -13,12 +13,14 @@ type ExerciseHistorySeriesListProps = {
 	series: ExerciseHistorySeries[];
 	metric1Label: string;
 	metric2Label: string | null;
+	metric1IsRepetitions?: boolean;
 };
 
 export default function ExerciseHistorySeriesList({
 	series,
 	metric1Label,
 	metric2Label,
+	metric1IsRepetitions = false,
 }: ExerciseHistorySeriesListProps) {
 	const gridClass = (rm: number | null) =>
 		typeof rm == 'number' ? 'grid-cols-3' : 'grid-cols-2';
@@ -39,9 +41,16 @@ export default function ExerciseHistorySeriesList({
 					<div
 						className={`mt-3 grid gap-2 col-span-5 ${gridClass(set.predictedRm)}`}
 					>
-						<HistoryValue label={metric1Label} value={set.metric1} />
-						{metric2Label && (
-							<HistoryValue label={metric2Label} value={set.metric2} />
+						{metric1IsRepetitions && metric2Label ? (
+							<>
+								<HistoryValue label={metric2Label} value={set.metric2} />
+								<HistoryValue label={metric1Label} value={set.metric1} />
+							</>
+						) : (
+							<>
+								<HistoryValue label={metric1Label} value={set.metric1} />
+								{metric2Label && <HistoryValue label={metric2Label} value={set.metric2} />}
+							</>
 						)}
 						{set.predictedRm && (
 							<HistoryValue

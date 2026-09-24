@@ -1,5 +1,6 @@
 import {
 	Column,
+	BeforeInsert,
 	CreateDateColumn,
 	Entity,
 	OneToMany,
@@ -10,6 +11,10 @@ import { User } from '../../users/entities/user.entity';
 
 @Entity('persons')
 export class Person {
+	@BeforeInsert()
+	normalizeEmail(): void {
+		if (this.email) this.email = this.email.trim().toLowerCase();
+	}
 	@PrimaryGeneratedColumn('uuid')
 	id!: string;
 

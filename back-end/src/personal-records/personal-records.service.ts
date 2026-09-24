@@ -11,6 +11,8 @@ import { Role } from '../common/enums/role.enum';
 import { ExerciseGroup } from '../exercise-groups/entities/exercise-group.entity';
 import { Exercise } from '../exercises/entities/exercise.entity';
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
+import { AthleteTenantAssociation } from '../athlete/entities/athlete-tenant-association.entity';
+import { AthleteTenantStatus } from '../common/enums/athlete-tenant-status.enum';
 import { User } from '../users/entities/user.entity';
 import { CreatePersonalRecordDto } from './dto/create-personal-record.dto';
 import { UpdatePersonalRecordDto } from './dto/update-personal-record.dto';
@@ -41,26 +43,26 @@ export class PersonalRecordsService {
 			this.findAthlete(dto.athleteId),
 		]);
 		const group = exerciseGroupId
-			? await this.ensureGroup(exerciseGroupId, athlete.tenantId)
+			? await this.ensureGroup(exerciseGroupId, actor.tenantId)
 			: null;
-
-		if (actor.tenantId && actor.tenantId !== athlete.tenantId)
-			throw new ForbiddenException('O atleta não pertence ao seu tenant.');
 		await this.assertCanReadAthlete(athlete, actor);
-
-		if (group && athlete.tenantId !== group.tenantId)
+		const own = actor.sub === athlete.id;
+		const episode = !own && await this.records.manager.getRepository(AthleteTenantAssociation).findOneBy({
+			athleteId: athlete.id, tenantId: actor.tenantId!, status: AthleteTenantStatus.ACTIVE,
+		});
+		if (!own && !episode) throw new ForbiddenException('Vínculo ativo necessário.');
+		if (group && !own && group.tenantId !== actor.tenantId)
+			throw new BadRequestException('Grupo fora do tenant.');
+		if (exercise?.tenantId && !own && exercise.tenantId !== actor.tenantId)
 			throw new BadRequestException(
-				'Atleta e grupo devem pertencer ao mesmo tenant.',
-			);
-
-		if (exercise?.tenantId && exercise.tenantId !== athlete.tenantId)
-			throw new BadRequestException(
-				'O exercício não pertence ao tenant do atleta.',
+				'O exercício não pertence ao tenant do operador.',
 			);
 
 		return this.records.save(
 			this.records.create({
-				tenantId: athlete.tenantId!,
+				tenantId: own ? null : actor.tenantId,
+				origin: own ? 'athlete' : 'tenant',
+				athleteTenantAssociationId: episode ? episode.id : null,
 				athleteId: athlete.id,
 				exerciseGroupId: group?.id ?? null,
 				exerciseId: exercise?.id ?? null,
@@ -82,16 +84,7 @@ export class PersonalRecordsService {
 			.leftJoinAndSelect('record.exercise', 'exercise')
 			.where('record.athlete_id = :athleteId', { athleteId })
 			.andWhere('record.deleted_at IS NULL')
-			.andWhere(
-				`(
-					record.exercise_group_id IS NULL
-					OR (
-						exerciseGroup.tenant_id = :tenantId
-						AND exerciseGroup.deleted_at IS NULL
-					)
-				)`,
-				{ tenantId: athlete.tenantId },
-			)
+			.andWhere('can_read_personal_record(record.id, :actorId)', { actorId: actor.sub })
 			.orderBy('record.updated_at', 'DESC')
 			.getMany();
 	}
@@ -119,9 +112,6 @@ export class PersonalRecordsService {
 					exerciseGroupId: normalizedExerciseGroupId,
 				})
 				.andWhere('record.deleted_at IS NULL')
-				.andWhere('exerciseGroup.tenant_id = :tenantId', {
-					tenantId: athlete.tenantId,
-				})
 				.andWhere('exerciseGroup.deleted_at IS NULL')
 				.orderBy('record.measured_at', order.measuredAt)
 				.addOrderBy('record.updated_at', order.updatedAt)
@@ -132,12 +122,10 @@ export class PersonalRecordsService {
 				'Informe exatamente um: exerciseGroupId ou exerciseId.',
 			);
 		}
-		if (athlete.tenantId === null) return null;
 		return this.records.findOne({
 			where: {
 				athleteId,
 				exerciseId: normalizedExerciseId,
-				tenantId: athlete.tenantId,
 				deletedAt: IsNull(),
 			},
 			order,
@@ -224,36 +212,24 @@ export class PersonalRecordsService {
 	}
 
 	private async assertCanReadAthlete(athlete: User, actor: JwtPayload) {
-		if (
-			actor.roles.some((role) => [Role.ORG_ADMIN, Role.ORG_SUPPORT].includes(role))
-		)
-			return;
-		if (
-			actor.roles.includes(Role.TENANT_ADMIN) &&
-			actor.tenantId === athlete.tenantId
-		)
-			return;
-		if (actor.sub === athlete.id) return;
-		if (
-			actor.roles.some((role) =>
-				[Role.TENANT_TRAINER, Role.TENANT_TRAINER_MASTER].includes(role),
-			)
-		) {
-			const association = await this.associations.existsBy({
-				athleteId: athlete.id,
-				trainerId: actor.sub,
-				endDate: IsNull(),
-			});
-			if (association) return;
-		}
+		const [access] = await this.records.manager.query<{ allowed: boolean }[]>(
+			'SELECT can_read_athlete_profile($1::uuid,$2::uuid) AS allowed', [athlete.id, actor.sub]);
+		if (access?.allowed) return;
 		throw new ForbiddenException('Você não pode consultar os 1RMs deste atleta.');
 	}
 
 	private async findManagedOne(id: string, actor: JwtPayload) {
 		const record = await this.records.findOne({ where: { id } });
 		if (!record) throw new NotFoundException('1RM não encontrado.');
-		if (actor.tenantId && record.tenantId !== actor.tenantId) {
-			throw new ForbiddenException('O 1RM não pertence ao seu tenant.');
+		if (actor.sub !== record.athleteId) {
+			const [permission] = await this.records.manager.query<{ allowed: boolean }[]>(
+				'SELECT can_prescribe_athlete($1::uuid,$2::uuid) AS allowed', [record.athleteId, actor.sub]);
+			const currentEpisode = await this.records.manager.getRepository(AthleteTenantAssociation).findOneBy({
+				athleteId: record.athleteId, tenantId: actor.tenantId!, status: AthleteTenantStatus.ACTIVE,
+			});
+			if (!permission?.allowed || record.tenantId !== actor.tenantId || record.origin !== 'tenant' ||
+				record.athleteTenantAssociationId !== currentEpisode?.id)
+				throw new ForbiddenException('O 1RM não pertence ao seu tenant.');
 		}
 		return record;
 	}

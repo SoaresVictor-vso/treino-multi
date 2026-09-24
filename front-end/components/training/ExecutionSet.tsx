@@ -14,6 +14,7 @@ import SeriesIndicator, { seriesTypeClassName } from './SeriesIndicator';
 import RpeIndicator from './RpeIndicator';
 import RpePicker from './RpePicker';
 import SetTypePicker, { setOptions } from './SetTypePicker';
+import { getVisualMetricOrder } from '@/lib/metricPresentation';
 import type {
 	ExecutionSetType,
 	ExecutionStatus,
@@ -71,6 +72,10 @@ export default function ExecutionSet({
 		setOptions[0];
 	const hasRpe =
 		(execution.prescribedPse ?? 0) > 0 || (execution.performedPse ?? 0) > 0;
+	const visualMetrics = getVisualMetricOrder(
+		execution.exercise.metric_1,
+		execution.exercise.metric_2,
+	);
 	const closeMenu = () => {
 		setMenuOpen(false);
 		setRpePickerOpen(false);
@@ -181,39 +186,22 @@ export default function ExecutionSet({
 							}
 						/>
 					</div>
-					<MetricField
-						metric={execution.exercise.metric_1}
-						value={
-							value(execution.performedMetric1, execution.prescribedMetric1) ??
-							undefined
-						}
-						type="v"
-						disabled={fieldsDisabled}
-						inputClassName="text-on-surface"
-						compact
-						onTypeChange={() => {}}
-						onChange={(item) =>
-							onChange('performedMetric1', item === '' ? null : Number(item))
-						}
-					/>
-					{execution.exercise.metric_2 && (
+					{visualMetrics.map(({ metric, key }) => (
 						<MetricField
-							metric={execution.exercise.metric_2}
-							value={
-								value(execution.performedMetric2, execution.prescribedMetric2) ??
-								undefined
-							}
-							type={execution.metric2Type ?? 'v'}
-							allowPercent
+							key={key}
+							metric={metric}
+							value={key === 1
+								? value(execution.performedMetric1, execution.prescribedMetric1) ?? undefined
+								: value(execution.performedMetric2, execution.prescribedMetric2) ?? undefined}
+							type={key === 1 ? 'v' : execution.metric2Type ?? 'v'}
+							allowPercent={key === 2}
 							disabled={fieldsDisabled}
 							inputClassName="text-on-surface"
 							compact
 							onTypeChange={() => {}}
-							onChange={(item) =>
-								onChange('performedMetric2', item === '' ? null : Number(item))
-							}
+							onChange={(item) => onChange(key === 1 ? 'performedMetric1' : 'performedMetric2', item === '' ? null : Number(item))}
 						/>
-					)}
+					))}
 					{hasRpe && (
 						<RpeIndicator
 							prescribed={execution.prescribedPse}

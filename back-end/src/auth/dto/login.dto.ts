@@ -1,4 +1,10 @@
-import { IsOptional, IsString, Length, MinLength } from 'class-validator';
+import {
+	IsBoolean,
+	IsEmail,
+	IsOptional,
+	IsString,
+	MinLength,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {
@@ -10,18 +16,15 @@ export class LoginDto {
 		description: 'E-mail ou document (CPF) da pessoa física',
 	})
 	@IsString()
-	login: string;
+	@IsEmail()
+	login!: string;
 
 	@ApiProperty({ example: 'S3nh@F0rt3!' })
 	@IsString()
 	@MinLength(8)
-	password: string;
+	password!: string;
 
-	/** Slug do tenant — presente quando o contexto é 'tenant'. Obrigatório quando context=tenant. */
-	@ApiProperty({
-		example: 'acme-corp',
-	})
 	@IsOptional()
-	@IsString()
-	tenantSlug?: string;
+	@IsBoolean()
+	rememberMe?: boolean;
 }

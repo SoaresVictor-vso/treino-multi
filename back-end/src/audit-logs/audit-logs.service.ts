@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindManyOptions, Repository } from 'typeorm';
+import { EntityManager, FindManyOptions, Repository } from 'typeorm';
 import { AuthenticationLog } from './entities/authentication-log.entity';
 import {
 	CriticalOperationLog,
@@ -106,7 +106,7 @@ export class AuditLogService {
 		await this.criticalLogRepo.save(log);
 	}
 
-	async logPasswordChange(dto: LogPasswordChangeDto): Promise<void> {
+	async logPasswordChange(dto: LogPasswordChangeDto, manager?: EntityManager): Promise<void> {
 		const log = this.passwordLogRepo.create({
 			tenantId: dto.tenantId,
 			userId: dto.userId,
@@ -114,7 +114,7 @@ export class AuditLogService {
 			ipAddress: dto.ipAddress ?? null,
 			usedToken: dto.usedToken ?? null,
 		});
-		await this.passwordLogRepo.save(log);
+		await (manager ? manager.save(PasswordChangeLog, log) : this.passwordLogRepo.save(log));
 	}
 
 	async isPasswordResetTokenAlreadyUsed(usedToken: string): Promise<boolean> {

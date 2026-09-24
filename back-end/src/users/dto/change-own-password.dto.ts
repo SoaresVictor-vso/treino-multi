@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class ChangeOwnPasswordDto {
 	@ApiProperty({ example: 'SenhaAtual@123' })
@@ -10,4 +10,8 @@ export class ChangeOwnPasswordDto {
 	@IsString()
 	@MinLength(8)
 	newPassword!: string;
+
+	@IsOptional()
+	@IsBoolean()
+	revokeAllSessions?: boolean;
 }

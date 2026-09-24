@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
 	RiAddLine,
@@ -53,6 +53,8 @@ const service = new AthleteService();
 const NO_TRAINER_VALUE = '__none__';
 
 type AthletePageCapabilities = {
+	tenantId?: string;
+	requiresTenantSelection?: boolean;
 	canManage: boolean;
 	canAssignWorkouts: boolean;
 	canRegisterPersonalRecord: boolean;
@@ -64,12 +66,29 @@ function addDays(date: string, days: number) {
 	return result.toISOString().slice(0, 10);
 }
 
+function AthleteIdentity({ athlete }: { athlete: Athlete }) {
+	return <>
+		<span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-container/15 text-primary-fixed-dim">
+			<RiUserLine size={20} />
+		</span>
+		<div>
+			<p className="font-semibold text-primary">{athlete.person.name}</p>
+			<p className="text-xs text-on-surface-variant">
+				{athlete.person.email || athlete.person.phone || 'Contato não informado'}
+			</p>
+		</div>
+	</>;
+}
+
 export default function AthletesClient({
+	tenantId,
+	requiresTenantSelection = false,
 	canManage,
 	canAssignWorkouts,
 	canRegisterPersonalRecord,
 }: AthletePageCapabilities) {
 	const [athletes, setAthletes] = useState<Athlete[]>([]);
+	const loadVersion = useRef(0);
 	const [trainers, setTrainers] = useState<TrainerOption[]>([]);
 	const [search, setSearch] = useState('');
 	const [loading, setLoading] = useState(true);
@@ -119,8 +138,16 @@ export default function AthletesClient({
 	const [athleteWorkoutError, setAthleteWorkoutError] = useState<string | null>(null);
 
 	const load = useCallback(async () => {
+		const version = ++loadVersion.current;
+		if (requiresTenantSelection && !tenantId) {
+			setAthletes([]);
+			setError(null);
+			setLoading(false);
+			return;
+		}
 		setLoading(true);
-		const result = await service.findAthletes();
+		const result = await service.findAthletes(tenantId);
+		if (version !== loadVersion.current) return;
 		if (!result.success || !result.data) {
 			setError(result.error || 'Não foi possível carregar os atletas.');
 		} else {
@@ -128,7 +155,7 @@ export default function AthletesClient({
 			setError(null);
 		}
 		setLoading(false);
-	}, []);
+	}, [tenantId, requiresTenantSelection]);
 
 	useEffect(() => {
 		void Promise.resolve().then(load);
@@ -406,6 +433,7 @@ export default function AthletesClient({
 			</section>
 
 			{error && <ErrorBox message={error} />}
+			{requiresTenantSelection && !tenantId && <p className="text-sm text-on-surface-variant">Selecione um tenant para visualizar os atletas.</p>}
 			<div className="flex max-w-xl items-center rounded-xl border border-outline-variant bg-surface-container-high px-3">
 				<RiSearchLine className="text-on-surface-variant" size={20} />
 				<input
@@ -579,22 +607,9 @@ export default function AthletesClient({
 									className="h-4 w-4 self-center accent-primary-container"
 								/>
 							)}
-							<Link
-								href={`/athlete/${athlete.id}`}
-								className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-fixed-dim"
-							>
-								<span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-container/15 text-primary-fixed-dim">
-									<RiUserLine size={20} />
-								</span>
-								<div>
-									<p className="font-semibold text-primary">{athlete.person.name}</p>
-									<p className="text-xs text-on-surface-variant">
-										{athlete.person.email ||
-											athlete.person.phone ||
-											'Contato não informado'}
-									</p>
-								</div>
-							</Link>
+							{requiresTenantSelection
+								? <div className="flex items-center gap-3"><AthleteIdentity athlete={athlete} /></div>
+								: <Link href={`/athlete/${athlete.id}`} className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary-fixed-dim"><AthleteIdentity athlete={athlete} /></Link>}
 							<div>
 								<span className="text-xs text-on-surface-variant md:hidden">
 									Treinador:{' '}

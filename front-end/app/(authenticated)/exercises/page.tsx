@@ -1,9 +1,10 @@
+'use client';
 import ExerciseCatalogPage from '@/components/exercises/ExerciseCatalogPage';
-import { getServerSessionUser } from '@/lib/auth.server';
+import { useSession } from '@/hooks/useSession';
 import { Role } from '@/lib/roles';
 
-export default async function ExercisesPage() {
-	const user = await getServerSessionUser();
+export default function ExercisesPage() {
+	const user = useSession();
 	const canCreateExercise = !!user?.roles.some((role) =>
 		[Role.ORG_ADMIN, Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER].includes(role),
 	);

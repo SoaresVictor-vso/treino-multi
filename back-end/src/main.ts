@@ -1,15 +1,30 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { AppModule } from './app.module';
+import { config as loadEnv } from 'dotenv';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { getTrustedOrigins } from './common/security/trusted-origin';
 
 async function bootstrap() {
+	// Load .env before importing modules that consume shared deployment constants.
+	loadEnv();
+	const { AppModule } = await import('./app.module.js');
 	const app = await NestFactory.create(AppModule);
+	const trustedOrigins = getTrustedOrigins();
+
+	// Reject browser requests from origins outside the exact credentialed CORS allow-list.
+	app.use((req, res, next) => {
+		const origin = req.headers.origin;
+		if (origin && !trustedOrigins.includes(origin))
+			return res.status(403).json({ statusCode: 403, message: 'Origem não autorizada.' });
+		if (!origin && req.headers['sec-fetch-site'] === 'cross-site')
+			return res.status(403).json({ statusCode: 403, message: 'Origem não autorizada.' });
+		next();
+	});
 
 	// CORS configuration
 	app.enableCors({
-		origin: process.env.FRONT_END_URL,
+		origin: trustedOrigins,
 		credentials: true,
 	});
 

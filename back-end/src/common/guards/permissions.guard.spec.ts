@@ -110,23 +110,23 @@ describe('PermissionsGuard', () => {
 	/**
 	 * TENANT_FINANCIAL tem FINANCIAL_INVOICES_CREATE → deve passar.
 	 */
-	it('deve permitir acesso ao TENANT_FINANCIAL para FINANCIAL_INVOICES_CREATE', () => {
+	it('deve permitir acesso ao TENANT_TRAINER_MASTER para gerir vínculos', () => {
 		reflector.getAllAndOverride.mockReturnValue([
-			Permission.FINANCIAL_INVOICES_CREATE,
+			Permission.ATHLETE_TENANT_ASSOCIATION_MANAGE,
 		]);
 
-		expect(guard.canActivate(makeContext([Role.TENANT_FINANCIAL]))).toBe(true);
+		expect(guard.canActivate(makeContext([Role.TENANT_TRAINER_MASTER]))).toBe(true);
 	});
 
 	/**
 	 * TENANT_ATTENDANT tem ATTENDANCE_TICKETS_UPDATE → deve passar.
 	 */
-	it('deve permitir acesso ao TENANT_ATTENDANT para ATTENDANCE_TICKETS_UPDATE', () => {
+	it('deve permitir acesso ao TENANT_ADMIN para ATTENDANCE_TICKETS_UPDATE', () => {
 		reflector.getAllAndOverride.mockReturnValue([
 			Permission.ATTENDANCE_TICKETS_UPDATE,
 		]);
 
-		expect(guard.canActivate(makeContext([Role.TENANT_ATTENDANT]))).toBe(true);
+		expect(guard.canActivate(makeContext([Role.TENANT_ADMIN]))).toBe(true);
 	});
 
 	/**
@@ -148,11 +148,11 @@ describe('PermissionsGuard', () => {
 	 */
 	it('deve considerar a união de permissões de múltiplas roles', () => {
 		reflector.getAllAndOverride.mockReturnValue([
-			Permission.FINANCIAL_INVOICES_READ,
-			Permission.ATTENDANCE_TICKETS_CREATE,
+			Permission.WORKOUT_ASSIGN,
+			Permission.USER_IMPERSONATE,
 		]);
 
-		const context = makeContext([Role.TENANT_FINANCIAL, Role.TENANT_ATTENDANT]);
+		const context = makeContext([Role.TENANT_TRAINER, Role.ORG_SUPPORT]);
 		expect(guard.canActivate(context)).toBe(true);
 	});
 

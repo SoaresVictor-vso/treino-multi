@@ -20,6 +20,8 @@ import { ExecutionStatus } from '../common/enums/execution-status.enum';
 import { ExecutionSetType } from '../common/enums/execution-set-type.enum';
 import { WorkoutStatus } from '../common/enums/workout-status.enum';
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
+import { AthleteTenantAssociation } from '../athlete/entities/athlete-tenant-association.entity';
+import { AthleteTenantStatus } from '../common/enums/athlete-tenant-status.enum';
 import { UsersService } from '../users/users.service';
 import { Activity } from '../workout-templates/entities/activity.entity';
 import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
@@ -188,7 +190,6 @@ export class WorkoutsService {
 			.getRepository(Workout)
 			.createQueryBuilder('workout')
 			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
-			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
 			.andWhere('workout.status IN (:...statuses)', {
 				statuses: [
 					WorkoutStatus.PENDING,
@@ -248,7 +249,6 @@ export class WorkoutsService {
 					COUNT(*) FILTER (WHERE workout.status IN ('pending', 'scheduled')) OVER() AS total
 				FROM workouts workout
 				WHERE workout.athlete_id = $1
-					AND workout.tenant_id = $2
 					AND workout.status IN ('pending', 'scheduled', 'in_progress')
 			), page AS (
 				SELECT * FROM matched
@@ -319,7 +319,6 @@ export class WorkoutsService {
 			.getRepository(Workout)
 			.createQueryBuilder('workout')
 			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
-			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
 			.andWhere('workout.status = :status', { status: WorkoutStatus.COMPLETED })
 			.select([
 				'workout.id AS id',
@@ -407,7 +406,6 @@ export class WorkoutsService {
 			.getRepository(Workout)
 			.createQueryBuilder('workout')
 			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
-			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
 			.andWhere('workout.status = :status', { status: WorkoutStatus.COMPLETED })
 			.andWhere(
 				`COALESCE(workout.performed_at, workout.updated_at) >= ${intervalStart}`,
@@ -454,7 +452,6 @@ export class WorkoutsService {
 			.getRepository(Workout)
 			.createQueryBuilder('workout')
 			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
-			.andWhere('workout.tenantId = :tenantId', { tenantId: actor.tenantId })
 			.andWhere(
 				new Brackets((where) =>
 					where
@@ -561,8 +558,7 @@ export class WorkoutsService {
 				AND association.data_fim IS NULL
 			INNER JOIN users athlete ON athlete.id = workout.athlete_id
 			INNER JOIN persons person ON person.id = athlete.person_id
-			WHERE workout.tenant_id = $2
-				AND ($3::boolean OR association.athlete_id IS NOT NULL)
+			WHERE can_read_athlete_workout(workout.id, $1)
 				AND (
 					workout.status IN ('pending', 'scheduled', 'in_progress')
 					OR (
@@ -580,20 +576,11 @@ export class WorkoutsService {
 				workout.performed_at DESC NULLS LAST,
 				workout.scheduled_date ASC NULLS FIRST,
 				person.name ASC`,
-			[actor.sub, actor.tenantId, canViewAllAthletes],
+			[actor.sub],
 		);
 	}
 
 	async findWorkout(id: string, actor: JwtPayload) {
-		const isOrganizationStaff = actor.roles.some((role) =>
-			[Role.ORG_ADMIN, Role.ORG_SUPPORT].includes(role),
-		);
-		const isTrainer = actor.roles.some((role) =>
-			[Role.TENANT_TRAINER, Role.TENANT_TRAINER_MASTER].includes(role),
-		);
-		const canReadAllTenantWorkouts = actor.roles.some((role) =>
-			[Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER].includes(role),
-		);
 		const rows = await this.dataSource.query<WorkoutExecutionRow[]>(
 			`SELECT
 				workout.id AS "workoutId",
@@ -604,21 +591,7 @@ export class WorkoutsService {
 				workout.performed_at AS "performedAt",
 				workout.finished_at AS "workoutFinishedAt",
 				workout.status AS "workoutStatus",
-				(
-					workout.athlete_id = $2
-					OR $3::boolean
-					OR ($4::boolean AND workout.tenant_id = $5)
-					OR (
-						$6::boolean
-						AND EXISTS (
-							SELECT 1
-							FROM athlete_trainer_associations association
-							WHERE association.athlete_id = workout.athlete_id
-								AND association.treinador_id = $2
-								AND association.data_fim IS NULL
-						)
-					)
-				) AS "canRead",
+				can_read_athlete_workout(workout.id, $2) AS "canRead",
 				execution.id AS "executionId",
 				execution.exercise_id AS "exerciseId",
 				execution.position AS "position",
@@ -695,6 +668,7 @@ export class WorkoutsService {
 				FROM personal_records record
 				WHERE record.athlete_id = workout.athlete_id
 					AND record.deleted_at IS NULL
+					AND can_read_personal_record(record.id, $2)
 					AND record.exercise_group_id IN (
 						SELECT membership.exercise_group_id
 						FROM exercise_group_exercises membership
@@ -715,16 +689,10 @@ export class WorkoutsService {
 				AND exercise_record.exercise_id = execution.exercise_id
 				AND exercise_record.exercise_group_id IS NULL
 				AND exercise_record.deleted_at IS NULL
+				AND can_read_personal_record(exercise_record.id, $2)
 			WHERE workout.id = $1
 			ORDER BY execution.position ASC`,
-			[
-				id,
-				actor.sub,
-				isOrganizationStaff,
-				canReadAllTenantWorkouts,
-				actor.tenantId,
-				isTrainer,
-			],
+			[id, actor.sub],
 		);
 		if (!rows.length) throw new NotFoundException('Treino não encontrado.');
 		if (!rows[0].canRead)
@@ -1181,10 +1149,6 @@ export class WorkoutsService {
 	async createMyWorkout(dto: CreateWorkoutDto, actor: JwtPayload) {
 		if (!actor.roles.includes(Role.TENANT_CLIENT))
 			throw new ForbiddenException('Esta ação é exclusiva para atletas.');
-		if (!actor.tenantId)
-			throw new ForbiddenException(
-				'O atleta precisa estar vinculado a um tenant.',
-			);
 
 		const startImmediately = dto.startImmediately === true;
 		const recordAsCompleted = dto.recordAsCompleted === true;
@@ -1271,7 +1235,8 @@ export class WorkoutsService {
 			const created = await manager.save(
 				Workout,
 				manager.create(Workout, {
-					tenantId: actor.tenantId!,
+					tenantId: null,
+					origin: 'athlete',
 					athleteId: actor.sub,
 					workoutTemplateId: null,
 					templateName: dto.name?.trim() || defaultName,
@@ -1349,11 +1314,17 @@ export class WorkoutsService {
 	}
 
 	async findAthleteWorkouts(athleteId: string, actor: JwtPayload) {
-		const athlete = await this.ensureCanManageAthleteWorkout(athleteId, actor);
-		const workouts = await this.dataSource.getRepository(Workout).find({
-			where: { athleteId, ...(actor.tenantId && { tenantId: actor.tenantId }) },
-			order: { scheduledDate: 'DESC', createdAt: 'DESC' },
-		});
+		const athlete = await this.usersService.findOne(athleteId);
+		const access = await this.dataSource.query<{ allowed: boolean }[]>(
+			'SELECT can_read_athlete_profile($1::uuid, $2::uuid) AS allowed',
+			[athleteId, actor.sub],
+		);
+		if (!access[0]?.allowed)
+			throw new ForbiddenException('Você não pode visualizar este atleta.');
+		const workouts = await this.dataSource.getRepository(Workout).createQueryBuilder('w')
+			.where('w.athleteId = :athleteId', { athleteId })
+			.andWhere('can_read_athlete_workout(w.id, :actorId)', { actorId: actor.sub })
+			.orderBy('w.scheduledDate', 'DESC').addOrderBy('w.createdAt', 'DESC').getMany();
 		return {
 			athlete: { id: athlete.id, name: athlete.person.name },
 			workouts: workouts.map((workout) => ({
@@ -1377,7 +1348,7 @@ export class WorkoutsService {
 			athlete,
 			dto,
 			actor.sub,
-			actor.tenantId ?? athlete.tenantId!,
+			actor.tenantId!,
 		);
 		return this.findWorkout(workout.id, actor);
 	}
@@ -1392,6 +1363,13 @@ export class WorkoutsService {
 			.findOne({ where: { id } });
 		if (!workout) throw new NotFoundException('Treino não encontrado.');
 		await this.ensureCanManageAthleteWorkout(workout.athleteId, actor);
+		if (workout.tenantId !== actor.tenantId || workout.origin !== 'tenant')
+			throw new ForbiddenException('Somente o tenant prescritor pode alterar a prescrição.');
+		const currentEpisode = await this.dataSource.getRepository(AthleteTenantAssociation).findOneBy({
+			athleteId: workout.athleteId, tenantId: actor.tenantId!, status: AthleteTenantStatus.ACTIVE,
+		});
+		if (workout.athleteTenantAssociationId !== currentEpisode?.id)
+			throw new ForbiddenException('Esta prescrição pertence a um episódio anterior.');
 		if (
 			![WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED].includes(workout.status)
 		)
@@ -1445,8 +1423,15 @@ export class WorkoutsService {
 			.getRepository(Workout)
 			.findOne({ where: { id } });
 		if (!workout) throw new NotFoundException('Treino não encontrado.');
-		if (actor.sub !== workout.athleteId)
+		if (actor.sub !== workout.athleteId) {
 			await this.ensureCanManageAthleteWorkout(workout.athleteId, actor);
+			const currentEpisode = await this.dataSource.getRepository(AthleteTenantAssociation).findOneBy({
+				athleteId: workout.athleteId, tenantId: actor.tenantId!, status: AthleteTenantStatus.ACTIVE,
+			});
+			if (workout.origin !== 'tenant' || workout.tenantId !== actor.tenantId ||
+				workout.athleteTenantAssociationId !== currentEpisode?.id)
+				throw new ForbiddenException('Esta prescrição não pertence ao vínculo ativo.');
+		}
 		if (
 			![WorkoutStatus.PENDING, WorkoutStatus.SCHEDULED].includes(workout.status)
 		)
@@ -1499,11 +1484,16 @@ export class WorkoutsService {
 			setType: activity.setType ?? ExecutionSetType.PADRAO,
 		}));
 		return this.dataSource.transaction(async (manager) => {
+			const episode = await manager.findOneByOrFail(AthleteTenantAssociation, {
+				athleteId: athlete.id, tenantId, status: AthleteTenantStatus.ACTIVE,
+			});
 			const workout = await manager.save(
 				Workout,
 				manager.create(Workout, {
 					tenantId,
 					athleteId: athlete.id,
+					origin: 'tenant',
+					athleteTenantAssociationId: episode.id,
 					workoutTemplateId: null,
 					templateName:
 						dto.name?.trim() || this.getDefaultWorkoutName(athlete.person.name),
@@ -1549,19 +1539,9 @@ export class WorkoutsService {
 			)
 		)
 			throw new BadRequestException('O usuário selecionado não é um atleta.');
-		const canManageAny = actor.roles.some((role) =>
-			[Role.ORG_ADMIN, Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER].includes(
-				role,
-			),
-		);
-		if (
-			!canManageAny &&
-			!(await this.associations.existsBy({
-				athleteId,
-				trainerId: actor.sub,
-				endDate: IsNull(),
-			}))
-		)
+		const [permission] = await this.dataSource.query<{ allowed: boolean }[]>(
+			'SELECT can_prescribe_athlete($1::uuid, $2::uuid) AS allowed', [athleteId, actor.sub]);
+		if (!permission?.allowed)
 			throw new ForbiddenException(
 				'Você só pode gerenciar treinos dos seus atletas vinculados.',
 			);
@@ -1585,12 +1565,20 @@ export class WorkoutsService {
 	): Promise<Workout> {
 		return this.dataSource.transaction(async (manager) => {
 			const { template } = input;
+			const [permission] = await manager.query<{ allowed: boolean }[]>(
+				'SELECT can_prescribe_athlete($1::uuid, $2::uuid) AS allowed', [input.athleteId, input.createdBy]);
+			if (!permission?.allowed) throw new ForbiddenException('Vínculo ativo necessário para prescrever.');
+			const episode = await manager.findOneByOrFail(AthleteTenantAssociation, {
+				athleteId: input.athleteId, tenantId: template.tenantId, status: AthleteTenantStatus.ACTIVE,
+			});
 
 			const scheduledDate = input.scheduledDate ?? undefined;
 			const workout = await manager.save(
 				Workout,
 				manager.create(Workout, {
 					tenantId: template.tenantId,
+					origin: 'tenant',
+					athleteTenantAssociationId: episode.id,
 					athleteId: input.athleteId,
 					workoutTemplateId: template.id,
 					templateName: template.name,
@@ -1628,26 +1616,9 @@ export class WorkoutsService {
 			.getRepository(Workout)
 			.findOne({ where: { id } });
 		if (!workout) throw new NotFoundException('Treino não encontrado.');
-		if (actor.sub === workout.athleteId) return workout;
-		if (
-			actor.roles.some((role) =>
-				[Role.ORG_ADMIN, Role.ORG_SUPPORT].includes(role),
-			) ||
-			(actor.roles.includes(Role.TENANT_ADMIN) &&
-				actor.tenantId === workout.tenantId)
-		)
-			return workout;
-		if (
-			actor.roles.some((role) =>
-				[Role.TENANT_TRAINER, Role.TENANT_TRAINER_MASTER].includes(role),
-			) &&
-			(await this.associations.existsBy({
-				athleteId: workout.athleteId,
-				trainerId: actor.sub,
-				endDate: IsNull(),
-			}))
-		)
-			return workout;
+		const [access] = await this.dataSource.query<{ allowed: boolean }[]>(
+			'SELECT can_read_athlete_workout($1::uuid, $2::uuid) AS allowed', [id, actor.sub]);
+		if (access?.allowed) return workout;
 		throw new ForbiddenException('Você não pode visualizar este treino.');
 	}
 

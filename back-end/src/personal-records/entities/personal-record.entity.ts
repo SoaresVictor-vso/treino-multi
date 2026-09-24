@@ -36,8 +36,14 @@ export class PersonalRecord {
 	@PrimaryGeneratedColumn('uuid')
 	id!: string;
 
-	@Column({ name: 'tenant_id', type: 'uuid' })
-	tenantId!: string;
+	@Column({ name: 'tenant_id', type: 'uuid', nullable: true })
+	tenantId!: string | null;
+
+	@Column({ type: 'varchar', default: 'tenant' })
+	origin!: 'tenant' | 'athlete';
+
+	@Column({ name: 'athlete_tenant_association_id', type: 'uuid', nullable: true })
+	athleteTenantAssociationId!: string | null;
 
 	@Column({ name: 'athlete_id', type: 'uuid' })
 	athleteId!: string;
@@ -72,9 +78,9 @@ export class PersonalRecord {
 	@DeleteDateColumn({ name: 'deleted_at' })
 	deletedAt!: Date | null;
 
-	@ManyToOne(() => Tenant, { onDelete: 'RESTRICT' })
+	@ManyToOne(() => Tenant, { onDelete: 'RESTRICT', nullable: true })
 	@JoinColumn({ name: 'tenant_id' })
-	tenant!: Tenant;
+	tenant!: Tenant | null;
 
 	@ManyToOne(() => User, { onDelete: 'RESTRICT' })
 	@JoinColumn({ name: 'athlete_id' })

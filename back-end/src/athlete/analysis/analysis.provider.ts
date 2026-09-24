@@ -1,86 +1,58 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { athleteAccessSql } from './sql/analysis-access.sql';
 import {
-	indicatorsSql,
-	exerciseThreeMonthIndicatorsSql,
-	lifetimeSql,
-	exercisesSql,
-	exerciseLifetimeSql,
-} from './sql/athlete-analysis.sql';
-import { measurementsSql } from './sql/athlete-measurements.sql';
+  athleteAnalysisQuery,
+  exerciseAnalysisQuery,
+} from './sql/analysis-query.sql';
 import type {
-	IndicatorRow,
-	MeasurementRow,
-	LifetimeRow,
-	ExerciseRow,
-	ExerciseLifetimeRow,
+  IndicatorRow,
+  MeasurementRow,
+  LifetimeRow,
+  ExerciseRow,
+  ExerciseLifetimeRow,
 } from './analysis.mapper';
 
-export interface AthleteAccessRow {
-	tenantId: string | null;
-	name: string;
-	isTrainer: boolean;
+export interface AnalysisAccessRow {
+  found: boolean;
+  allowed: boolean;
+  name: string | null;
+}
+export interface AthleteAnalysisRow extends AnalysisAccessRow {
+  measurements: MeasurementRow[];
+  lifetime: LifetimeRow[];
+  exercises: ExerciseRow[];
+}
+export interface ExerciseAnalysisRow extends AnalysisAccessRow {
+  indicators: IndicatorRow[];
+  lifetime: ExerciseLifetimeRow[];
 }
 
 @Injectable()
 export class AnalysisProvider {
-	constructor(private readonly dataSource: DataSource) {}
-	access(athleteId: string, actorId: string) {
-		return this.dataSource.query<AthleteAccessRow[]>(athleteAccessSql, [
-			athleteId,
-			actorId,
-		]);
-	}
-	indicators(
-		athleteId: string,
-		tenantId: string,
-		days: number,
-		exerciseId: number | null = null,
-	) {
-		return this.dataSource.query<IndicatorRow[]>(indicatorsSql, [
-			athleteId,
-			tenantId,
-			days,
-			exerciseId,
-		]);
-	}
-	exerciseThreeMonthIndicators(
-		athleteId: string,
-		tenantId: string,
-		exerciseId: number,
-		from: string,
-		to: string,
-	) {
-		return this.dataSource.query<IndicatorRow[]>(
-			exerciseThreeMonthIndicatorsSql,
-			[athleteId, tenantId, from, to, exerciseId],
-		);
-	}
-	measurements(athleteId: string, tenantId: string, days: number) {
-		return this.dataSource.query<MeasurementRow[]>(measurementsSql, [
-			athleteId,
-			tenantId,
-			days,
-		]);
-	}
-	lifetime(athleteId: string, tenantId: string) {
-		return this.dataSource.query<LifetimeRow[]>(lifetimeSql, [
-			athleteId,
-			tenantId,
-		]);
-	}
-	exercises(athleteId: string, tenantId: string) {
-		return this.dataSource.query<ExerciseRow[]>(exercisesSql, [
-			athleteId,
-			tenantId,
-		]);
-	}
-	exerciseLifetime(athleteId: string, tenantId: string, exerciseId: number) {
-		return this.dataSource.query<ExerciseLifetimeRow[]>(exerciseLifetimeSql, [
-			athleteId,
-			tenantId,
-			exerciseId,
-		]);
-	}
+  constructor(private readonly dataSource: DataSource) {}
+
+  async athlete(athleteId: string, actorId: string, days: number) {
+    const [row] = await this.dataSource.query<AthleteAnalysisRow[]>(
+      athleteAnalysisQuery, [athleteId, actorId, days],
+    );
+    return row;
+  }
+
+  async exercise(
+    athleteId: string,
+    actorId: string,
+    period: '7' | '15' | '30' | '3m',
+    exerciseId: number,
+    from: string,
+    to: string,
+  ) {
+    const threeMonths = period === '3m';
+    const params = threeMonths
+      ? [athleteId, actorId, from, to, exerciseId]
+      : [athleteId, actorId, Number(period), exerciseId];
+    const [row] = await this.dataSource.query<ExerciseAnalysisRow[]>(
+      exerciseAnalysisQuery(threeMonths), params,
+    );
+    return row;
+  }
 }

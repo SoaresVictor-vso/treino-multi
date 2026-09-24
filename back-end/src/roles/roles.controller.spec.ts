@@ -51,9 +51,9 @@ describe('RolesController', () => {
 			);
 		});
 
-		it('standalone:user deve ter apenas permissões de autenticação básica', () => {
+		it('tenant:client deve manter autenticação básica sem gestão de usuários', () => {
 			const result = controller.findAll();
-			const standaloneEntry = result.find((r) => r.role === Role.STANDALONE_USER);
+			const standaloneEntry = result.find((r) => r.role === Role.TENANT_CLIENT);
 
 			expect(standaloneEntry).toBeDefined();
 			expect(standaloneEntry!.permissions).toContain(Permission.AUTH_LOGIN);
@@ -77,14 +77,14 @@ describe('RolesController', () => {
 			});
 		});
 
-		it('deve retornar as permissões corretas para tenant:financial', () => {
-			const result = controller.findOne(Role.TENANT_FINANCIAL) as {
+		it('deve retornar a permissão de gestão de vínculo ao trainer-master', () => {
+			const result = controller.findOne(Role.TENANT_TRAINER_MASTER) as {
 				role: Role;
 				permissions: Permission[];
 			};
 
-			expect(result.permissions).toContain(Permission.FINANCIAL_INVOICES_READ);
-			expect(result.permissions).toContain(Permission.FINANCIAL_INVOICES_CREATE);
+			expect(result.permissions).toContain(Permission.ATHLETE_TENANT_ASSOCIATION_MANAGE);
+			expect(result.permissions).toContain(Permission.ATHLETE_MANAGE);
 			expect(result.permissions).not.toContain(Permission.USER_CREATE);
 		});
 

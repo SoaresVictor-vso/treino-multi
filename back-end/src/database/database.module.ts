@@ -16,6 +16,9 @@ import { Exercise } from '../exercises/entities/exercise.entity';
 import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
 import { Activity } from '../workout-templates/entities/activity.entity';
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
+import { AthleteTenantAssociation } from '../athlete/entities/athlete-tenant-association.entity';
+import { ExternalIdentity } from '../auth/entities/external-identity.entity';
+import { SessionFamily } from '../auth/entities/session-family.entity';
 import { Workout } from '../workouts/entities/workout.entity';
 import { Execution } from '../workouts/entities/execution.entity';
 import { WorkoutExerciseNote } from '../workouts/entities/workout-exercise-note.entity';
@@ -54,6 +57,9 @@ import { DatabaseSyncService } from './database-sync.service';
 					WorkoutTemplate,
 					Activity,
 					AthleteTrainerAssociation,
+					AthleteTenantAssociation,
+					ExternalIdentity,
+					SessionFamily,
 					Workout,
 					Execution,
 					WorkoutExerciseNote,

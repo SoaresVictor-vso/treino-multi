@@ -11,6 +11,7 @@ import {
 
 import { MetricField } from './MetricField';
 import { RestDurationField } from './RestDurationField';
+import { getVisualMetricOrder } from '@/lib/metricPresentation';
 
 const RpeMetric: Metric = {
 	name: 'RPE',
@@ -35,6 +36,7 @@ export function ActivityBlock({
 	onRemove?: () => void;
 }) {
 	const [menuOpen, setMenuOpen] = useState(false);
+	const visualMetrics = getVisualMetricOrder(exercise.metric_1, exercise.metric_2);
 
 	return (
 		<div
@@ -68,29 +70,22 @@ export function ActivityBlock({
 						</div>
 					)}
 				</div>
-				{exercise.metric_1 && (
+				{visualMetrics.map(({ metric, key }) => (
 					<MetricField
-						metric={exercise.metric_1}
-						value={activity.metric1}
-						type={activity.type1}
-						onChange={(value) => onChange('metric1', value)}
-						onTypeChange={(value) => onChange('type1', value)}
-						disabled={disabled}
-					/>
-				)}
-				{exercise.metric_2 && (
-					<MetricField
-						metric={exercise.metric_2}
-						value={activity.metric2}
-						type={activity.type2}
+						key={key}
+						metric={metric}
+						value={key === 1 ? activity.metric1 : activity.metric2}
+						type={key === 1 ? activity.type1 : activity.type2}
 						onChange={(value) =>
-							onChange('metric2', value === '' ? undefined : value)
+							key === 1
+								? onChange('metric1', value)
+								: onChange('metric2', value === '' ? undefined : value)
 						}
-						onTypeChange={(value) => onChange('type2', value)}
+						onTypeChange={(value) => onChange(key === 1 ? 'type1' : 'type2', value)}
 						disabled={disabled}
-						allowPercent
+						allowPercent={key === 2}
 					/>
-				)}
+				))}
 				<MetricField
 					metric={RpeMetric}
 					value={activity.pse}

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import React from 'react';
 import * as icons from 'react-icons/ri';
-import { clearSessionTokens } from '@/gateway/client';
+import { logoutSession } from '@/gateway/client';
 import { NavItemPublic } from '@/lib/navigation';
 
 export default function Sidebar({
@@ -21,8 +21,8 @@ export default function Sidebar({
 	const router = useRouter();
 	const [collapsed, setCollapsed] = useState(true);
 
-	function handleLogout() {
-		clearSessionTokens();
+	async function handleLogout() {
+		await logoutSession();
 		router.push('/login');
 	}
 

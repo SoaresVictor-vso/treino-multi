@@ -13,6 +13,8 @@ import { Person } from '../persons/entities/person.entity';
 import { CreateAthleteTrainerAssociationDto } from './dto/create-athlete-trainer-association.dto';
 import { CreateAthleteTrainerAssociationsDto } from './dto/create-athlete-trainer-associations.dto';
 import { AthleteTrainerAssociation } from './entities/athlete-trainer-association.entity';
+import { AthleteTenantAssociation } from './entities/athlete-tenant-association.entity';
+import { AthleteTenantStatus } from '../common/enums/athlete-tenant-status.enum';
 import { UsersService } from '../users/users.service';
 
 @Injectable()
@@ -25,10 +27,14 @@ export class AthleteService {
 		private readonly dataSource: DataSource,
 	) {}
 
-	async findAthletes(actor: JwtPayload) {
+	async findAthletes(actor: JwtPayload, selectedTenantId?: string) {
+		const tenantId = this.resolveReadTenantId(actor, selectedTenantId);
 		const isTrainer = actor.roles.includes(Role.TENANT_TRAINER);
 		const qb = this.users
 			.createQueryBuilder('athlete')
+			.innerJoin(AthleteTenantAssociation, 'tenantAssociation',
+				'tenantAssociation.athleteId = athlete.id AND tenantAssociation.tenantId = :tenantId AND tenantAssociation.status = :active',
+				{ tenantId, active: AthleteTenantStatus.ACTIVE })
 			.innerJoin('athlete.person', 'person')
 			.innerJoin(
 				'athlete.userRoles',
@@ -40,7 +46,7 @@ export class AthleteService {
 				'athlete.activeAssociation',
 				AthleteTrainerAssociation,
 				'association',
-				'association.athleteId = athlete.id AND association.endDate IS NULL',
+				'association.athleteTenantAssociationId = tenantAssociation.id AND association.endDate IS NULL',
 			)
 			.leftJoinAndMapOne(
 				'association.trainer',
@@ -56,15 +62,13 @@ export class AthleteService {
 			)
 			.orderBy('person.name', 'ASC');
 
-		if (actor.tenantId)
-			qb.andWhere('athlete.tenantId = :tenantId', { tenantId: actor.tenantId });
 		if (isTrainer)
 			qb.andWhere('association.trainerId = :trainerId', { trainerId: actor.sub });
 
 		const rows = await qb
 			.select([
 				'athlete.id AS athlete_id',
-				'athlete.tenant_id AS athlete_tenant_id',
+				'tenantAssociation.tenant_id AS athlete_tenant_id',
 				'athlete.is_active AS athlete_is_active',
 				'person.name AS person_name',
 				'person.email AS person_email',
@@ -106,6 +110,19 @@ export class AthleteService {
 		}));
 	}
 
+	private resolveReadTenantId(actor: JwtPayload, selectedTenantId?: string): string {
+		if (actor.tenantId) {
+			if (selectedTenantId && selectedTenantId !== actor.tenantId)
+				throw new ForbiddenException('Tenant fora do seu contexto.');
+			return actor.tenantId;
+		}
+		if (!actor.roles.includes(Role.ORG_ADMIN))
+			throw new ForbiddenException('Contexto de tenant necessário.');
+		if (!selectedTenantId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedTenantId))
+			throw new BadRequestException('Selecione um tenant válido.');
+		return selectedTenantId;
+	}
+
 	async findTrainers(actor: JwtPayload) {
 		const qb = this.users
 			.createQueryBuilder('trainer')
@@ -138,6 +155,7 @@ export class AthleteService {
 		actor: JwtPayload,
 	) {
 		this.ensureValidStartDate(dto.startDate);
+		if (!actor.tenantId) throw new ForbiddenException('Contexto de tenant necessário.');
 		const [athlete, trainer] = await this.usersService.findTenantUser(
 			[dto.athleteId, dto.trainerId],
 			actor.tenantId,
@@ -150,29 +168,22 @@ export class AthleteService {
 		) {
 			throw new BadRequestException('O usuário selecionado não é um treinador.');
 		}
-		if (athlete.tenantId !== trainer.tenantId)
-			throw new BadRequestException(
-				'Atleta e treinador devem pertencer ao mesmo tenant.',
-			);
+		if (trainer.tenantId !== actor.tenantId) throw new ForbiddenException('Treinador fora do tenant.');
 
 		return this.dataSource.transaction(async (manager) => {
-			const current = await manager.findOne(AthleteTrainerAssociation, {
-				where: { athleteId: athlete.id, endDate: IsNull() },
+			const episode = await manager.findOneByOrFail(AthleteTenantAssociation, {
+				athleteId: athlete.id, tenantId: actor.tenantId!, status: AthleteTenantStatus.ACTIVE,
 			});
-			if (current) {
-				if (current.trainerId === trainer.id)
-					throw new ConflictLikeBadRequest(
-						'O atleta já está associado a este treinador.',
-					);
-				current.endDate = dto.startDate;
-				current.endedByUserId = actor.sub;
-				await manager.save(current);
-			}
+			const current = await manager.findOne(AthleteTrainerAssociation, {
+				where: { athleteTenantAssociationId: episode.id, trainerId: trainer.id, endDate: IsNull() },
+			});
+			if (current) throw new ConflictLikeBadRequest('O atleta já está associado a este treinador.');
 			return manager.save(
 				AthleteTrainerAssociation,
 				manager.create(AthleteTrainerAssociation, {
 					athleteId: athlete.id,
 					trainerId: trainer.id,
+					athleteTenantAssociationId: episode.id,
 					startDate: dto.startDate,
 					startedByUserId: actor.sub,
 					endDate: null,
@@ -187,6 +198,7 @@ export class AthleteService {
 		actor: JwtPayload,
 	) {
 		this.ensureValidStartDate(dto.startDate);
+		if (!actor.tenantId) throw new ForbiddenException('Contexto de tenant necessário.');
 		const athleteIds = [...new Set(dto.athleteIds)];
 		const [trainer, ...athletes] = await this.usersService.findTenantUser(
 			[dto.trainerId, ...athleteIds],
@@ -204,28 +216,23 @@ export class AthleteService {
 				'Um dos usuários selecionados não é um atleta.',
 			);
 		}
-		if (athletes.some((athlete) => athlete.tenantId !== trainer.tenantId)) {
-			throw new BadRequestException(
-				'Atletas e treinador devem pertencer ao mesmo tenant.',
-			);
-		}
+		if (trainer.tenantId !== actor.tenantId) throw new ForbiddenException('Treinador fora do tenant.');
 
 		return this.dataSource.transaction(async (manager) => {
 			for (const athlete of athletes) {
-				const current = await manager.findOne(AthleteTrainerAssociation, {
-					where: { athleteId: athlete.id, endDate: IsNull() },
+				const episode = await manager.findOneByOrFail(AthleteTenantAssociation, {
+					athleteId: athlete.id, tenantId: actor.tenantId!, status: AthleteTenantStatus.ACTIVE,
 				});
-				if (current) {
-					if (current.trainerId === trainer.id) continue;
-					current.endDate = dto.startDate;
-					current.endedByUserId = actor.sub;
-					await manager.save(current);
-				}
+				const current = await manager.findOne(AthleteTrainerAssociation, {
+					where: { athleteTenantAssociationId: episode.id, trainerId: trainer.id, endDate: IsNull() },
+				});
+				if (current) continue;
 				await manager.save(
 					AthleteTrainerAssociation,
 					manager.create(AthleteTrainerAssociation, {
 						athleteId: athlete.id,
 						trainerId: trainer.id,
+						athleteTenantAssociationId: episode.id,
 						startDate: dto.startDate,
 						startedByUserId: actor.sub,
 						endDate: null,
@@ -248,7 +255,9 @@ export class AthleteService {
 		});
 		if (!association)
 			throw new NotFoundException('Vínculo ativo não encontrado.');
-		if (actor.tenantId && association.athlete.tenantId !== actor.tenantId)
+		const episode = association.athleteTenantAssociationId && await this.dataSource.getRepository(AthleteTenantAssociation)
+			.findOneBy({ id: association.athleteTenantAssociationId, status: AthleteTenantStatus.ACTIVE });
+		if (!actor.tenantId || !episode || episode.tenantId !== actor.tenantId)
 			throw new ForbiddenException('O vínculo não pertence ao seu tenant.');
 		association.endDate = endDate ?? new Date().toISOString().slice(0, 10);
 		association.endedByUserId = actor.sub;

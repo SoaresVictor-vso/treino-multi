@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class RefreshTokenDto {
@@ -7,5 +7,6 @@ export class RefreshTokenDto {
 		example: 'abc123...',
 	})
 	@IsString()
-	refreshToken: string;
+	@IsOptional()
+	refreshToken?: string;
 }

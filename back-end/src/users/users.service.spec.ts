@@ -63,6 +63,7 @@ describe('UsersService', () => {
 						findOne: jest.fn(),
 						find: jest.fn(),
 						update: jest.fn(),
+						save: jest.fn(),
 						softRemove: jest.fn(),
 						createQueryBuilder: jest.fn(),
 					},
@@ -154,11 +155,11 @@ describe('UsersService', () => {
 				name: 'Nova Pessoa',
 				email: 'nova@org.com',
 				document: '12345678901',
-				fone: '11999990000',
+					phone: '11999990000',
 				tenantId: 'tenant-uuid-1',
 				context: 'tenant',
 				password: 'Senha@123',
-				roles: [Role.ORG_SUPPORT],
+					tenantFunction: 'admin',
 			});
 
 			expect(result).toEqual(savedUser);
@@ -267,9 +268,9 @@ describe('UsersService', () => {
 				person: {
 					id: 'person-uuid-1',
 					name: 'Nome Novo',
-					email: 'novo@org.com',
+						email: 'old@org.com',
 					document: '10987654321',
-					phone: '11888887777',
+						phone: '11888887777',
 				} as any,
 			});
 
@@ -281,15 +282,14 @@ describe('UsersService', () => {
 
 			const result = await service.updateManagedUser('user-uuid-1', {
 				name: 'Nome Novo',
-				email: 'novo@org.com',
-				document: '10987654321',
-				fone: '11888887777',
+					document: '10987654321',
+						fone: '11888887777',
 			});
 
 			expect(personRepo.save).toHaveBeenCalledWith(
 				expect.objectContaining({
 					name: 'Nome Novo',
-					email: 'novo@org.com',
+						email: 'old@org.com',
 					document: '10987654321',
 					phone: '11888887777',
 				}),
@@ -346,7 +346,9 @@ describe('UsersService', () => {
 		it('deve salvar hash do token usado ao redefinir senha com sucesso', async () => {
 			const user = makeUser();
 			userRepo.findOne.mockResolvedValue(user);
-			userRepo.update.mockResolvedValue(undefined as any);
+				userRepo.update.mockResolvedValue(undefined as any);
+				dataSource.transaction.mockImplementation(async (callback: any) =>
+					callback({ update: jest.fn().mockResolvedValue(undefined) }));
 
 			const token = jwt.sign(
 				{ sub: user.id, purpose: 'password-reset' },
@@ -370,8 +372,9 @@ describe('UsersService', () => {
 					isSession: false,
 					userId: user.id,
 					tenantId: user.tenantId,
-					usedToken: expectedUsedTokenHash,
-				}),
+						usedToken: expectedUsedTokenHash,
+					}),
+					expect.anything(),
 			);
 		});
 	});

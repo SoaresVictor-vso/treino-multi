@@ -32,8 +32,8 @@ export class User {
 	@Column({ type: 'varchar' })
 	context!: UserContext;
 
-	@Column({ name: 'password_hash', type: 'varchar' })
-	passwordHash!: string;
+	@Column({ name: 'password_hash', type: 'varchar', nullable: true })
+	passwordHash!: string | null;
 
 	@Column({ name: 'is_active', type: 'boolean', default: true })
 	isActive!: boolean;

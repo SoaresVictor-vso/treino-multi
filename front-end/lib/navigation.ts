@@ -67,6 +67,13 @@ const NAV_ITEMS: { [href: string]: NavItem } = {
 		],
 		hidden: false,
 		},
+	'/associations': {
+		href: '/associations',
+		label: 'Vínculos com atletas',
+		icon: 'RiLinksLine',
+		allowedRoles: [Role.TENANT_ADMIN, Role.TENANT_TRAINER_MASTER],
+		hidden: false,
+	},
 	'/exercise-groups': {
 		href: '/exercise-groups',
 		label: 'Grupos de exercícios',

@@ -4,10 +4,11 @@ import { LoginRequest, LoginResponse } from '../types/login';
 export class LoginService {
 	private readonly apiUrl = 'auth/login';
 
-	async login(identifier: string, password: string) {
+	async login(identifier: string, password: string, rememberMe: boolean) {
 		const payload: LoginRequest = {
 			login: identifier,
 			password,
+			rememberMe,
 		};
 		const response = await apiRequest<LoginResponse>(this.apiUrl, {
 			method: 'POST',
