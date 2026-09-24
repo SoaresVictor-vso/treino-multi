@@ -37,6 +37,12 @@ export class AthleteTenantAssociationsController {
     return this.service.invite(actor, dto.email, dto.password, ip);
   }
 
+  @Post(':id/revoke')
+  @RequirePermissions(Permission.ATHLETE_TENANT_ASSOCIATION_MANAGE)
+  revoke(@CurrentUser() actor: JwtPayload, @Param('id', ParseUUIDPipe) id: string, @Ip() ip: string) {
+    return this.service.revoke(actor, id, ip);
+  }
+
   @Post(':id/accept') accept(@CurrentUser() actor: JwtPayload, @Param('id', ParseUUIDPipe) id: string, @Ip() ip: string) {
     return this.service.decide(actor, id, true, ip);
   }

@@ -9,6 +9,7 @@
 		"lint": "eslint"
 	},
 	"dependencies": {
+		"@treino-multi/shared": "file:../packages/shared",
 		"@hookform/resolvers": "^5.4.0",
 		"@orama/orama": "^3.1.18",
 		"@orama/stemmers": "^3.1.18",

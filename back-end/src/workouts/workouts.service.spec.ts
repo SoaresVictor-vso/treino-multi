@@ -272,6 +272,41 @@ describe('WorkoutsService', () => {
 		);
 	});
 
+	it('permite visualizar o perfil com lista vazia quando o escopo não permite nenhum treino', async () => {
+		const user = { id: input.athleteId, person: { name: 'Atleta' } };
+		const queryBuilder = {
+			where: jest.fn().mockReturnThis(),
+			andWhere: jest.fn().mockReturnThis(),
+			orderBy: jest.fn().mockReturnThis(),
+			addOrderBy: jest.fn().mockReturnThis(),
+			getMany: jest.fn().mockResolvedValue([]),
+		};
+		const repo = { createQueryBuilder: jest.fn().mockReturnValue(queryBuilder) };
+		Object.assign(dataSource, { getRepository: jest.fn().mockReturnValue(repo) });
+		Object.assign(service['usersService'], { findOne: jest.fn().mockResolvedValue(user) });
+		dataSource.query.mockResolvedValue([{ allowed: true }]);
+
+		await expect(service.findAthleteWorkouts(input.athleteId, {
+			sub: input.createdBy,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_ADMIN],
+		})).resolves.toEqual({ athlete: { id: input.athleteId, name: 'Atleta' }, workouts: [] });
+		expect(dataSource.query).toHaveBeenCalledWith(
+			'SELECT can_read_athlete_profile($1::uuid, $2::uuid) AS allowed',
+			[input.athleteId, input.createdBy],
+		);
+	});
+
+	it('nega o perfil independentemente da quantidade de treinos', async () => {
+		Object.assign(service['usersService'], { findOne: jest.fn().mockResolvedValue({ id: input.athleteId, person: { name: 'Atleta' } }) });
+		dataSource.query.mockResolvedValue([{ allowed: false }]);
+		await expect(service.findAthleteWorkouts(input.athleteId, {
+			sub: input.createdBy,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_TRAINER],
+		})).rejects.toThrow('Você não pode visualizar este atleta.');
+	});
+
 	it('impede o treinador de atribuir treino a atletas sem vínculo ativo', async () => {
 		associations.findBy.mockResolvedValue([]);
 

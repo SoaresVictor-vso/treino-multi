@@ -4,14 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-	RiArrowRightSLine,
 	RiEditLine,
-	RiLockPasswordLine,
 	RiLogoutBoxRLine,
 	RiMailLine,
 	RiPhoneLine,
 	RiSaveLine,
-	RiShieldCheckLine,
 	RiUserLine,
 } from 'react-icons/ri';
 import Button from '@/components/ui/Button';
@@ -26,7 +23,7 @@ import {
 	PHONE_REGEX,
 } from '@/lib/constants';
 import { UsersService } from '@/gateway/services/users';
-import { forgetBrowserSession, logoutSession } from '@/gateway/client';
+import { logoutSession } from '@/gateway/client';
 
 const usersService = new UsersService();
 type ProfileForm = { name: string; email: string; phone: string; document: string };
@@ -38,15 +35,9 @@ export default function PerfilPage() {
 	const [loading, setLoading] = useState(true);
 	const [profileOpen, setProfileOpen] = useState(false);
 	const [documentLocked, setDocumentLocked] = useState(false);
-	const [passwordOpen, setPasswordOpen] = useState(false);
 	const [profileError, setProfileError] = useState<string | null>(null);
 	const [profileMessage, setProfileMessage] = useState<string | null>(null);
 	const [savingProfile, setSavingProfile] = useState(false);
-	const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmation: '' });
-	const [passwordError, setPasswordError] = useState<string | null>(null);
-	const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
-	const [savingPassword, setSavingPassword] = useState(false);
-	const [revokeAllSessions, setRevokeAllSessions] = useState(false);
 
 	useEffect(() => {
 		let active = true;
@@ -94,21 +85,6 @@ export default function PerfilPage() {
 		setProfileMessage('Dados pessoais atualizados.');
 	}
 
-	async function savePassword(event: React.FormEvent<HTMLFormElement>) {
-		event.preventDefault();
-		if (passwords.newPassword.length < 8) return setPasswordError('A nova senha deve ter pelo menos 8 caracteres.');
-		if (passwords.newPassword !== passwords.confirmation) return setPasswordError('A confirmação não confere com a nova senha.');
-		setSavingPassword(true);
-		setPasswordError(null);
-		const result = await usersService.changeMyPassword({ currentPassword: passwords.currentPassword, newPassword: passwords.newPassword, revokeAllSessions });
-		setSavingPassword(false);
-		if (!result.success) return setPasswordError(result.error || 'Não foi possível alterar sua senha.');
-		if (revokeAllSessions) { await forgetBrowserSession(); router.replace('/login'); return; }
-		setPasswords({ currentPassword: '', newPassword: '', confirmation: '' });
-		setPasswordOpen(false);
-		setPasswordMessage('Senha alterada com sucesso.');
-	}
-
 	return <section className="mx-auto w-full max-w-2xl px-4 pb-4">
 		{loading ? <p className="rounded-xl bg-surface-container p-4 text-sm text-on-surface-variant">Carregando seus dados...</p> : <section className="overflow-hidden rounded-2xl bg-surface-container p-4">
 			<section>
@@ -124,13 +100,10 @@ export default function PerfilPage() {
 			<section className="mt-6 border-t border-outline-variant/50 pt-5"><h2 className="mb-3 text-sm font-medium text-on-surface-variant">Dados pessoais</h2><div><div className="border-b border-outline-variant/50 py-3"><p className="text-xs font-medium text-on-surface-variant">Nome completo</p><p className="mt-1 text-sm font-medium text-primary">{profile.name || 'Não informado'}</p></div><div className="border-b border-outline-variant/50 py-3"><p className="text-xs font-medium text-on-surface-variant">E-mail</p><p className="mt-1 break-words text-sm font-medium text-primary">{profile.email || 'Não informado'}</p></div><div className="border-b border-outline-variant/50 py-3"><p className="text-xs font-medium text-on-surface-variant">Telefone</p><p className="mt-1 text-sm font-medium text-primary">{profile.phone ? applyMask(profile.phone, PHONE_MASK_REGEX) : 'Não informado'}</p></div><div className="py-3"><p className="text-xs font-medium text-on-surface-variant">CPF</p><p className="mt-1 text-sm font-medium text-primary">{profile.document ? applyMask(profile.document, CPF_MASK_REGEX) : 'Não informado'}</p></div></div>{profileMessage && <p role="status" className="mt-3 text-sm font-medium text-primary-fixed">{profileMessage}</p>}{profileError && <div className="mt-3"><ErrorBox message={profileError} /></div>}</section>
 
 			<section className="mt-6 border-t border-outline-variant/50 pt-5"><h2 className="mb-3 text-sm font-medium text-on-surface-variant">Sua conta</h2><Link href="/app/consultorias" className="block rounded-xl px-2 py-4 hover:bg-surface-container-high">Gerenciar consultorias →</Link><Link href="/login-methods" className="block rounded-xl px-2 py-4 hover:bg-surface-container-high">Métodos de login →</Link></section>
-			<section className="mt-6 border-t border-outline-variant/50 pt-5"><h2 className="mb-3 text-sm font-medium text-on-surface-variant">Segurança</h2><button type="button" onClick={() => { setPasswordError(null); setPasswordMessage(null); setPasswordOpen(true); }} className="flex min-h-16 w-full items-center gap-3 rounded-xl px-1 py-3 text-left transition hover:bg-surface-container-high focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-fixed-dim/30"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-secondary-container text-primary-fixed"><RiLockPasswordLine size={20} aria-hidden /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-primary">Senha</span><span className="mt-1 block text-xs text-on-surface-variant">Altere sua senha de acesso</span></span><RiArrowRightSLine size={23} className="shrink-0 text-on-surface-variant" aria-hidden /></button>{passwordMessage && <p role="status" className="mt-3 text-sm font-medium text-primary-fixed">{passwordMessage}</p>}</section>
-
 			<section className="mt-6 border-t border-outline-variant/50 pt-5"><Button type="button" variant="outline" className="w-full border-error/50 text-error hover:border-error hover:bg-error-container/20 hover:text-error" onClick={handleLogout}><RiLogoutBoxRLine size={20} aria-hidden />Sair da conta</Button></section>
 		</section>}
 
 		<Modal isOpen={profileOpen} title="Alterar dados pessoais" description="Atualize as informações exibidas no seu perfil." onClose={() => setProfileOpen(false)}><form className="space-y-5" onSubmit={saveProfile}><div className="grid gap-4 sm:grid-cols-2"><Input label="Nome completo" required value={profile.name} disabled={savingProfile} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} /><Input label="E-mail" type="email" required leadingIcon={<RiMailLine />} value={profile.email} disabled hint="O e-mail não pode ser alterado." /><Input label="Telefone" type="tel" leadingIcon={<RiPhoneLine />} mask={PHONE_MASK_REGEX} value={profile.phone} disabled={savingProfile} onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value }))} /><Input label="CPF" mask={CPF_MASK_REGEX} value={profile.document} disabled={savingProfile || documentLocked} hint={documentLocked ? 'O documento cadastrado não pode ser alterado.' : 'Informe seu CPF para completar o cadastro.'} onChange={(event) => setProfile((current) => ({ ...current, document: event.target.value }))} /></div>{profileError && <ErrorBox message={profileError} />}<div className="flex justify-end gap-3 border-t border-outline-variant pt-5"><Button type="button" variant="outline" onClick={() => setProfileOpen(false)}>Cancelar</Button><Button type="submit" disabled={savingProfile}><RiSaveLine aria-hidden />{savingProfile ? 'Salvando...' : 'Salvar dados'}</Button></div></form></Modal>
 
-		<Modal isOpen={passwordOpen} title="Alterar senha" description="Confirme sua senha atual antes de definir uma nova." onClose={() => setPasswordOpen(false)}><form className="space-y-5" onSubmit={savePassword}><Input label="Senha atual" type="password" required autoComplete="current-password" value={passwords.currentPassword} disabled={savingPassword} onChange={(event) => setPasswords((current) => ({ ...current, currentPassword: event.target.value }))} /><div className="grid gap-4 sm:grid-cols-2"><Input label="Nova senha" type="password" required minLength={8} autoComplete="new-password" value={passwords.newPassword} disabled={savingPassword} onChange={(event) => setPasswords((current) => ({ ...current, newPassword: event.target.value }))} /><Input label="Confirmar nova senha" type="password" required minLength={8} autoComplete="new-password" value={passwords.confirmation} disabled={savingPassword} onChange={(event) => setPasswords((current) => ({ ...current, confirmation: event.target.value }))} /></div><p className="flex items-center gap-2 text-xs text-on-surface-variant"><RiShieldCheckLine size={16} aria-hidden />A nova senha deve ter pelo menos 8 caracteres.</p><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={revokeAllSessions} onChange={event => setRevokeAllSessions(event.target.checked)} /> Revogar todas as sessões</label>{passwordError && <ErrorBox message={passwordError} />}<div className="flex justify-end gap-3 border-t border-outline-variant pt-5"><Button type="button" variant="outline" onClick={() => setPasswordOpen(false)}>Cancelar</Button><Button type="submit" disabled={savingPassword}>{savingPassword ? 'Alterando...' : 'Alterar senha'}</Button></div></form></Modal>
 	</section>;
 }

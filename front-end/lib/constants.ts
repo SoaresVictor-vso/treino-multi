@@ -1,4 +1,8 @@
-export const API_URL =
+/** Browser requests stay on the frontend origin so auth cookies are first-party. */
+export const API_URL = '/api';
+
+/** Direct API origin for server-side requests that bypass the browser cookie jar. */
+export const API_ORIGIN =
 	process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 
 export const TTL_PARAMETROS = 24 * 60 * 60 * 1000;

@@ -1,5 +1,6 @@
 import {
 	BadRequestException,
+	ForbiddenException,
 	Body,
 	Controller,
 	Delete,
@@ -27,6 +28,7 @@ import { Permission } from '../common/enums/permission.enum';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import * as jwtPayloadInterface from '../auth/interfaces/jwt-payload.interface';
 import { CreateTenantFullDto } from './dto/create-tenant-full.dto';
+import { Role } from '../common/enums/role.enum';
 
 /**
  * CRUD de Tenant.
@@ -37,6 +39,17 @@ import { CreateTenantFullDto } from './dto/create-tenant-full.dto';
 @Controller('tenants')
 export class TenantsController {
 	constructor(private readonly tenantsService: TenantsService) {}
+
+	@Get('athlete-follow-up-options')
+	@RequirePermissions(Permission.TENANT_READ)
+	athleteFollowUpOptions(
+		@CurrentUser() actor: jwtPayloadInterface.JwtPayload,
+		@Query('name') name?: string,
+	) {
+		if (!actor.roles.includes(Role.ORG_ADMIN))
+			throw new ForbiddenException('Acesso restrito à administração da organização.');
+		return this.tenantsService.findAthleteFollowUpOptions(name);
+	}
 
 	/** POST /tenants — cria um novo tenant */
 	@ApiOperation({ summary: 'Cria um novo tenant' })

@@ -1,31 +1,41 @@
 import { localDay, periodCte } from './period.sql';
 
-// Workout adherence counts prescribed sets. Exercise-level RPE adherence
-// averages the valid sets for that exercise; athlete-level uses its measurement.
+// Exercise analysis averages the stored measurements from tenant-generated
+// workouts, weighted by their considered sets. Athlete-created workouts are
+// excluded before aggregation.
 const indicatorBody = (dateCondition: string, exerciseParameter: string) => `,
+eligible_workouts AS (
+  SELECT p.period, w.id AS workout_id
+  FROM periods p
+  JOIN workouts w ON w.athlete_id = $1 AND w.origin = 'tenant'
+    AND can_read_athlete_workout(w.id, $2::uuid) AND w.status = 'completed'
+    AND ${dateCondition}
+),
 eligible AS (
   SELECT p.period, e.status, e.prescribed_metric_1, e.prescribed_metric_2,
     e.performed_metric_1, e.performed_metric_2, e.prescribed_pse, e.performed_pse,
     exercise.metric_2_id IS NOT NULL AS has_metric_2
   FROM periods p
-  JOIN workouts w ON w.athlete_id = $1 AND can_read_athlete_workout(w.id, $2::uuid) AND w.status = 'completed'
+  JOIN workouts w ON w.athlete_id = $1 AND w.origin = 'tenant'
+    AND can_read_athlete_workout(w.id, $2::uuid) AND w.status = 'completed'
     AND ${dateCondition}
   JOIN executions e ON e.workout_id = w.id
   JOIN exercises exercise ON exercise.id = e.exercise_id
   WHERE (${exerciseParameter}::int IS NULL OR e.exercise_id = ${exerciseParameter})
 )
 SELECT p.period, p.start_day::text AS "startDay", p.end_day::text AS "endDay",
-  AVG(performed_pse) FILTER (WHERE status = 'completed' AND performed_pse > 0) AS "averageRpe",
-  CASE WHEN COUNT(e.status) = 0 THEN NULL ELSE 100.0 * COUNT(*) FILTER (
-    WHERE status = 'completed' AND prescribed_metric_1 > 0
-      AND performed_metric_1 = prescribed_metric_1
-      AND (NOT has_metric_2 OR (prescribed_metric_2 > 0 AND performed_metric_2 = prescribed_metric_2))
-  ) / COUNT(e.status) END AS adherence,
+  SUM(wm.value * wm.considered_sets) FILTER (WHERE m.key = 'average-rpe')
+    / NULLIF(SUM(wm.considered_sets) FILTER (WHERE m.key = 'average-rpe'), 0) AS "averageRpe",
+  AVG(wm.value) FILTER (WHERE m.key = 'workout-adherence') AS adherence,
   CASE WHEN ${exerciseParameter}::int IS NULL THEN NULL::numeric
-    ELSE AVG(CASE WHEN performed_pse = prescribed_pse THEN 100.0 ELSE 0.0 END) FILTER (
-    WHERE status = 'completed' AND performed_pse > 0 AND prescribed_pse > 0
-  ) END AS "rpeAdherence"
-FROM periods p LEFT JOIN eligible e USING (period)
+    ELSE SUM(wm.value * wm.considered_sets) FILTER (WHERE m.key = 'effort-adherence')
+      / NULLIF(SUM(wm.considered_sets) FILTER (WHERE m.key = 'effort-adherence'), 0)
+  END AS "rpeAdherence"
+FROM periods p
+LEFT JOIN eligible_workouts ew USING (period)
+LEFT JOIN workout_measurements wm ON wm.workout_id = ew.workout_id
+LEFT JOIN measurements m ON m.id = wm.measurement_id
+LEFT JOIN eligible e ON e.period = p.period
 GROUP BY p.period, p.start_day, p.end_day`;
 
 export const indicatorsSql = `${periodCte}${indicatorBody(`${localDay} >= p.start_day AND ${localDay} < p.end_day`, '$4')}`;

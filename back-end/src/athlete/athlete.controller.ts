@@ -6,6 +6,7 @@ import {
 	ParseUUIDPipe,
 	Patch,
 	Post,
+	Query,
 	UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -32,8 +33,8 @@ export class AthleteController {
 		summary: 'Lista os atletas visíveis ao treinador ou à administração',
 	})
 	@RequirePermissions(Permission.ATHLETE_READ)
-	findAthletes(@CurrentUser() actor: JwtPayload) {
-		return this.service.findAthletes(actor);
+	findAthletes(@CurrentUser() actor: JwtPayload, @Query('tenantId') tenantId?: string) {
+		return this.service.findAthletes(actor, tenantId);
 	}
 
 	@Get('trainers')

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { RiEyeLine, RiEyeOffLine } from 'react-icons/ri';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import Checkbox from '@/components/ui/Checkbox';
@@ -21,9 +20,10 @@ import { getAuthToken } from '@/lib/auth';
 import { getLandingPathForRoles } from '@/lib/landing';
 import { getSessionUser } from '@/lib/auth';
 import { apiRequest } from '@/gateway/client';
-import { ATHLETE_SELF_REGISTRATION_ENABLED } from '@shared/constants';
+import { ATHLETE_SELF_REGISTRATION_ENABLED } from '@treino-multi/shared';
 import Link from 'next/link';
 import GoogleCredentialButton from '@/components/auth/GoogleCredentialButton';
+import PasswordInput from '@/components/auth/PasswordInput';
 
 const REMEMBER_ME_KEY = 'rememberMe';
 
@@ -31,7 +31,6 @@ export default function Login() {
 	const router = useRouter();
 	const [login, setLogin] = useState('');
 	const [password, setPassword] = useState('');
-	const [showPassword, setShowPassword] = useState(false);
 	const [rememberMe, setRememberMe] = useState(
 		() =>
 			typeof window !== 'undefined' &&
@@ -151,24 +150,11 @@ export default function Login() {
 						onBlur={(e) => setError(validateAndCleanLogin(e.target.value))}
 						selectOnClick={false}
 					/>
-					<Input
+					<PasswordInput
 						label="Senha"
-						type={showPassword ? 'text' : 'password'}
-						// placeholder="••••••••"
 						value={password}
 						onChange={(e) => setPassword(e.target.value)}
 						selectOnClick={false}
-						trailingContent={
-							<button
-								type="button"
-								onClick={() => setShowPassword((visible) => !visible)}
-								className="rounded p-1 text-on-surface-variant transition-colors hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary-fixed-dim/30"
-								aria-label={showPassword ? 'Ocultar senha' : 'Visualizar senha'}
-								aria-pressed={showPassword}
-							>
-								{showPassword ? <RiEyeOffLine size={20} /> : <RiEyeLine size={20} />}
-							</button>
-						}
 					/>
 					<Checkbox
 						id="remember-me"

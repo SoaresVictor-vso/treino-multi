@@ -41,6 +41,7 @@ import {
 	MinLength,
 } from 'class-validator';
 import { OAuthProvider } from '../common/enums/oauth-provider.enum';
+import { assertTrustedOrigin } from '../common/security/trusted-origin';
 
 class AthleteSignupDto {
 	@IsString() @MinLength(2) name!: string;
@@ -52,6 +53,11 @@ class OAuthDto {
 	@IsEnum(OAuthProvider) provider!: OAuthProvider;
 	@IsString() credential!: string;
 	@IsOptional() @IsBoolean() rememberMe?: boolean;
+}
+class UnlinkProviderDto {
+	@IsEnum(OAuthProvider) provider!: OAuthProvider;
+	@IsOptional() @IsString() password?: string;
+	@IsOptional() @IsString() credential?: string;
 }
 class SetFirstPasswordDto extends OAuthDto {
 	@IsString() @MinLength(8) newPassword!: string;
@@ -70,6 +76,7 @@ export class AuthController {
 		@Req() req: express.Request,
 		@Res({ passthrough: true }) res: express.Response,
 	) {
+		assertTrustedOrigin(req);
 		const token = this.readRefreshCookie(req);
 		if (token) await this.authService.logout(token).catch(() => undefined);
 		this.setRefreshCookie(res, null);
@@ -89,6 +96,7 @@ export class AuthController {
 		@Req() req: express.Request,
 		@Res({ passthrough: true }) res: express.Response,
 	) {
+		assertTrustedOrigin(req);
 		const tokens = await this.authService.loginOAuth(
 			dto.provider,
 			dto.credential,
@@ -119,9 +127,14 @@ export class AuthController {
 	@Post('oauth/unlink')
 	unlink(
 		@CurrentUser() actor: jwtPayloadInterface.JwtPayload,
-		@Body() dto: OAuthDto,
+		@Body() dto: UnlinkProviderDto,
 	) {
-		return this.authService.unlinkProvider(actor, dto.provider, dto.credential);
+		return this.authService.unlinkProvider(
+			actor,
+			dto.provider,
+			dto.password,
+			dto.credential,
+		);
 	}
 
 	@ApiBearerAuth('JWT')
@@ -163,6 +176,7 @@ export class AuthController {
 		@Req() req: express.Request,
 		@Res({ passthrough: true }) res: express.Response,
 	) {
+		assertTrustedOrigin(req);
 		const userAgent = req.headers['user-agent'];
 		const tokens = await this.authService.login(dto, ip, userAgent);
 		this.setRefreshCookie(res, tokens.rememberMe ? tokens.refreshToken : null);
@@ -187,6 +201,7 @@ export class AuthController {
 		@Req() req: express.Request,
 		@Res({ passthrough: true }) res: express.Response,
 	) {
+		assertTrustedOrigin(req);
 		const rawToken = dto.refreshToken ?? this.readRefreshCookie(req);
 		const tokens = await this.authService.refreshAccessToken(rawToken);
 		if (tokens.rememberMe) this.setRefreshCookie(res, tokens.refreshToken);
@@ -208,6 +223,7 @@ export class AuthController {
 		@Req() req: express.Request,
 		@Res({ passthrough: true }) res: express.Response,
 	) {
+		assertTrustedOrigin(req);
 		const rawToken = dto.refreshToken ?? this.readRefreshCookie(req);
 		await this.authService.logout(rawToken);
 		this.setRefreshCookie(res, null);
@@ -237,9 +253,9 @@ export class AuthController {
 	private setRefreshCookie(res: express.Response, token: string | null): void {
 		const opts = {
 			httpOnly: true,
-			secure: process.env.NODE_ENV === 'production',
+			secure: true,
 			sameSite: 'strict' as const,
-			path: '/auth',
+			path: '/api/auth',
 			maxAge: token ? 30 * 24 * 60 * 60 * 1000 : 0,
 		};
 		if (token) res.cookie('rememberRefreshToken', token, opts);

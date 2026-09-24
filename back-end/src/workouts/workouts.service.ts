@@ -1315,11 +1315,16 @@ export class WorkoutsService {
 
 	async findAthleteWorkouts(athleteId: string, actor: JwtPayload) {
 		const athlete = await this.usersService.findOne(athleteId);
+		const access = await this.dataSource.query<{ allowed: boolean }[]>(
+			'SELECT can_read_athlete_profile($1::uuid, $2::uuid) AS allowed',
+			[athleteId, actor.sub],
+		);
+		if (!access[0]?.allowed)
+			throw new ForbiddenException('Você não pode visualizar este atleta.');
 		const workouts = await this.dataSource.getRepository(Workout).createQueryBuilder('w')
 			.where('w.athleteId = :athleteId', { athleteId })
 			.andWhere('can_read_athlete_workout(w.id, :actorId)', { actorId: actor.sub })
 			.orderBy('w.scheduledDate', 'DESC').addOrderBy('w.createdAt', 'DESC').getMany();
-		if (actor.sub !== athleteId && !workouts.length) throw new ForbiddenException('Você não pode visualizar este atleta.');
 		return {
 			athlete: { id: athlete.id, name: athlete.person.name },
 			workouts: workouts.map((workout) => ({

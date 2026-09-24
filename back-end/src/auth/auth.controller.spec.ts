@@ -4,12 +4,18 @@ import { AuthService } from './auth.service';
 import { Role } from '../common/enums/role.enum';
 
 const response = () => ({ cookie: jest.fn(), clearCookie: jest.fn() });
-const request = (cookie?: string) => ({ headers: { 'user-agent': 'test-agent', ...(cookie ? { cookie } : {}) } });
+const request = (cookie?: string) => ({ headers: { 'user-agent': 'test-agent', origin: 'https://app.test', ...(cookie ? { cookie } : {}) } });
 
 describe('AuthController session transport', () => {
+  const previousFrontendUrl = process.env.FRONT_END_URL;
   const auth = { login: jest.fn(), loginOAuth: jest.fn(), refreshAccessToken: jest.fn(),
     logout: jest.fn(), impersonate: jest.fn() };
   const controller = new AuthController(auth as unknown as AuthService);
+  beforeAll(() => { process.env.FRONT_END_URL = 'https://app.test'; });
+  afterAll(() => {
+    if (previousFrontendUrl === undefined) delete process.env.FRONT_END_URL;
+    else process.env.FRONT_END_URL = previousFrontendUrl;
+  });
   beforeEach(() => jest.clearAllMocks());
 
   it('returns the refresh only for a window-memory login', async () => {
@@ -29,7 +35,7 @@ describe('AuthController session transport', () => {
     expect(await controller.login({ login: 'a@test.com', password: 'password', rememberMe: true },
       '127.0.0.1', request() as any, res as any)).toEqual({ ...tokens, refreshToken: '' });
     expect(res.cookie).toHaveBeenCalledWith('rememberRefreshToken', 'private-refresh',
-      expect.objectContaining({ httpOnly: true, sameSite: 'strict', path: '/auth' }));
+		expect.objectContaining({ httpOnly: true, secure: true, sameSite: 'strict', path: '/api/auth' }));
   });
 
   it('rotates from the remembered cookie without exposing the new refresh', async () => {

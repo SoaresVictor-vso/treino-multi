@@ -27,13 +27,14 @@ export class AthleteService {
 		private readonly dataSource: DataSource,
 	) {}
 
-	async findAthletes(actor: JwtPayload) {
+	async findAthletes(actor: JwtPayload, selectedTenantId?: string) {
+		const tenantId = this.resolveReadTenantId(actor, selectedTenantId);
 		const isTrainer = actor.roles.includes(Role.TENANT_TRAINER);
 		const qb = this.users
 			.createQueryBuilder('athlete')
 			.innerJoin(AthleteTenantAssociation, 'tenantAssociation',
 				'tenantAssociation.athleteId = athlete.id AND tenantAssociation.tenantId = :tenantId AND tenantAssociation.status = :active',
-				{ tenantId: actor.tenantId, active: AthleteTenantStatus.ACTIVE })
+				{ tenantId, active: AthleteTenantStatus.ACTIVE })
 			.innerJoin('athlete.person', 'person')
 			.innerJoin(
 				'athlete.userRoles',
@@ -61,7 +62,6 @@ export class AthleteService {
 			)
 			.orderBy('person.name', 'ASC');
 
-		if (!actor.tenantId) throw new ForbiddenException('Contexto de tenant necessário.');
 		if (isTrainer)
 			qb.andWhere('association.trainerId = :trainerId', { trainerId: actor.sub });
 
@@ -108,6 +108,19 @@ export class AthleteService {
 					}
 				: null,
 		}));
+	}
+
+	private resolveReadTenantId(actor: JwtPayload, selectedTenantId?: string): string {
+		if (actor.tenantId) {
+			if (selectedTenantId && selectedTenantId !== actor.tenantId)
+				throw new ForbiddenException('Tenant fora do seu contexto.');
+			return actor.tenantId;
+		}
+		if (!actor.roles.includes(Role.ORG_ADMIN))
+			throw new ForbiddenException('Contexto de tenant necessário.');
+		if (!selectedTenantId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedTenantId))
+			throw new BadRequestException('Selecione um tenant válido.');
+		return selectedTenantId;
 	}
 
 	async findTrainers(actor: JwtPayload) {

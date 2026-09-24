@@ -3,5 +3,6 @@ export enum AthleteTenantStatus {
 	ACTIVE = 'active',
 	REJECTED = 'rejected',
 	EXPIRED = 'expired',
+	REVOKED = 'revoked',
 	CANCELLED = 'cancelled',
 }

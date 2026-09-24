@@ -22,7 +22,7 @@ import { AuditLogService } from '../audit-logs/audit-logs.service';
 import { ExternalIdentity } from './entities/external-identity.entity';
 import { OAuthProvider } from '../common/enums/oauth-provider.enum';
 import { SessionFamily } from './entities/session-family.entity';
-import { ATHLETE_SELF_REGISTRATION_ENABLED } from '../../../packages/shared/constants';
+import { ATHLETE_SELF_REGISTRATION_ENABLED } from '@treino-multi/shared';
 import { GoogleIdTokenProvider } from './oauth-providers/google-id-token';
 import { OAuthIdentityProvider } from './interfaces/oauth-identity-provider.interface';
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';
@@ -352,37 +352,45 @@ export class AuthService {
 	async unlinkProvider(
 		actor: JwtPayload,
 		provider: OAuthProvider,
-		credential: string,
+		password?: string,
+		credential?: string,
 	) {
-		const identity = await this.providerIdentity(provider).verify(credential);
-		if (Date.now() / 1000 - identity.iat > 5 * 60)
-			throw new UnauthorizedException('Reautenticação recente necessária.');
+		// Só a conta sem senha usa a reautenticação pelo provider.
 		const account = await this.userRepo.findOne({
 			where: { id: actor.sub, isActive: true },
 			relations: ['person'],
 		});
-		if (
-			!account ||
-			account.person.email?.trim().toLowerCase() !==
-				identity.email.trim().toLowerCase()
-		)
-			throw new ForbiddenException('Email do provider não corresponde à conta.');
+		if (!account) throw new UnauthorizedException('Conta inativa.');
+		let subject: string | undefined;
+		if (!account.passwordHash) {
+			if (!credential) throw new UnauthorizedException('Reautenticação necessária.');
+			const identity = await this.providerIdentity(provider).verify(credential);
+			if (Date.now() / 1000 - identity.iat > 5 * 60)
+				throw new UnauthorizedException('Reautenticação recente necessária.');
+			if (account.person.email?.trim().toLowerCase() !== identity.email.trim().toLowerCase())
+				throw new ForbiddenException('Email do provider não corresponde à conta.');
+			subject = identity.sub;
+		}
 		return this.dataSource.transaction(async (manager) => {
 			const user = await manager.findOneOrFail(User, {
 				where: { id: actor.sub, isActive: true },
+				lock: { mode: 'pessimistic_write' },
 			});
+			if (user.passwordHash) {
+				if (!password || !(await bcrypt.compare(password, user.passwordHash)))
+					throw new UnauthorizedException('Senha atual inválida.');
+			} else if (!subject) {
+				throw new UnauthorizedException('Reautenticação necessária.');
+			}
 			const linked = await manager.findOne(ExternalIdentity, {
-				where: { userId: actor.sub, provider, subject: identity.sub },
+				where: { userId: actor.sub, provider, ...(user.passwordHash ? {} : { subject }) },
 			});
 			if (!linked) throw new ForbiddenException('Provider não vinculado à conta.');
 			if (
 				!user.passwordHash &&
-				(await manager.count(ExternalIdentity, { where: { userId: actor.sub } })) <=
-					1
+				(await manager.count(ExternalIdentity, { where: { userId: actor.sub } })) <= 1
 			)
-				throw new ConflictException(
-					'A conta deve manter ao menos um método de login.',
-				);
+				throw new ConflictException('A conta deve manter ao menos um método de login.');
 			await manager.delete(ExternalIdentity, linked.id);
 			return { provider, linked: false };
 		});

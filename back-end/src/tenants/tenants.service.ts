@@ -174,6 +174,18 @@ export class TenantsService {
 		return qb.getMany();
 	}
 
+	async findAthleteFollowUpOptions(name?: string): Promise<{ id: string; name: string }[]> {
+		const qb = this.tenantRepo.createQueryBuilder('tenant')
+			.select('tenant.id', 'id')
+			.addSelect('COALESCE(tenant.tradeName, tenant.name)', 'name')
+			.where('tenant.isActive = :active', { active: true })
+			.orderBy('tenant.name', 'ASC')
+			.limit(30);
+		if (name?.trim())
+			qb.andWhere('COALESCE(tenant.tradeName, tenant.name) ILIKE :name', { name: `%${name.trim().slice(0, 80)}%` });
+		return qb.getRawMany<{ id: string; name: string }>();
+	}
+
 	async findOne(id: string): Promise<Tenant> {
 		const tenant = await this.tenantRepo.findOne({ where: { id } });
 		if (!tenant) {

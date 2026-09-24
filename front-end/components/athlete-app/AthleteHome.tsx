@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RiAddLine, RiCloseLine, RiPlayFill, RiRunLine, RiTimeLine } from 'react-icons/ri';
+import { RiAddLine, RiCloseLine, RiPlayFill, RiTimeLine } from 'react-icons/ri';
 import InviteNotifications from './InviteNotifications';
 import TrainingForm, { type TrainingFormValues } from '@/components/training/TrainingForm';
 import Calendar, { localDateKey } from '@/components/ui/Calendar';
 import Button from '@/components/ui/Button';
 import ErrorBox from '@/components/ui/ErrorBox';
 import Modal from '@/components/ui/Modal';
+import { useSession } from '@/hooks/useSession';
 import {
 	workoutsService,
 	type CalendarWorkout,
@@ -49,8 +50,9 @@ function formatScheduledDate(date: string | null) {
 	}).format(parsed);
 }
 
-export default function AthleteHome({ athleteName }: { athleteName?: string }) {
+export default function AthleteHome() {
 	const router = useRouter();
+	const user = useSession();
 	const [calendarMonth, setCalendarMonth] = useState(
 		() => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
 	);
@@ -147,7 +149,7 @@ export default function AthleteHome({ athleteName }: { athleteName?: string }) {
 			<header className="flex items-start justify-between gap-4">
 				<div>
 				<h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
-					Olá, {firstName(athleteName)}.
+					Olá, {firstName(user?.name ?? undefined)}.
 				</h1>
 				<p className="mt-1 text-sm leading-6 text-on-surface-variant sm:text-base">
 					{inProgress ? 'Seu treino está esperando por você.' : nextWorkout

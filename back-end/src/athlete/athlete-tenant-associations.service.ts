@@ -127,6 +127,25 @@ export class AthleteTenantAssociationsService {
     });
   }
 
+  async revoke(actor: JwtPayload, id: string, ipAddress?: string) {
+    await this.operator(actor);
+    return this.db.transaction(async manager => {
+      const episode = await manager.findOne(AthleteTenantAssociation, { where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!episode || episode.tenantId !== actor.tenantId || episode.invitedByUserId !== actor.sub)
+        throw new NotFoundException('Convite não encontrado.');
+      if (episode.status !== AthleteTenantStatus.PENDING || episode.expiresAt.getTime() <= Date.now())
+        throw new ConflictException('Convite não está mais pendente.');
+      episode.status = AthleteTenantStatus.REVOKED;
+      await manager.save(episode);
+      await manager.save(CriticalOperationLog, manager.create(CriticalOperationLog, {
+        tenantId: episode.tenantId, tableName: 'athlete_tenant_associations', operation: 'UPDATE',
+        recordId: episode.id, userId: actor.sub, ipAddress: ipAddress ?? null,
+        diff: { status: { before: 'pending', after: 'revoked' } },
+      }));
+      return { id, status: episode.status };
+    });
+  }
+
   async end(actor: JwtPayload, id: string, password?: string, ipAddress?: string) {
     // An athlete can end their own episode without a password. Operators require one.
     if (password !== undefined) await this.operator(actor, password);
@@ -186,7 +205,7 @@ export class AthleteTenantAssociationsService {
     const trainers = episodes.length ? await this.db.getRepository(AthleteTrainerAssociation).find({
       where: { athleteTenantAssociationId: In(episodes.map(e => e.id)) }, relations: ['trainer', 'trainer.person'],
     }) : [];
-    return episodes.filter(e => e.status !== AthleteTenantStatus.EXPIRED).map(e => ({
+    return episodes.filter(e => e.status !== AthleteTenantStatus.EXPIRED && e.status !== AthleteTenantStatus.REVOKED).map(e => ({
       id: e.id, tenantName: e.tenant.name, status: e.status, scope: e.scope, invitedAt: e.invitedAt,
       expiresAt: e.expiresAt, startedAt: e.startedAt, endedAt: e.endedAt,
       previousContract: episodes.some(previous => previous.tenantId === e.tenantId &&
@@ -219,12 +238,14 @@ export class AthleteTenantAssociationsService {
     return episodes.map(e => {
       const named = e.status === AthleteTenantStatus.ACTIVE ||
         (e.status === AthleteTenantStatus.CANCELLED && !!e.endedAt && now - e.endedAt.getTime() < ATHLETE_HISTORY_NAME_TTL_MS);
-      return { status: e.status, scope: e.scope, invitedAt: e.invitedAt, startedAt: e.startedAt, endedAt: e.endedAt,
-        invitedEmail: [AthleteTenantStatus.PENDING, AthleteTenantStatus.REJECTED, AthleteTenantStatus.EXPIRED].includes(e.status) ? e.invitedEmail : null,
+      return { ...(e.status === AthleteTenantStatus.PENDING && e.invitedByUserId === actor.sub ? { id: e.id } : {}),
+        status: e.status, scope: e.scope, invitedAt: e.invitedAt, startedAt: e.startedAt, endedAt: e.endedAt,
+        invitedEmail: [AthleteTenantStatus.PENDING, AthleteTenantStatus.REJECTED, AthleteTenantStatus.EXPIRED, AthleteTenantStatus.REVOKED].includes(e.status) ? e.invitedEmail : null,
         athleteName: named ? e.athlete.person.name :
           e.status === AthleteTenantStatus.CANCELLED ? 'Atleta desligado' :
           e.status === AthleteTenantStatus.PENDING ? 'Convite pendente' :
-          e.status === AthleteTenantStatus.REJECTED ? 'Convite recusado' : 'Convite expirado',
+          e.status === AthleteTenantStatus.REJECTED ? 'Convite recusado' :
+          e.status === AthleteTenantStatus.REVOKED ? 'Convite revogado' : 'Convite expirado',
         events: logs.filter(log => log.recordId === e.id).map(log => ({
           type: log.operation === 'CREATE' ? 'invite' : log.diff?.status?.after ?? 'scope',
           at: log.createdAt, actorRole: log.userId === e.athleteId ? 'atleta' : 'consultoria',
