@@ -21,6 +21,7 @@ import PersonalRecordRequiredModal from '@/components/shared/PersonalRecordRequi
 import ExerciseReorderModal from '@/components/shared/ExerciseReorderModal';
 import ExerciseExecutionCard from './ExerciseExecutionCard';
 import WorkoutComparison from './WorkoutComparison';
+import { isRepetitionsMetric } from '@/lib/metricPresentation';
 import {
 	completionMessages,
 	default as WorkoutCompletionScreen,
@@ -232,10 +233,12 @@ export default function TrainingExecution({ id }: { id: string }) {
 		const history = {
 			name: execution.exercise.name,
 			id: exerciseId,
-			metric1Label: `${execution.exercise.metric_1.name} (${execution.exercise.metric_1.symbol})`,
-			metric2Label: execution.exercise.metric_2
-				? `${execution.exercise.metric_2.name} (${execution.exercise.metric_2.symbol})`
-				: null,
+			metric1Label: `${(isRepetitionsMetric(execution.exercise.metric_1) && execution.exercise.metric_2 ? execution.exercise.metric_2 : execution.exercise.metric_1).name} (${(isRepetitionsMetric(execution.exercise.metric_1) && execution.exercise.metric_2 ? execution.exercise.metric_2 : execution.exercise.metric_1).symbol})`,
+			metric2Label: isRepetitionsMetric(execution.exercise.metric_1)
+				? `${execution.exercise.metric_1.name} (${execution.exercise.metric_1.symbol})`
+				: execution.exercise.metric_2
+					? `${execution.exercise.metric_2.name} (${execution.exercise.metric_2.symbol})`
+					: null,
 			rows: cachedRows ?? null,
 		};
 

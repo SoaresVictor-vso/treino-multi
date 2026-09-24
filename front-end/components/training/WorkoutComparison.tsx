@@ -12,6 +12,7 @@ import { MetricFieldType, type Metric } from '@/gateway/services/parametro';
 import type { WorkoutExecution } from '@/gateway/services/workouts';
 import SeriesIndicator, { seriesTypeClassName } from './SeriesIndicator';
 import RpeIndicator from './RpeIndicator';
+import { getVisualMetricOrder } from '@/lib/metricPresentation';
 
 type ComparedValue = {
 	label: string;
@@ -122,24 +123,17 @@ function executionValues(
 ) {
 	const expected = variant === 'expected';
 	const values: ComparedValue[] = [
-		{
-			label: execution.exercise.metric_1.name,
-			value: expected ? execution.prescribedMetric1 : execution.performedMetric1,
-			metric: execution.exercise.metric_1,
-			type: execution.metric1Type,
-		},
-		...(execution.exercise.metric_2
-			? [
-					{
-						label: execution.exercise.metric_2.name,
-						value: expected
-							? execution.prescribedMetric2
-							: execution.performedMetric2,
-						metric: execution.exercise.metric_2,
-						type: execution.metric2Type,
-					},
-				]
-			: []),
+		...getVisualMetricOrder(
+			execution.exercise.metric_1,
+			execution.exercise.metric_2,
+		).map(({ metric, key }) => ({
+			label: metric.name,
+			value: key === 1
+				? expected ? execution.prescribedMetric1 : execution.performedMetric1
+				: expected ? execution.prescribedMetric2 : execution.performedMetric2,
+			metric,
+			type: key === 1 ? execution.metric1Type : execution.metric2Type,
+		})),
 		// O 1RM é um resultado da execução, portanto aparece ao lado das métricas
 		// realizadas e nunca no lado prescrito da comparação.
 		...(!expected && execution.predictedRm !== null && execution.predictedRm !== undefined

@@ -9,6 +9,7 @@ import { RestDurationField } from '@/components/workout-template/RestDurationFie
 import SeriesIndicator, { seriesTypeClassName } from './SeriesIndicator';
 import SetTypePicker from './SetTypePicker';
 import RpePicker from './RpePicker';
+import { getVisualMetricOrder } from '@/lib/metricPresentation';
 
 export default function TrainingActivityBlock({
 	exercise, index, activity, onChange, onRemove, recordedPerformance = false,
@@ -22,6 +23,7 @@ export default function TrainingActivityBlock({
 }) {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [rpePickerOpen, setRpePickerOpen] = useState(false);
+	const visualMetrics = getVisualMetricOrder(exercise.metric_1, exercise.metric_2);
 	return (
 		<div className="rounded border border-outline-variant bg-surface-container-high px-2 py-1.5">
 			<div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[auto_repeat(4,minmax(0,1fr))]">
@@ -34,8 +36,7 @@ export default function TrainingActivityBlock({
 						</div>
 					)}
 				</div>
-				{exercise.metric_1 && <MetricField metric={exercise.metric_1} value={activity.metric1} type={activity.type1} onChange={(value) => onChange('metric1', value)} onTypeChange={(value) => onChange('type1', value)} />}
-				{exercise.metric_2 && <MetricField metric={exercise.metric_2} value={activity.metric2} type={activity.type2} onChange={(value) => onChange('metric2', value)} onTypeChange={(value) => onChange('type2', value)} allowPercent={!recordedPerformance} />}
+				{visualMetrics.map(({ metric, key }) => <MetricField key={key} metric={metric} value={key === 1 ? activity.metric1 : activity.metric2} type={key === 1 ? activity.type1 : activity.type2} onChange={(value) => onChange(key === 1 ? 'metric1' : 'metric2', value)} onTypeChange={(value) => onChange(key === 1 ? 'type1' : 'type2', value)} allowPercent={key === 2 && !recordedPerformance} />)}
 				<div className="relative block min-w-0 text-xs font-semibold leading-none text-on-surface-variant">
 					<span className="block truncate">{recordedPerformance ? 'RPE realizado (opcional)' : 'RPE (opcional)'}</span>
 					<button type="button" onClick={() => setRpePickerOpen((open) => !open)} className="mt-1 flex h-8 w-full items-center justify-between rounded-lg border border-outline-variant bg-surface-container px-3 text-sm text-on-surface"><span>{activity.pse > 0 ? `RPE ${activity.pse}` : 'Selecionar'}</span><span aria-hidden="true">⌄</span></button>

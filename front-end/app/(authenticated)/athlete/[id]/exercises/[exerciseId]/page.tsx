@@ -344,6 +344,7 @@ function WorkoutAccordion({
 					series={workout.series}
 					metric1Label={`${labels[0]?.symbol ?? 'Métrica'}`}
 					metric2Label={labels[1]?.symbol || null}
+					metric1IsRepetitions={labels[0]?.name.trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '') === 'repeticoes'}
 				/>
 			</div>
 		</details>
