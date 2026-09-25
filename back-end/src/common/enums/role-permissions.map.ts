@@ -1,5 +1,9 @@
-import { Permission } from './permission.enum';
-import { Role } from './role.enum';
+import { enums } from '@treino-multi/shared';
+const { Permission, Role } = enums;
+type Permission = enums.Permission;
+type Role = enums.Role;
+
+
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 	[Role.ORG_ADMIN]: Object.values(Permission),

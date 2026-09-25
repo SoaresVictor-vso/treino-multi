@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import {
 	BadRequestException,
 	ConflictException,
@@ -9,7 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, IsNull, Repository } from 'typeorm';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { Exercise } from '../exercises/entities/exercise.entity';
-import { Role } from '../common/enums/role.enum';
+
 import { AddExerciseToGroupDto } from './dto/add-exercise-to-group.dto';
 import { CreateExerciseGroupDto } from './dto/create-exercise-group.dto';
 import { UpdateExerciseGroupDto } from './dto/update-exercise-group.dto';

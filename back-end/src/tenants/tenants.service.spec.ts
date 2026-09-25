@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 /**
  * Testes unitários do TenantsService.
  */
@@ -11,7 +14,7 @@ import { Tenant } from './entities/tenant.entity';
 import { Person } from '../persons/entities/person.entity';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
-import { Role } from '../common/enums/role.enum';
+
 import { CreateTenantFullDto } from './dto/create-tenant-full.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { AuditLogService } from '../audit-logs/audit-logs.service';

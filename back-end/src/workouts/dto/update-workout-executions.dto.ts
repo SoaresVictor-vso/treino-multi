@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { ExecutionStatus, ExecutionSetType } = enums;
+type ExecutionStatus = enums.ExecutionStatus;
+type ExecutionSetType = enums.ExecutionSetType;
 import { Type } from 'class-transformer';
 import {
 	IsArray,
@@ -10,8 +14,8 @@ import {
 	Min,
 	ValidateNested,
 } from 'class-validator';
-import { ExecutionStatus } from '../../common/enums/execution-status.enum';
-import { ExecutionSetType } from '../../common/enums/execution-set-type.enum';
+
+
 
 export class UpdateWorkoutExecutionDto {
 	@IsOptional() @IsInt() id?: number;

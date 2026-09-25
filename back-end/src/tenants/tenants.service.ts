@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import {
 	ConflictException,
 	Injectable,
@@ -13,7 +16,7 @@ import { AuditLogService } from '../audit-logs/audit-logs.service';
 import { Person } from '../persons/entities/person.entity';
 import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/entities/user-role.entity';
-import { Role } from '../common/enums/role.enum';
+
 
 const normalizeNullableString = (
 	value: string | null | undefined,

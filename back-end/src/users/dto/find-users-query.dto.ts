@@ -1,13 +1,12 @@
+import { enums } from '@treino-multi/shared';
+const { Role, UserOrderBy } = enums;
+type Role = enums.Role;
+type UserOrderBy = enums.UserOrderBy;
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { Role } from '../../common/enums/role.enum';
 
-export enum UserOrderBy {
-	ID = 'id',
-	CREATED_AT = 'createdAt',
-	UPDATED_AT = 'updatedAt',
-	NAME = 'name',
-}
+
+
 
 export class FindUsersQueryDto {
 	@ApiPropertyOptional({

@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { Permission, Role } = enums;
+type Permission = enums.Permission;
+type Role = enums.Role;
 import {
 	BadRequestException,
 	ForbiddenException,
@@ -8,8 +12,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Exercise } from '../exercises/entities/exercise.entity';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { Permission } from '../common/enums/permission.enum';
-import { Role } from '../common/enums/role.enum';
+
+
 import { resolvePermissions } from '../common/enums/role-permissions.map';
 import { CreateWorkoutTemplateDto } from './dto/create-workout-template.dto';
 import { UpdateWorkoutTemplateDto } from './dto/update-workout-template.dto';

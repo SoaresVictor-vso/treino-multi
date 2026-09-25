@@ -1,8 +1,11 @@
 'use client';
+
+import { constants } from '@treino-multi/shared';
+const { ATHLETE_SELF_REGISTRATION_ENABLED } = constants;
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ATHLETE_SELF_REGISTRATION_ENABLED } from '@treino-multi/shared';
+
 import { apiRequest } from '@/gateway/client';
 
 export default function AthleteSignup() {

@@ -1,6 +1,9 @@
+import { enums } from '@treino-multi/shared';
+const { OAuthProvider } = enums;
+type OAuthProvider = enums.OAuthProvider;
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
-import { OAuthProvider } from '../common/enums/oauth-provider.enum';
+
 
 const actor = { sub: 'user-1' } as any;
 

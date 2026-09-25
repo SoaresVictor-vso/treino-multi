@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 /**
  * Testes unitários da LocalStrategy — Fase 2
  *
@@ -16,7 +19,7 @@ import { Test } from '@nestjs/testing';
 import { LocalStrategy } from './local.strategy';
 import { AuthService } from '../auth.service';
 import { User } from '../../users/entities/user.entity';
-import { Role } from '../../common/enums/role.enum';
+
 import { UserRole } from '../../users/entities/user-role.entity';
 import { AuditLogService } from '../../audit-logs/audit-logs.service';
 

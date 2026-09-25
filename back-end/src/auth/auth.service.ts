@@ -1,3 +1,8 @@
+import { enums, constants } from '@treino-multi/shared';
+const { Role, OAuthProvider } = enums;
+type Role = enums.Role;
+type OAuthProvider = enums.OAuthProvider;
+const { ATHLETE_SELF_REGISTRATION_ENABLED } = constants;
 import {
 	ConflictException,
 	ForbiddenException,
@@ -16,13 +21,13 @@ import { UserRole } from '../users/entities/user-role.entity';
 import { RefreshToken } from '../users/entities/refresh-token.entity';
 import { UsersService } from '../users/users.service';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
-import { Role } from '../common/enums/role.enum';
+
 import { LoginDto } from './dto/login.dto';
 import { AuditLogService } from '../audit-logs/audit-logs.service';
 import { ExternalIdentity } from './entities/external-identity.entity';
-import { OAuthProvider } from '../common/enums/oauth-provider.enum';
+
 import { SessionFamily } from './entities/session-family.entity';
-import { ATHLETE_SELF_REGISTRATION_ENABLED } from '@treino-multi/shared';
+
 import { GoogleIdTokenProvider } from './oauth-providers/google-id-token';
 import { OAuthIdentityProvider } from './interfaces/oauth-identity-provider.interface';
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';

@@ -1,7 +1,11 @@
+import { enums } from '@treino-multi/shared';
+const { OAuthProvider, Role } = enums;
+type OAuthProvider = enums.OAuthProvider;
+type Role = enums.Role;
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
-import { OAuthProvider } from '../common/enums/oauth-provider.enum';
-import { Role } from '../common/enums/role.enum';
+
+
 import { User } from '../users/entities/user.entity';
 import { SessionFamily } from './entities/session-family.entity';
 import {

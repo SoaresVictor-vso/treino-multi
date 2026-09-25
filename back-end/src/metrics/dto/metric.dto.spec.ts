@@ -1,7 +1,10 @@
+import { enums } from '@treino-multi/shared';
+const { MetricFieldType } = enums;
+type MetricFieldType = enums.MetricFieldType;
 import { validate } from 'class-validator';
 import { CreateMetricDto } from './create-metric.dto';
 import { UpdateMetricDto } from './update-metric.dto';
-import { MetricFieldType } from '../../common/enums/metric-field-type.enum';
+
 
 describe('Metric DTOs', () => {
 	const valid = (): CreateMetricDto => ({

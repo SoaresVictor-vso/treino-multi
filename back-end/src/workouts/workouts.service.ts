@@ -1,3 +1,11 @@
+import { enums, tools } from '@treino-multi/shared';
+const { Role, ExecutionStatus, ExecutionSetType, WorkoutStatus, AthleteTenantStatus } = enums;
+type Role = enums.Role;
+type ExecutionStatus = enums.ExecutionStatus;
+type ExecutionSetType = enums.ExecutionSetType;
+type WorkoutStatus = enums.WorkoutStatus;
+type AthleteTenantStatus = enums.AthleteTenantStatus;
+const { predictedRmForExecution } = tools;
 import {
 	BadRequestException,
 	ConflictException,
@@ -15,13 +23,13 @@ import {
 } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { Role } from '../common/enums/role.enum';
-import { ExecutionStatus } from '../common/enums/execution-status.enum';
-import { ExecutionSetType } from '../common/enums/execution-set-type.enum';
-import { WorkoutStatus } from '../common/enums/workout-status.enum';
+
+
+
+
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
 import { AthleteTenantAssociation } from '../athlete/entities/athlete-tenant-association.entity';
-import { AthleteTenantStatus } from '../common/enums/athlete-tenant-status.enum';
+
 import { UsersService } from '../users/users.service';
 import { Activity } from '../workout-templates/entities/activity.entity';
 import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
@@ -33,7 +41,7 @@ import { WorkoutExerciseNote } from './entities/workout-exercise-note.entity';
 import { Workout } from './entities/workout.entity';
 import { MeasurementsService } from '../measurements/measurements.service';
 import { Exercise } from '../exercises/entities/exercise.entity';
-import { predictedRmForExecution } from '../exercise-reviews/predicted-rm';
+
 
 export interface GenerateWorkoutFromTemplateInput {
 	template: WorkoutTemplate;
@@ -45,6 +53,7 @@ export interface GenerateWorkoutFromTemplateInput {
 type WorkoutExecutionRow = {
 	workoutId: string;
 	athleteId: string;
+	createdBy: string;
 	templateName: string;
 	templateDescription: string;
 	scheduledDate: string | null;
@@ -227,7 +236,7 @@ export class WorkoutsService {
 					templateName: string;
 					templateDescription: string;
 					scheduledDate: string | null;
-					status: WorkoutStatus.PENDING | WorkoutStatus.SCHEDULED;
+					status: enums.WorkoutStatus.PENDING | enums.WorkoutStatus.SCHEDULED;
 				}[];
 				total: string;
 				inProgress: {
@@ -235,7 +244,7 @@ export class WorkoutsService {
 					templateName: string;
 					templateDescription: string;
 					scheduledDate: string | null;
-					status: WorkoutStatus.IN_PROGRESS;
+					status: enums.WorkoutStatus.IN_PROGRESS;
 				} | null;
 			}[]
 		>(
@@ -319,7 +328,7 @@ export class WorkoutsService {
 			.getRepository(Workout)
 			.createQueryBuilder('workout')
 			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
-			.andWhere('workout.status = :status', { status: WorkoutStatus.COMPLETED })
+			.andWhere('workout.status = :status', { status: enums.WorkoutStatus.COMPLETED })
 			.select([
 				'workout.id AS id',
 				'workout.template_name AS "templateName"',
@@ -362,7 +371,7 @@ export class WorkoutsService {
 				scheduledDate: string | null;
 				performedAt: string | null;
 				sortAt: string;
-				status: WorkoutStatus.COMPLETED;
+				status: enums.WorkoutStatus.COMPLETED;
 				total: string;
 			}>();
 		const total = Number(rows[0]?.total ?? 0);
@@ -406,7 +415,7 @@ export class WorkoutsService {
 			.getRepository(Workout)
 			.createQueryBuilder('workout')
 			.where('workout.athleteId = :athleteId', { athleteId: actor.sub })
-			.andWhere('workout.status = :status', { status: WorkoutStatus.COMPLETED })
+			.andWhere('workout.status = :status', { status: enums.WorkoutStatus.COMPLETED })
 			.andWhere(
 				`COALESCE(workout.performed_at, workout.updated_at) >= ${intervalStart}`,
 			)
@@ -585,6 +594,7 @@ export class WorkoutsService {
 			`SELECT
 				workout.id AS "workoutId",
 				workout.athlete_id AS "athleteId",
+				workout.created_by AS "createdBy",
 				workout.template_name AS "templateName",
 				workout.template_description AS "templateDescription",
 				workout.scheduled_date AS "scheduledDate",
@@ -733,6 +743,7 @@ export class WorkoutsService {
 		return {
 			id: workout.workoutId,
 			athleteId: workout.athleteId,
+			createdBy: workout.createdBy,
 			templateName: workout.templateName,
 			templateDescription: workout.templateDescription,
 			scheduledDate: workout.scheduledDate,
@@ -876,7 +887,7 @@ export class WorkoutsService {
 				);
 			const hasWorkoutInProgress = await manager.getRepository(Workout).existsBy({
 				athleteId: workout.athleteId,
-				status: WorkoutStatus.IN_PROGRESS,
+				status: enums.WorkoutStatus.IN_PROGRESS,
 			});
 			if (hasWorkoutInProgress)
 				throw new BadRequestException(

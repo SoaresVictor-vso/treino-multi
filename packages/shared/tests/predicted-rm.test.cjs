@@ -1,4 +1,17 @@
-import { calculatePredictedRm, predictedRmForExecution } from './predicted-rm';
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+function expect(actual) {
+  return {
+    toBe: (expected) => assert.equal(actual, expected),
+    toEqual: (expected) => assert.deepEqual(actual, expected),
+    toBeNull: () => assert.equal(actual, null),
+    toBeCloseTo: (expected) => assert.ok(Math.abs(actual - expected) < 0.0001),
+    toThrow: () => assert.throws(actual),
+  };
+}
+const { tools, tests } = require('../dist');
+const { calculatePredictedRm, predictedRmForExecution } = tools;
+const { rmReferenceCases } = tests;
 
 describe('predicted 1RM', () => {
 	it('uses Brzycki for repetitions from 1 to 36', () => {
@@ -15,4 +28,12 @@ describe('predicted 1RM', () => {
 		expect(predictedRmForExecution({ metric1Name: 'distancia', metric2Name: 'tempo', metric1: 1000, metric2: 300, completed: true })).toBeNull();
 		expect(predictedRmForExecution({ metric1Name: 'repeticoes', metric2Name: 'peso', metric1: 10, metric2: 100, completed: false })).toBeNull();
 	});
+});
+
+it('matches the shared RM reference cases', () => {
+ for (const item of rmReferenceCases) {
+  const actual = calculatePredictedRm(item.weight, item.repetitions);
+  if (item.expected === null) assert.equal(actual, null);
+  else assert.ok(Math.abs(actual - item.expected) < 0.0001);
+ }
 });

@@ -1,5 +1,8 @@
+import { enums } from '@treino-multi/shared';
+const { MetricFieldType } = enums;
+type MetricFieldType = enums.MetricFieldType;
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
-import { MetricFieldType } from '../../common/enums/metric-field-type.enum';
+
 
 @Entity('metrics')
 export class Metric {

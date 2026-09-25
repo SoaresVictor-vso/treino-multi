@@ -12,6 +12,7 @@ import {
 	RiUserLine,
 } from 'react-icons/ri';
 import Button from '@/components/ui/Button';
+import ClearParametersCacheButton from '@/components/ClearParametersCacheButton';
 import ErrorBox from '@/components/ui/ErrorBox';
 import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';
@@ -100,6 +101,7 @@ export default function PerfilPage() {
 			<section className="mt-6 border-t border-outline-variant/50 pt-5"><h2 className="mb-3 text-sm font-medium text-on-surface-variant">Dados pessoais</h2><div><div className="border-b border-outline-variant/50 py-3"><p className="text-xs font-medium text-on-surface-variant">Nome completo</p><p className="mt-1 text-sm font-medium text-primary">{profile.name || 'Não informado'}</p></div><div className="border-b border-outline-variant/50 py-3"><p className="text-xs font-medium text-on-surface-variant">E-mail</p><p className="mt-1 break-words text-sm font-medium text-primary">{profile.email || 'Não informado'}</p></div><div className="border-b border-outline-variant/50 py-3"><p className="text-xs font-medium text-on-surface-variant">Telefone</p><p className="mt-1 text-sm font-medium text-primary">{profile.phone ? applyMask(profile.phone, PHONE_MASK_REGEX) : 'Não informado'}</p></div><div className="py-3"><p className="text-xs font-medium text-on-surface-variant">CPF</p><p className="mt-1 text-sm font-medium text-primary">{profile.document ? applyMask(profile.document, CPF_MASK_REGEX) : 'Não informado'}</p></div></div>{profileMessage && <p role="status" className="mt-3 text-sm font-medium text-primary-fixed">{profileMessage}</p>}{profileError && <div className="mt-3"><ErrorBox message={profileError} /></div>}</section>
 
 			<section className="mt-6 border-t border-outline-variant/50 pt-5"><h2 className="mb-3 text-sm font-medium text-on-surface-variant">Sua conta</h2><Link href="/app/consultorias" className="block rounded-xl px-2 py-4 hover:bg-surface-container-high">Gerenciar consultorias →</Link><Link href="/login-methods" className="block rounded-xl px-2 py-4 hover:bg-surface-container-high">Métodos de login →</Link></section>
+			<section className="mt-6 border-t border-outline-variant/50 pt-5"><ClearParametersCacheButton presentation="profile" /></section>
 			<section className="mt-6 border-t border-outline-variant/50 pt-5"><Button type="button" variant="outline" className="w-full border-error/50 text-error hover:border-error hover:bg-error-container/20 hover:text-error" onClick={handleLogout}><RiLogoutBoxRLine size={20} aria-hidden />Sair da conta</Button></section>
 		</section>}
 

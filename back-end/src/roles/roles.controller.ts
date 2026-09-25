@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { Permission, Role } = enums;
+type Permission = enums.Permission;
+type Role = enums.Role;
 import { Controller, Get, Param } from '@nestjs/common';
 import {
 	ApiBearerAuth,
@@ -6,8 +10,8 @@ import {
 	ApiTags,
 } from '@nestjs/swagger';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
-import { Permission } from '../common/enums/permission.enum';
-import { Role } from '../common/enums/role.enum';
+
+
 import { ROLE_PERMISSIONS } from '../common/enums/role-permissions.map';
 
 /**

@@ -1,5 +1,8 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import { DataSource } from 'typeorm';
-import { Role } from '../common/enums/role.enum';
+
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';
 import { User } from '../users/entities/user.entity';
 import { AthleteTenantAssociation } from './entities/athlete-tenant-association.entity';

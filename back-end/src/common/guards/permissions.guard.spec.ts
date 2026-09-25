@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { Permission, Role } = enums;
+type Permission = enums.Permission;
+type Role = enums.Role;
 /**
  * Testes unitários do PermissionsGuard — Fase 3
  *
@@ -22,8 +26,8 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
-import { Permission } from '../enums/permission.enum';
-import { Role } from '../enums/role.enum';
+
+
 import { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
 import {
 	PERMISSIONS_KEY,

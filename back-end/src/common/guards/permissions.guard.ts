@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { Permission, Role } = enums;
+type Permission = enums.Permission;
+type Role = enums.Role;
 import {
 	CanActivate,
 	ExecutionContext,
@@ -6,8 +10,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
-import { Permission } from '../enums/permission.enum';
-import { Role } from '../enums/role.enum';
+
+
 import { resolvePermissions } from '../enums/role-permissions.map';
 import {
 	PERMISSIONS_KEY,

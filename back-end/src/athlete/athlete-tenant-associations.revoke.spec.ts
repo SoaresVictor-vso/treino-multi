@@ -1,7 +1,10 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';
-import { Role } from '../common/enums/role.enum';
+
 import { User } from '../users/entities/user.entity';
 import { AthleteTenantAssociationsService } from './athlete-tenant-associations.service';
 import { AthleteTenantAssociation } from './entities/athlete-tenant-association.entity';

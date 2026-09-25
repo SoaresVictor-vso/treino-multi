@@ -1,3 +1,8 @@
+import { enums, types } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
+type UserContext = types.UserContext;
+export type TenantFunction = types.TenantFunction;
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
 	ArrayMinSize,
@@ -13,8 +18,8 @@ import {
 	MinLength,
 	ValidateIf,
 } from 'class-validator';
-import { Role } from '../../common/enums/role.enum';
-import type { UserContext } from '../entities/user.entity';
+
+
 
 const USER_CONTEXTS: UserContext[] = ['organization', 'tenant', 'standalone'];
 
@@ -87,5 +92,3 @@ export class CreateManagedUserDto {
 	})
 	tenantFunction!: TenantFunction | null;
 }
-
-export type TenantFunction = 'admin' | 'trainer' | 'trainer-master' | 'client';

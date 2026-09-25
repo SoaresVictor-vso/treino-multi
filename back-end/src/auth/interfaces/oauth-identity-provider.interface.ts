@@ -1,4 +1,7 @@
-import { OAuthProvider } from '../../common/enums/oauth-provider.enum';
+import { enums } from '@treino-multi/shared';
+const { OAuthProvider } = enums;
+type OAuthProvider = enums.OAuthProvider;
+
 
 export interface OAuthIdentity {
   sub: string;

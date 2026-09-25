@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { Role, AthleteTenantStatus } = enums;
+type Role = enums.Role;
+type AthleteTenantStatus = enums.AthleteTenantStatus;
 import {
 	BadRequestException,
 	ForbiddenException,
@@ -7,12 +11,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { Role } from '../common/enums/role.enum';
+
 import { ExerciseGroup } from '../exercise-groups/entities/exercise-group.entity';
 import { Exercise } from '../exercises/entities/exercise.entity';
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
 import { AthleteTenantAssociation } from '../athlete/entities/athlete-tenant-association.entity';
-import { AthleteTenantStatus } from '../common/enums/athlete-tenant-status.enum';
+
 import { User } from '../users/entities/user.entity';
 import { CreatePersonalRecordDto } from './dto/create-personal-record.dto';
 import { UpdatePersonalRecordDto } from './dto/update-personal-record.dto';

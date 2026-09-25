@@ -1,3 +1,8 @@
+import { enums } from '@treino-multi/shared';
+const { UserOrderBy, Role, AthleteTenantStatus } = enums;
+type UserOrderBy = enums.UserOrderBy;
+type Role = enums.Role;
+type AthleteTenantStatus = enums.AthleteTenantStatus;
 import {
 	BadRequestException,
 	ConflictException,
@@ -18,13 +23,14 @@ import { AuditLogService } from '../audit-logs/audit-logs.service';
 import { Person } from '../persons/entities/person.entity';
 import { CreateManagedUserDto } from './dto/create-managed-user.dto';
 import { UpdateManagedUserDto } from './dto/update-managed-user.dto';
-import { FindUsersQueryDto, UserOrderBy } from './dto/find-users-query.dto';
-import { Role } from '../common/enums/role.enum';
+import { FindUsersQueryDto } from './dto/find-users-query.dto';
+
+
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
 import { SessionFamily } from '../auth/entities/session-family.entity';
 import { AthleteTenantAssociation } from '../athlete/entities/athlete-tenant-association.entity';
-import { AthleteTenantStatus } from '../common/enums/athlete-tenant-status.enum';
+
 
 const USER_ORDERING = {
 	[UserOrderBy.ID]: {

@@ -182,6 +182,17 @@ export class ExercisesService implements ExercisesServiceContract {
 		return this.syncPromise;
 	}
 
+	public async waitForSync(): Promise<void> {
+		if (this.syncPromise) await this.syncPromise.catch(() => undefined);
+	}
+
+	public resetSearchIndex(): void {
+		this.stemmedIndex = createStemmedCatalogIndex();
+		this.typoTolerantIndex = createTypoTolerantCatalogIndex();
+		this.catalogSize = 0;
+		this.isIndexReady = false;
+	}
+
 	private async syncCatalogOnce(): Promise<ExerciseParameter[]> {
 		const since =
 			typeof localStorage !== 'undefined'

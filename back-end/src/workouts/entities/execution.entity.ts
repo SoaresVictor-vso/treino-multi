@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { ExecutionStatus, ExecutionSetType } = enums;
+type ExecutionStatus = enums.ExecutionStatus;
+type ExecutionSetType = enums.ExecutionSetType;
 import {
 	Column,
 	Check,
@@ -10,8 +14,8 @@ import {
 	UpdateDateColumn,
 	type ValueTransformer,
 } from 'typeorm';
-import { ExecutionStatus } from '../../common/enums/execution-status.enum';
-import { ExecutionSetType } from '../../common/enums/execution-set-type.enum';
+
+
 import { Exercise } from '../../exercises/entities/exercise.entity';
 import type { RegisterType } from '../../workout-templates/entities/activity.entity';
 import { Workout } from './workout.entity';

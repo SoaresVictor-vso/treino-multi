@@ -1,12 +1,17 @@
+import { enums } from '@treino-multi/shared';
+const { ExecutionStatus, Role, WorkoutStatus } = enums;
+type ExecutionStatus = enums.ExecutionStatus;
+type Role = enums.Role;
+type WorkoutStatus = enums.WorkoutStatus;
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { AthleteTrainerAssociation } from '../athlete/entities/athlete-trainer-association.entity';
 import { AthleteTenantAssociation } from '../athlete/entities/athlete-tenant-association.entity';
 import { UsersService } from '../users/users.service';
-import { ExecutionStatus } from '../common/enums/execution-status.enum';
-import { Role } from '../common/enums/role.enum';
-import { WorkoutStatus } from '../common/enums/workout-status.enum';
+
+
+
 import { WorkoutTemplate } from '../workout-templates/entities/workout-template.entity';
 import { Execution } from './entities/execution.entity';
 import { WorkoutExerciseNote } from './entities/workout-exercise-note.entity';

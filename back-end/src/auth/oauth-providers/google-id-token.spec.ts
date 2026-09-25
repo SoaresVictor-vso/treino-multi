@@ -1,7 +1,10 @@
+import { enums } from '@treino-multi/shared';
+const { OAuthProvider } = enums;
+type OAuthProvider = enums.OAuthProvider;
 import * as crypto from 'crypto';
 import { UnauthorizedException } from '@nestjs/common';
 import { GoogleIdTokenProvider, verifyGoogleIdToken } from './google-id-token';
-import { OAuthProvider } from '../../common/enums/oauth-provider.enum';
+
 
 describe('Google ID token verification', () => {
   const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });

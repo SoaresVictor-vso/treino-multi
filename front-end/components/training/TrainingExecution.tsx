@@ -27,6 +27,7 @@ import {
 	default as WorkoutCompletionScreen,
 } from './WorkoutCompletionScreen';
 import WorkoutMeasurements from './WorkoutMeasurements';
+import { preliminaryMeasurements } from './preliminaryMeasurements';
 import { API_ERROR_EVENT } from '@/gateway/client';
 import { getSessionUser } from '@/lib/auth';
 import {
@@ -876,6 +877,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 				</>
 			) : (
 				<>
+					{workout.status === 'in_progress' && <WorkoutMeasurements measurements={preliminaryMeasurements(workout)} />}
 					{isAthlete &&
 						['pending', 'scheduled', 'in_progress'].includes(workout.status) && (
 							<div className="flex flex-wrap gap-2">

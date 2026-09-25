@@ -1,4 +1,9 @@
+import { types } from '@treino-multi/shared';
+type UserContext = types.UserContext;
+export type TenantFunction = types.TenantFunction;
 import { Role } from '@/lib/roles';
+
+
 
 export type CreateUserDto = {
 	name: string;
@@ -6,10 +11,8 @@ export type CreateUserDto = {
 	document?: string | null;
 	phone?: string | null;
 	tenantId?: string | null;
-	context: 'organization' | 'tenant' | 'standalone';
+	context: UserContext;
 	password: string;
 	isActive?: boolean;
 	tenantFunction: TenantFunction | null;
 };
-
-export type TenantFunction = 'admin' | 'trainer' | 'trainer-master' | 'client';

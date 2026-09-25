@@ -1,3 +1,5 @@
+import { types } from '@treino-multi/shared';
+export type MeasurementPresentation = types.MeasurementPresentation;
 import {
 	Column,
 	Entity,
@@ -7,12 +9,8 @@ import {
 } from 'typeorm';
 import { Metric } from '../../metrics/entities/metric.entity';
 
-export type MeasurementPresentation = {
-	containerClass: string;
-	iconClass: string;
-	valueClass: string;
-	labelClass: string;
-};
+
+
 
 @Entity('measurements')
 export class Measurement {

@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { ExecutionSetType } = enums;
+type ExecutionSetType = enums.ExecutionSetType;
 import { Type } from 'class-transformer';
 import {
 	IsArray,
@@ -12,7 +15,7 @@ import {
 	ValidateNested,
 } from 'class-validator';
 import { ActivityDto } from '../../workout-templates/dto/activity.dto';
-import { ExecutionSetType } from '../../common/enums/execution-set-type.enum';
+
 
 class WorkoutActivityDto extends ActivityDto {
 	@IsEnum(ExecutionSetType)

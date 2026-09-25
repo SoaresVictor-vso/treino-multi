@@ -1,17 +1,22 @@
+import { enums } from '@treino-multi/shared';
+const { Role, AthleteTenantStatus, AthleteReadScope } = enums;
+type Role = enums.Role;
+type AthleteTenantStatus = enums.AthleteTenantStatus;
+type AthleteReadScope = enums.AthleteReadScope;
 import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
-import { Role } from '../common/enums/role.enum';
+
 import { ATHLETE_HISTORY_NAME_TTL_MS, ATHLETE_INVITE_TTL_MS } from '../common/constants/athlete-association.constants';
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';
 import { User } from '../users/entities/user.entity';
 import { Person } from '../persons/entities/person.entity';
 import { AthleteTrainerAssociation } from './entities/athlete-trainer-association.entity';
 import { AthleteTenantAssociation } from './entities/athlete-tenant-association.entity';
-import { AthleteTenantStatus } from '../common/enums/athlete-tenant-status.enum';
-import { AthleteReadScope } from '../common/enums/athlete-read-scope.enum';
+
+
 
 @Injectable()
 export class AthleteTenantAssociationsService {

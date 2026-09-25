@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 /**
  * Testes unitários do RolesGuard — Fase 3
  *
@@ -14,7 +17,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesGuard } from './roles.guard';
-import { Role } from '../enums/role.enum';
+
 import { JwtPayload } from '../../auth/interfaces/jwt-payload.interface';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 

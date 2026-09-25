@@ -1,8 +1,11 @@
+import { enums } from '@treino-multi/shared';
+const { OAuthProvider } = enums;
+type OAuthProvider = enums.OAuthProvider;
 import { UnauthorizedException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OAuthProvider } from '../../common/enums/oauth-provider.enum';
+
 import {
 	OAuthIdentity,
 	OAuthIdentityProvider,

@@ -1,6 +1,9 @@
+import { enums } from '@treino-multi/shared';
+const { OAuthProvider } = enums;
+type OAuthProvider = enums.OAuthProvider;
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
-import { OAuthProvider } from '../../common/enums/oauth-provider.enum';
+
 
 @Entity('external_identities')
 export class ExternalIdentity {

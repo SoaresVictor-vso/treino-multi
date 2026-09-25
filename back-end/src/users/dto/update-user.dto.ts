@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import {
 	ArrayMinSize,
 	IsArray,
@@ -8,7 +11,7 @@ import {
 	MinLength,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Role } from '../../common/enums/role.enum';
+
 
 export class UpdateUserDto {
 	@ApiProperty({ example: 'NovaSenha@123' })

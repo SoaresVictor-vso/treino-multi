@@ -1,3 +1,8 @@
+import { enums } from '@treino-multi/shared';
+const { Role, Permission, OAuthProvider } = enums;
+type Role = enums.Role;
+type Permission = enums.Permission;
+type OAuthProvider = enums.OAuthProvider;
 import {
 	Body,
 	Controller,
@@ -30,8 +35,8 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
-import { Role } from '../common/enums/role.enum';
-import { Permission } from '../common/enums/permission.enum';
+
+
 import {
 	IsBoolean,
 	IsEmail,
@@ -40,7 +45,7 @@ import {
 	IsString,
 	MinLength,
 } from 'class-validator';
-import { OAuthProvider } from '../common/enums/oauth-provider.enum';
+
 import { assertTrustedOrigin } from '../common/security/trusted-origin';
 
 class AthleteSignupDto {

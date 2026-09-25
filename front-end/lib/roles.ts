@@ -1,11 +1,9 @@
-/** Espelho do enum Role do back-end. Mantenha em sincronia com back-end/src/common/enums/role.enum.ts */
-export enum Role {
-	ORG_ADMIN = 'org:admin',
-	ORG_SUPPORT = 'org:support',
-	TENANT_ADMIN = 'tenant:admin',
-	// STANDALONE_USER = "standalone:user",
-	TENANT_CLIENT = 'tenant:client',
-	TENANT_TRAINER = 'tenant:trainer',
-	TENANT_TRAINER_MASTER = 'tenant:trainer-master',
-	ALL = '*', // Role especial para rotas públicas, que aceita qualquer usuário autenticado
-}
+import { enums } from '@treino-multi/shared';
+const { Role: SharedRole } = enums;
+type SharedRole = enums.Role;
+
+
+// '*' is a frontend route marker and is never a persisted or authorized role.
+export const Role = { ...SharedRole, ALL: '*' } as const;
+export type Role = SharedRole;
+export type RouteRole = Role | typeof Role.ALL;

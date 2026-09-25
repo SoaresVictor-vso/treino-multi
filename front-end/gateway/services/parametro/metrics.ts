@@ -1,10 +1,11 @@
+import { enums } from '@treino-multi/shared';
+const { MetricFieldType } = enums;
+export type MetricFieldType = enums.MetricFieldType;
+export { MetricFieldType };
 import { authenticatedRequest } from '@/gateway/client';
 
-export enum MetricFieldType {
-	INT = 'int',
-	DECIMAL = 'decimal',
-	TIME = 'time',
-}
+
+
 
 export type Metric = {
 	id: number;

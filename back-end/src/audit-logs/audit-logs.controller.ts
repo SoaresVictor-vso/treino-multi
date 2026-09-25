@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { Permission, Role } = enums;
+type Permission = enums.Permission;
+type Role = enums.Role;
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import {
 	ApiBearerAuth,
@@ -9,7 +13,7 @@ import {
 import { IsOptional, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
-import { Permission } from '../common/enums/permission.enum';
+
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { AuditLogService, AuditLogFilter } from './audit-logs.service';
 import { AuthenticationLog } from './entities/authentication-log.entity';
@@ -17,7 +21,7 @@ import { CriticalOperationLog } from './entities/critical-operation-log.entity';
 import { PasswordChangeLog } from './entities/password-change-log.entity';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '../common/enums/role.enum';
+
 
 /** Parâmetros de query compartilhados por todos os endpoints de log */
 class LogQueryDto {

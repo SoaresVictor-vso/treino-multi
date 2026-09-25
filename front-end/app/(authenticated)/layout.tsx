@@ -13,7 +13,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   const pathname = usePathname();
   const router = useRouter();
   const allowed = getAllowedRoles(pathname);
-  const permitted = !!user && (!allowed || allowed.includes(Role.ALL) || allowed.some(role => user.roles.includes(role)));
+  const permitted = !!user && (!allowed || allowed.includes(Role.ALL) || allowed.some(role => role !== Role.ALL && user.roles.includes(role)));
   useEffect(() => { if (user && !permitted) router.replace('/unauthorized'); }, [user, permitted, router]);
   if (!permitted) return null;
   if (isAthleteAppUser(user.roles)) return <AthleteAppShell>{children}</AthleteAppShell>;

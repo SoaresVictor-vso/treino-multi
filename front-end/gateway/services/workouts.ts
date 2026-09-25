@@ -1,14 +1,18 @@
+import { enums, types } from '@treino-multi/shared';
+const { ExecutionStatus: SharedExecutionStatus, WorkoutStatus: SharedWorkoutStatus, ExecutionSetType: SharedExecutionSetType } = enums;
+type SharedExecutionStatus = enums.ExecutionStatus;
+type SharedWorkoutStatus = enums.WorkoutStatus;
+type SharedExecutionSetType = enums.ExecutionSetType;
+type MeasurementPresentation = types.MeasurementPresentation;
 import { authenticatedRequest } from '@/gateway/client';
 import type { Exercise, Metric } from '@/gateway/services/parametro';
 import type { Activity } from '@/gateway/services/workout-templates';
 
-export type ExecutionStatus =
-	| 'pending'
-	| 'in_progress'
-	| 'completed'
-	| 'skipped';
-export type WorkoutStatus = ExecutionStatus | 'scheduled' | 'cancelled';
-export type ExecutionSetType = 'padrao' | 'aquecimento' | 'dropset' | 'falha';
+
+
+export type ExecutionStatus = `${SharedExecutionStatus}`;
+export type WorkoutStatus = `${SharedWorkoutStatus}`;
+export type ExecutionSetType = `${SharedExecutionSetType}`;
 export type TrainingActivity = Activity & { setType: ExecutionSetType };
 
 export type WorkoutExecution = {
@@ -49,6 +53,7 @@ export type WorkoutExerciseNote = {
 export type WorkoutDetail = {
 	id: string;
 	athleteId: string;
+	createdBy: string;
 	templateName: string;
 	templateDescription: string;
 	scheduledDate: string | null;
@@ -69,12 +74,7 @@ export type WorkoutMeasurement = {
 	key: string;
 	name: string;
 	icon: string;
-	presentation: {
-		containerClass: string;
-		iconClass: string;
-		valueClass: string;
-		labelClass: string;
-	};
+	presentation: MeasurementPresentation;
 };
 
 export type MyWorkout = {

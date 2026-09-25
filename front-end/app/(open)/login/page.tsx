@@ -1,5 +1,8 @@
 'use client';
 
+import { constants } from '@treino-multi/shared';
+const { ATHLETE_SELF_REGISTRATION_ENABLED } = constants;
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Input from '@/components/ui/Input';
@@ -20,7 +23,7 @@ import { getAuthToken } from '@/lib/auth';
 import { getLandingPathForRoles } from '@/lib/landing';
 import { getSessionUser } from '@/lib/auth';
 import { apiRequest } from '@/gateway/client';
-import { ATHLETE_SELF_REGISTRATION_ENABLED } from '@treino-multi/shared';
+
 import Link from 'next/link';
 import GoogleCredentialButton from '@/components/auth/GoogleCredentialButton';
 import PasswordInput from '@/components/auth/PasswordInput';

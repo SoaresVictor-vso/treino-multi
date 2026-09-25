@@ -1,5 +1,8 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import { UserContext } from '../../users/entities/user.entity';
-import { Role } from '../../common/enums/role.enum';
+
 
 /**
  * Payload completo embutido no JWT de acesso.

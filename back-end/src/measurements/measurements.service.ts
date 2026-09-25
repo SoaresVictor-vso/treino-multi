@@ -1,20 +1,19 @@
+import { enums, tools, types } from '@treino-multi/shared';
+const { ExecutionStatus } = enums;
+type ExecutionStatus = enums.ExecutionStatus;
+const { createZeroState, evaluateValueFormula, executeFormula, formulaFields, validateFormula } = tools;
+type FormulaContext = types.FormulaContext;
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { EntityManager, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ExecutionStatus } from '../common/enums/execution-status.enum';
+
 import { Execution } from '../workouts/entities/execution.entity';
 import { Workout } from '../workouts/entities/workout.entity';
 import { Metric } from '../metrics/entities/metric.entity';
 import { Measurement } from './entities/measurement.entity';
 import { WorkoutMeasurement } from './entities/workout-measurement.entity';
-import {
-	createZeroState,
-	evaluateValueFormula,
-	executeFormula,
-	formulaFields,
-	validateFormula,
-	type FormulaContext,
-} from './formula-engine';
+
+
 
 const executionFields = [
 	'duration',

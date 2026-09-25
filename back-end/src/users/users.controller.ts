@@ -1,3 +1,8 @@
+import { enums } from '@treino-multi/shared';
+const { Permission, UserOrderBy, Role } = enums;
+type Permission = enums.Permission;
+type UserOrderBy = enums.UserOrderBy;
+type Role = enums.Role;
 import {
 	Body,
 	Controller,
@@ -23,15 +28,16 @@ import {
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
-import { Permission } from '../common/enums/permission.enum';
+
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import * as jwtPayloadInterface from '../auth/interfaces/jwt-payload.interface';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { CreateManagedUserDto } from './dto/create-managed-user.dto';
 import { UpdateManagedUserDto } from './dto/update-managed-user.dto';
-import { FindUsersQueryDto, UserOrderBy } from './dto/find-users-query.dto';
-import { Role } from '../common/enums/role.enum';
+import { FindUsersQueryDto } from './dto/find-users-query.dto';
+
+
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { ChangeOwnPasswordDto } from './dto/change-own-password.dto';
 

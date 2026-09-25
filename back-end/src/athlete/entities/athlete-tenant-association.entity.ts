@@ -1,8 +1,12 @@
+import { enums } from '@treino-multi/shared';
+const { AthleteTenantStatus, AthleteReadScope } = enums;
+type AthleteTenantStatus = enums.AthleteTenantStatus;
+type AthleteReadScope = enums.AthleteReadScope;
 import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Tenant } from '../../tenants/entities/tenant.entity';
-import { AthleteTenantStatus } from '../../common/enums/athlete-tenant-status.enum';
-import { AthleteReadScope } from '../../common/enums/athlete-read-scope.enum';
+
+
 
 @Entity('athlete_tenant_associations')
 export class AthleteTenantAssociation {

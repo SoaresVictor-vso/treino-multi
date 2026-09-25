@@ -2,6 +2,8 @@
 
 ## Especificações
 
+- Crie uma spec somente quando ela for explicitamente solicitada ou quando já existir uma spec implementada sobre o assunto e for necessário registrar uma nova versão.
+- Não crie uma spec para documentar planos, análises ou propostas quando ela não tiver sido explicitamente solicitada e não houver uma versão implementada anterior sobre o assunto.
 - Registre as especificações em `specs/<assunto>/vN.md`.
 - Cada versão deve informar data de criação, data de alteração, data de aprovação e data de implementação. Use `—` enquanto aprovação ou implementação não ocorrerem; não antecipe essas datas.
 - Uma especificação pode ser alterada a qualquer momento enquanto não tiver data de implementação. Atualize a data de alteração a cada edição.

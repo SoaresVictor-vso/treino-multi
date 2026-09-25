@@ -14,6 +14,15 @@ import { MetricsService } from './metrics';
 
 export type ParameterType = 'metrics' | 'exercises';
 
+export async function clearParametersCache(): Promise<void> {
+	await exercisesService.waitForSync();
+	await indexedDbService.clearStores(['exercises', 'metrics']);
+	localStorage.removeItem('last_sync_exercises');
+	localStorage.removeItem('last_search_exercises');
+	localStorage.removeItem('last_search_metrics');
+	exercisesService.resetSearchIndex();
+}
+
 export class ParametersService {
 	public async search<T extends IndexedDbEntity>(
 		parameter: ParameterType,

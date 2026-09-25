@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import {
 	Column,
 	CreateDateColumn,
@@ -7,7 +10,7 @@ import {
 	ManyToOne,
 	PrimaryColumn,
 } from 'typeorm';
-import { Role } from '../../common/enums/role.enum';
+
 import { User } from './user.entity';
 
 @Entity('user_roles')

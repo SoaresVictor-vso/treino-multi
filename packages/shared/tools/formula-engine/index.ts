@@ -1,3 +1,4 @@
+import type { FormulaContext, ZeroState } from '../../types';
 /** A deliberately small expression language for database-backed measurements. */
 type Token = {
 	type: 'number' | 'identifier' | 'operator' | 'punctuation' | 'eof';
@@ -163,11 +164,6 @@ class Parser {
 	}
 }
 
-export type FormulaContext = Record<
-	string,
-	number | boolean | null | undefined
->;
-export type ZeroState = Record<string, number>;
 export function createZeroState(): ZeroState {
 	return new Proxy(Object.create(null), {
 		get: (target, key) =>

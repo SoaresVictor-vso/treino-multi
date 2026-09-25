@@ -1,3 +1,7 @@
+import { constants, enums } from '@treino-multi/shared';
+const { MEASUREMENT_DEFINITIONS } = constants;
+const { Role } = enums;
+type Role = enums.Role;
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -6,8 +10,8 @@ import { UserRole } from '../users/entities/user-role.entity';
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';
 import { Measurement } from '../measurements/entities/measurement.entity';
 import { Metric } from '../metrics/entities/metric.entity';
-import { MEASUREMENT_DEFINITIONS } from '../measurements/measurements.constants';
-import { Role } from '../common/enums/role.enum';
+
+
 
 const makeUserRole = (overrides: Partial<UserRole> = {}): UserRole =>
 	Object.assign(new UserRole(), {

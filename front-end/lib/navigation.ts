@@ -1,10 +1,10 @@
-import { Role } from './roles';
+import { Role, type RouteRole } from './roles';
 
 interface NavItem {
 	href: string;
 	label: string;
 	icon: string;
-	allowedRoles: Role[];
+	allowedRoles: RouteRole[];
 	hidden: boolean;
 }
 
@@ -104,13 +104,13 @@ export function getNavItemsForRoles(roles: Role[]): NavItemPublic[] {
 			(item) =>
 				!item.hidden &&
 				(item.allowedRoles.includes(Role.ALL) ||
-					item.allowedRoles.some((r) => roles.includes(r))),
+					item.allowedRoles.some((r) => r !== Role.ALL && roles.includes(r))),
 		)
 		.map(({ href, label, icon }) => ({ href, label, icon }));
 }
 
 /** Retorna os roles permitidos para o pathname dado, ou null se a rota não estiver mapeada. */
-export function getAllowedRoles(pathname: string): Role[] | null {
+export function getAllowedRoles(pathname: string): RouteRole[] | null {
 	const conf = NAV_ITEMS[pathname];
 	return conf ? conf.allowedRoles : null;
 }

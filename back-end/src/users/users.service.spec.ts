@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { Role, UserOrderBy } = enums;
+type Role = enums.Role;
+type UserOrderBy = enums.UserOrderBy;
 /**
  * Testes unitários do UsersService — Fase 4
  *
@@ -18,10 +22,10 @@ import * as crypto from 'crypto';
 import { UsersService } from './users.service';
 import { User } from './entities/user.entity';
 import { UserRole } from './entities/user-role.entity';
-import { Role } from '../common/enums/role.enum';
+
 import { AuditLogService } from '../audit-logs/audit-logs.service';
 import { Person } from '../persons/entities/person.entity';
-import { UserOrderBy } from './dto/find-users-query.dto';
+
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 

@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { WorkoutStatus } = enums;
+type WorkoutStatus = enums.WorkoutStatus;
 import {
 	Column,
 	CreateDateColumn,
@@ -9,7 +12,7 @@ import {
 	PrimaryGeneratedColumn,
 	UpdateDateColumn,
 } from 'typeorm';
-import { WorkoutStatus } from '../../common/enums/workout-status.enum';
+
 import { Tenant } from '../../tenants/entities/tenant.entity';
 import { User } from '../../users/entities/user.entity';
 import { WorkoutTemplate } from '../../workout-templates/entities/workout-template.entity';

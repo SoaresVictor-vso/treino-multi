@@ -1,6 +1,11 @@
+import { enums } from '@treino-multi/shared';
+const { AthleteReadScope, AthleteTenantStatus } = enums;
+type AthleteReadScope = enums.AthleteReadScope;
+type AthleteTenantStatus = enums.AthleteTenantStatus;
 import { authenticatedRequest } from '../client';
-export type AssociationStatus = 'pending' | 'active' | 'rejected' | 'cancelled';
-export type ReadScope = 'PRESCRIBED_BY_TENANT' | 'PRESCRIBED_BY_TENANT_LIFETIME' | 'TENANT_AND_ATHLETE' | 'ALL_WORKOUTS';
+
+export type AssociationStatus = `${enums.AthleteTenantStatus.PENDING | enums.AthleteTenantStatus.ACTIVE | enums.AthleteTenantStatus.REJECTED | enums.AthleteTenantStatus.CANCELLED}`;
+export type ReadScope = `${AthleteReadScope}`;
 export interface Association {
   id: string; tenantName: string; status: AssociationStatus; scope: ReadScope;
   invitedAt: string; expiresAt: string; startedAt: string | null; endedAt: string | null;

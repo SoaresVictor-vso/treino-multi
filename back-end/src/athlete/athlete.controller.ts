@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { Permission } = enums;
+type Permission = enums.Permission;
 import {
 	Body,
 	Controller,
@@ -13,7 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
-import { Permission } from '../common/enums/permission.enum';
+
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { CreateAthleteTrainerAssociationDto } from './dto/create-athlete-trainer-association.dto';

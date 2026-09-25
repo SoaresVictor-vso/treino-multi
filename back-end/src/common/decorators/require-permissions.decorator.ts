@@ -1,5 +1,8 @@
+import { enums } from '@treino-multi/shared';
+const { Permission } = enums;
+type Permission = enums.Permission;
 import { SetMetadata } from '@nestjs/common';
-import { Permission } from '../enums/permission.enum';
+
 
 /** Chave de metadata utilizada pelo PermissionsGuard */
 export const PERMISSIONS_KEY = 'permissions';

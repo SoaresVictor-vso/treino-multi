@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { Permission, Role } = enums;
+type Permission = enums.Permission;
+type Role = enums.Role;
 import {
 	BadRequestException,
 	ForbiddenException,
@@ -24,11 +28,11 @@ import {
 import { TenantsService } from './tenants.service';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
-import { Permission } from '../common/enums/permission.enum';
+
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import * as jwtPayloadInterface from '../auth/interfaces/jwt-payload.interface';
 import { CreateTenantFullDto } from './dto/create-tenant-full.dto';
-import { Role } from '../common/enums/role.enum';
+
 
 /**
  * CRUD de Tenant.

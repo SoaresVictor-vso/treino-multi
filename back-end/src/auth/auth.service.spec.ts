@@ -1,7 +1,10 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { Role } from '../common/enums/role.enum';
+
 import { AuthService } from './auth.service';
 import { AuthQueryProvider } from './auth-query.provider';
 import { SessionFamily } from './entities/session-family.entity';

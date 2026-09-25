@@ -1,21 +1,4 @@
-import type { Measurement } from './entities/measurement.entity';
-
-type MeasurementDefinition = Pick<
-	Measurement,
-	| 'key'
-	| 'name'
-	| 'formula'
-	| 'valueFormula'
-	| 'staticWeight'
-	| 'dynamicWeight'
-	| 'icon'
-	| 'unit'
-	| 'aggregation'
-	| 'presentation'
-> & {
-	metric1Name: string | null;
-	metric2Name: string | null;
-};
+import type { MeasurementDefinition } from '../types';
 
 const standardPresentation = {
 	containerClass: 'bg-surface-container-high border-outline-variant',

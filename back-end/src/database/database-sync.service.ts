@@ -1,12 +1,16 @@
+import { enums, constants } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
+const { MEASUREMENT_DEFINITIONS } = constants;
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Not, Repository } from 'typeorm';
 import { UserRole } from '../users/entities/user-role.entity';
 import { CriticalOperationLog } from '../audit-logs/entities/critical-operation-log.entity';
-import { Role } from '../common/enums/role.enum';
+
 import { Measurement } from '../measurements/entities/measurement.entity';
 import { Metric } from '../metrics/entities/metric.entity';
-import { MEASUREMENT_DEFINITIONS } from '../measurements/measurements.constants';
+
 
 function stableJson(value: unknown): string | undefined {
 	if (Array.isArray(value))

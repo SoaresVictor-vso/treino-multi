@@ -1,5 +1,9 @@
-import { Permission } from './permission.enum';
-import { Role } from './role.enum';
+import { enums } from '@treino-multi/shared';
+const { Permission, Role } = enums;
+type Permission = enums.Permission;
+type Role = enums.Role;
+
+
 import { resolvePermissions, ROLE_PERMISSIONS } from './role-permissions.map';
 
 describe('ROLE_PERMISSIONS', () => {

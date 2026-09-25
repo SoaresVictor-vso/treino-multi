@@ -1,7 +1,10 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import { UnauthorizedException } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { Role } from '../common/enums/role.enum';
+
 
 const response = () => ({ cookie: jest.fn(), clearCookie: jest.fn() });
 const request = (cookie?: string) => ({ headers: { 'user-agent': 'test-agent', origin: 'https://app.test', ...(cookie ? { cookie } : {}) } });

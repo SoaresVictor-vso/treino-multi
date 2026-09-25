@@ -1,3 +1,7 @@
+import { enums, types } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
+export type UserContext = types.UserContext;
 import {
 	ArrayMinSize,
 	IsArray,
@@ -8,9 +12,10 @@ import {
 	MinLength,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Role } from '../../common/enums/role.enum';
 
-export type UserContext = 'organization' | 'tenant' | 'standalone';
+
+
+
 
 export class CreateUserDto {
 	@ApiProperty({ example: 'uuid-da-person' })

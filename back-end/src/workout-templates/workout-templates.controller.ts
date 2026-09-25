@@ -1,3 +1,6 @@
+import { enums } from '@treino-multi/shared';
+const { Permission } = enums;
+type Permission = enums.Permission;
 import {
 	Body,
 	Controller,
@@ -19,7 +22,7 @@ import {
 } from '@nestjs/swagger';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Permission } from '../common/enums/permission.enum';
+
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CreateWorkoutTemplateDto } from './dto/create-workout-template.dto';
 import { UpdateWorkoutTemplateDto } from './dto/update-workout-template.dto';

@@ -1,3 +1,7 @@
+import { enums } from '@treino-multi/shared';
+const { Role, Permission } = enums;
+type Role = enums.Role;
+type Permission = enums.Permission;
 /**
  * Testes unitários do RolesController — Fase 4
  *
@@ -7,8 +11,8 @@
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { RolesController } from './roles.controller';
-import { Role } from '../common/enums/role.enum';
-import { Permission } from '../common/enums/permission.enum';
+
+
 import { ROLE_PERMISSIONS } from '../common/enums/role-permissions.map';
 
 describe('RolesController', () => {

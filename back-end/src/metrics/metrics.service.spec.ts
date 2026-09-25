@@ -1,8 +1,11 @@
+import { enums } from '@treino-multi/shared';
+const { MetricFieldType } = enums;
+type MetricFieldType = enums.MetricFieldType;
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { MetricFieldType } from '../common/enums/metric-field-type.enum';
+
 import { Metric } from './entities/metric.entity';
 import { MetricsService } from './metrics.service';
 

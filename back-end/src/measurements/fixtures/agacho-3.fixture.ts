@@ -1,4 +1,7 @@
-import { ExecutionStatus } from '../../common/enums/execution-status.enum';
+import { enums } from '@treino-multi/shared';
+const { ExecutionStatus } = enums;
+type ExecutionStatus = enums.ExecutionStatus;
+
 
 const squat = {
 	metric1: { id: 1, name: 'repeticoes' },

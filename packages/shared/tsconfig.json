@@ -5,7 +5,16 @@
     "declaration": true,
     "strict": true,
     "outDir": "dist",
-    "types": []
+    "types": [],
+    "rootDir": "."
   },
-  "include": ["constants.ts"]
+  "include": [
+    "index.ts",
+    "constants/**/*.ts",
+    "enums/**/*.ts",
+    "tools/**/*.ts",
+    "types/**/*.ts",
+    "tests/index.ts",
+    "tests/reference-cases.ts"
+  ]
 }

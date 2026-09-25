@@ -1,5 +1,8 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import { JwtStrategy } from './jwt.strategy';
-import { Role } from '../../common/enums/role.enum';
+
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 
 const payload: JwtPayload = { sub: 'user-id', personId: 'person-id', context: 'standalone',

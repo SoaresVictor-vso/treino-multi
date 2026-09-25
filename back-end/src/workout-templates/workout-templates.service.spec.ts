@@ -1,9 +1,12 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Exercise } from '../exercises/entities/exercise.entity';
-import { Role } from '../common/enums/role.enum';
+
 import { WorkoutTemplate } from './entities/workout-template.entity';
 import { Activity } from './entities/activity.entity';
 import { WorkoutTemplatesService } from './workout-templates.service';

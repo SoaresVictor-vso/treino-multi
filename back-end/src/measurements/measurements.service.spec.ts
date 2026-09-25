@@ -1,11 +1,15 @@
+import { enums, constants } from '@treino-multi/shared';
+const { ExecutionStatus } = enums;
+type ExecutionStatus = enums.ExecutionStatus;
+const { MEASUREMENT_DEFINITIONS } = constants;
 import { EntityManager, Repository } from 'typeorm';
-import { ExecutionStatus } from '../common/enums/execution-status.enum';
+
 import { Execution } from '../workouts/entities/execution.entity';
 import { Workout } from '../workouts/entities/workout.entity';
 import { Metric } from '../metrics/entities/metric.entity';
 import { Measurement } from './entities/measurement.entity';
 import { WorkoutMeasurement } from './entities/workout-measurement.entity';
-import { MEASUREMENT_DEFINITIONS } from './measurements.constants';
+
 import { agacho3WorkoutFixture } from './fixtures/agacho-3.fixture';
 import { MeasurementsService } from './measurements.service';
 

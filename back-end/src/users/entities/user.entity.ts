@@ -1,3 +1,5 @@
+import { types } from '@treino-multi/shared';
+export type UserContext = types.UserContext;
 import {
 	Check,
 	Column,
@@ -15,7 +17,8 @@ import { Tenant } from '../../tenants/entities/tenant.entity';
 import { UserRole } from './user-role.entity';
 import { RefreshToken } from './refresh-token.entity';
 
-export type UserContext = 'organization' | 'tenant' | 'standalone';
+
+
 
 @Entity('users')
 @Check(`"context" IN ('organization','tenant','standalone')`)

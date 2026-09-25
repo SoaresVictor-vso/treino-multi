@@ -1,6 +1,9 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { AthleteService } from './athlete.service';
-import { Role } from '../common/enums/role.enum';
+
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 
 const tenantA = '11111111-1111-4111-8111-111111111111';

@@ -1,6 +1,9 @@
+import { enums } from '@treino-multi/shared';
+const { MetricFieldType } = enums;
+type MetricFieldType = enums.MetricFieldType;
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsString, MaxLength } from 'class-validator';
-import { MetricFieldType } from '../../common/enums/metric-field-type.enum';
+
 
 export class CreateMetricDto {
 	@ApiProperty({ example: 'repeticoes' })

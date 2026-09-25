@@ -1,6 +1,9 @@
+import { types } from '@treino-multi/shared';
+export type UserContext = types.UserContext;
 import { Role } from '@/lib/roles';
 
-export type UserContext = 'organization' | 'tenant' | 'standalone';
+
+
 
 export interface UserListItemDto {
 	id: string;

@@ -1,12 +1,23 @@
-import {
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+function expect(actual) {
+  return {
+    toBe: (expected) => assert.equal(actual, expected),
+    toEqual: (expected) => assert.deepEqual(actual, expected),
+    toBeNull: () => assert.equal(actual, null),
+    toBeCloseTo: (expected) => assert.ok(Math.abs(actual - expected) < 0.0001),
+    toThrow: () => assert.throws(actual),
+  };
+}
+const {
 	createZeroState,
 	evaluateValueFormula,
 	executeFormula,
 	validateFormula,
-} from './formula-engine';
-import { MEASUREMENT_DEFINITIONS } from './measurements.constants';
+} = require('../dist/tools/formula-engine');
+const { MEASUREMENT_DEFINITIONS } = require('../dist/constants/measurements.constants');
 
-const definition = (key: string) => {
+const definition = (key) => {
 	const found = MEASUREMENT_DEFINITIONS.find(
 		(measurement) => measurement.key === key,
 	);
@@ -29,7 +40,7 @@ describe('formula engine', () => {
 			...executionFields,
 			...MEASUREMENT_DEFINITIONS.flatMap((measurement) =>
 				[measurement.metric1Name, measurement.metric2Name].filter(
-					(name): name is string => name !== null,
+					(name) => name !== null,
 				),
 			),
 		];
@@ -123,4 +134,15 @@ describe('formula engine', () => {
 			validateFormula('curr.total = unknown', ['peso'], true),
 		).toThrow();
 	});
+});
+
+const { tests } = require('../dist');
+const { formulaReferenceCases } = tests;
+it('matches the shared formula reference cases', () => {
+ for (const item of formulaReferenceCases) {
+  const definition = MEASUREMENT_DEFINITIONS.find((entry) => entry.key === item.key);
+  const curr = createZeroState();
+  for (const context of item.contexts) executeFormula(definition.formula, curr, context);
+  assert.ok(Math.abs(evaluateValueFormula(definition.valueFormula, curr) - item.expected) < 0.0001);
+ }
 });

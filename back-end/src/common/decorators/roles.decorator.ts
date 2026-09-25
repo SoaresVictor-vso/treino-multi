@@ -1,5 +1,8 @@
+import { enums } from '@treino-multi/shared';
+const { Role } = enums;
+type Role = enums.Role;
 import { SetMetadata } from '@nestjs/common';
-import { Role } from '../enums/role.enum';
+
 
 /** Chave de metadata utilizada pelo RolesGuard */
 export const ROLES_KEY = 'roles';

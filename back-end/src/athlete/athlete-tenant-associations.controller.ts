@@ -1,13 +1,17 @@
+import { enums } from '@treino-multi/shared';
+const { Permission, AthleteReadScope } = enums;
+type Permission = enums.Permission;
+type AthleteReadScope = enums.AthleteReadScope;
 import { Body, Controller, Get, Ip, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { IsEmail, IsEnum, IsString } from 'class-validator';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { JwtPayload } from '../auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
-import { Permission } from '../common/enums/permission.enum';
+
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { AthleteReadScope } from '../common/enums/athlete-read-scope.enum';
+
 import { AthleteTenantAssociationsService } from './athlete-tenant-associations.service';
 
 class InviteDto { @IsEmail() email!: string; @IsString() password!: string; }

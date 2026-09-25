@@ -101,6 +101,40 @@ export class IndexedDbService {
 		});
 	}
 
+	public async clearStores(stores: string[]): Promise<void> {
+		if (typeof window === 'undefined' || !window.indexedDB) return;
+
+		const database = await new Promise<IDBDatabase>((resolve, reject) => {
+			const request = indexedDB.open(DATABASE_NAME);
+			request.onsuccess = () => resolve(request.result);
+			request.onerror = () => reject(request.error);
+		});
+		const existingStores = stores.filter((store) =>
+			database.objectStoreNames.contains(store),
+		);
+		if (existingStores.length === 0) {
+			database.close();
+			return;
+		}
+
+		return new Promise((resolve, reject) => {
+			const transaction = database.transaction(existingStores, 'readwrite');
+			existingStores.forEach((store) => transaction.objectStore(store).clear());
+			transaction.oncomplete = () => {
+				database.close();
+				resolve();
+			};
+			transaction.onerror = () => {
+				database.close();
+				reject(transaction.error);
+			};
+			transaction.onabort = () => {
+				database.close();
+				reject(transaction.error);
+			};
+		});
+	}
+
 	private openDatabase(
 		parametro: string,
 		fields: string[] = [],

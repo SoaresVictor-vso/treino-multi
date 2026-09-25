@@ -6,6 +6,7 @@ import { useState } from 'react';
 import React from 'react';
 import * as icons from 'react-icons/ri';
 import { logoutSession } from '@/gateway/client';
+import ClearParametersCacheButton from '@/components/ClearParametersCacheButton';
 import { NavItemPublic } from '@/lib/navigation';
 
 export default function Sidebar({
@@ -81,6 +82,7 @@ export default function Sidebar({
 				</nav>
 
 				<div className="border-t border-gray-700 px-2 py-4">
+					<ClearParametersCacheButton presentation="sidebar" compact={compact} />
 					<button
 						onClick={handleLogout}
 						title={compact ? 'Sair' : undefined}
