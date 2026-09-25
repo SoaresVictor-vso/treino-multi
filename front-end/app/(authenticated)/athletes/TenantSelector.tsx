@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { getAuthToken } from '@/lib/auth';
-import { searchTenantOptions } from './tenant-options';
+import { searchTenantOptions } from '@/gateway/services/tenant-options';
 
 export default function TenantSelector({ value, onChange }: { value: string; onChange: (id: string) => void }) {
 	const [query, setQuery] = useState('');
@@ -15,7 +15,13 @@ export default function TenantSelector({ value, onChange }: { value: string; onC
 			if (!token) return;
 			const result = await searchTenantOptions(token, query);
 			if (!active) return;
-			setOptions(result.options);
+			setOptions(
+				result.options?.map((tenant) => (
+					<option key={tenant.id} value={tenant.id}>
+						{tenant.name}
+					</option>
+				)) ?? null,
+			);
 			setError(result.error);
 		}, 250);
 		return () => { active = false; window.clearTimeout(timer); };

@@ -39,7 +39,7 @@ export default function GoogleCredentialButton({
 		});
 		target.current.replaceChildren();
 		google.accounts.id.renderButton(target.current, {
-			theme: 'outline',
+			theme: 'outline_dark',
 			size: 'large',
 			text: 'continue_with',
 		});
