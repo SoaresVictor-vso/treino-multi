@@ -276,7 +276,7 @@ export default function AthletesClient({
 			await Promise.all([
 				personalRecordsService.findByAthlete(athlete.id),
 				exerciseGroupsService.findAll(),
-				exercisesService.syncCatalog(),
+				exercisesService.readCatalog(),
 				metricsService.search(),
 			]);
 		if (!recordsResult.success || !groupsResult.success) {

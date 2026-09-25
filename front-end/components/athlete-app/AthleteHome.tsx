@@ -88,7 +88,9 @@ export default function AthleteHome() {
 		const timer = setTimeout(() => {
 			void loadCalendar(calendarMonth);
 		});
-		return () => clearTimeout(timer);
+		const refresh = () => void loadCalendar(calendarMonth);
+		window.addEventListener('workout-status-changed', refresh);
+		return () => { clearTimeout(timer); window.removeEventListener('workout-status-changed', refresh); };
 	}, [calendarMonth, loadCalendar]);
 	const entries = useMemo<DatedWorkout[]>(
 		() =>

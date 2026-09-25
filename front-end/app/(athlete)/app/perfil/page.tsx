@@ -25,6 +25,8 @@ import {
 } from '@/lib/constants';
 import { UsersService } from '@/gateway/services/users';
 import { logoutSession } from '@/gateway/client';
+import { getSessionUser } from '@/lib/auth';
+import { synchronizeAll } from '@/lib/offline-contingency';
 
 const usersService = new UsersService();
 type ProfileForm = { name: string; email: string; phone: string; document: string };
@@ -39,6 +41,23 @@ export default function PerfilPage() {
 	const [profileError, setProfileError] = useState<string | null>(null);
 	const [profileMessage, setProfileMessage] = useState<string | null>(null);
 	const [savingProfile, setSavingProfile] = useState(false);
+	const [syncing, setSyncing] = useState(false);
+	const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+	async function synchronizeWorkouts() {
+		const userId = getSessionUser()?.sub;
+		if (!userId) return;
+		setSyncing(true);
+		setSyncMessage(null);
+		try {
+			const result = await synchronizeAll(userId);
+			setSyncMessage(result.errors.length ? result.errors.join(' ') : 'Tudo Sincronizado!');
+		} catch (cause) {
+			setSyncMessage(cause instanceof Error ? cause.message : 'Não foi possível sincronizar.');
+		} finally {
+			setSyncing(false);
+		}
+	}
 
 	useEffect(() => {
 		let active = true;
@@ -55,6 +74,7 @@ export default function PerfilPage() {
 	}, []);
 
 	function openProfileModal() {
+		if (!navigator.onLine) { setProfileError('É necessária conexão para alterar dados cadastrais.'); return; }
 		setProfileError(null);
 		setProfileMessage(null);
 		setProfileOpen(true);
@@ -67,6 +87,7 @@ export default function PerfilPage() {
 
 	async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
+		if (!navigator.onLine) return setProfileError('É necessária conexão para alterar dados cadastrais.');
 		const name = profile.name.trim();
 		const email = profile.email.trim();
 		const phone = profile.phone.trim();
@@ -101,7 +122,7 @@ export default function PerfilPage() {
 			<section className="mt-6 border-t border-outline-variant/50 pt-5"><h2 className="mb-3 text-sm font-medium text-on-surface-variant">Dados pessoais</h2><div><div className="border-b border-outline-variant/50 py-3"><p className="text-xs font-medium text-on-surface-variant">Nome completo</p><p className="mt-1 text-sm font-medium text-primary">{profile.name || 'Não informado'}</p></div><div className="border-b border-outline-variant/50 py-3"><p className="text-xs font-medium text-on-surface-variant">E-mail</p><p className="mt-1 break-words text-sm font-medium text-primary">{profile.email || 'Não informado'}</p></div><div className="border-b border-outline-variant/50 py-3"><p className="text-xs font-medium text-on-surface-variant">Telefone</p><p className="mt-1 text-sm font-medium text-primary">{profile.phone ? applyMask(profile.phone, PHONE_MASK_REGEX) : 'Não informado'}</p></div><div className="py-3"><p className="text-xs font-medium text-on-surface-variant">CPF</p><p className="mt-1 text-sm font-medium text-primary">{profile.document ? applyMask(profile.document, CPF_MASK_REGEX) : 'Não informado'}</p></div></div>{profileMessage && <p role="status" className="mt-3 text-sm font-medium text-primary-fixed">{profileMessage}</p>}{profileError && <div className="mt-3"><ErrorBox message={profileError} /></div>}</section>
 
 			<section className="mt-6 border-t border-outline-variant/50 pt-5"><h2 className="mb-3 text-sm font-medium text-on-surface-variant">Sua conta</h2><Link href="/app/consultorias" className="block rounded-xl px-2 py-4 hover:bg-surface-container-high">Gerenciar consultorias →</Link><Link href="/login-methods" className="block rounded-xl px-2 py-4 hover:bg-surface-container-high">Métodos de login →</Link></section>
-			<section className="mt-6 border-t border-outline-variant/50 pt-5"><ClearParametersCacheButton presentation="profile" /></section>
+			<section className="mt-6 space-y-3 border-t border-outline-variant/50 pt-5"><Button type="button" variant="outline" className="w-full" disabled={syncing} onClick={() => void synchronizeWorkouts()}>{syncing ? 'Sincronizando...' : 'Sincronizar agora'}</Button>{syncMessage && <p role="status" className="text-sm text-on-surface-variant">{syncMessage}</p>}<ClearParametersCacheButton presentation="profile" /></section>
 			<section className="mt-6 border-t border-outline-variant/50 pt-5"><Button type="button" variant="outline" className="w-full border-error/50 text-error hover:border-error hover:bg-error-container/20 hover:text-error" onClick={handleLogout}><RiLogoutBoxRLine size={20} aria-hidden />Sair da conta</Button></section>
 		</section>}
 

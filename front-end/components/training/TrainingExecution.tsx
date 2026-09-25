@@ -28,8 +28,23 @@ import {
 } from './WorkoutCompletionScreen';
 import WorkoutMeasurements from './WorkoutMeasurements';
 import { preliminaryMeasurements } from './preliminaryMeasurements';
-import { API_ERROR_EVENT } from '@/gateway/client';
 import { getSessionUser } from '@/lib/auth';
+import { Role } from '@/lib/roles';
+import {
+	createConfirmedWorkout,
+	readCurrentWorkout,
+	readPendingWorkout,
+	updatePendingWorkout,
+	waitForPendingWorkoutWrites,
+	readConfirmedWorkout,
+	syncPendingWorkouts,
+	resolveWorkoutConflict,
+	syncSingleWorkoutSource,
+	pullWorkouts,
+	recordWorkoutConflict,
+	readTrainerReview,
+	acknowledgeTrainerReview,
+} from '@/lib/offline-contingency';
 import {
 	workoutsService,
 	type WorkoutDetail,
@@ -41,22 +56,6 @@ import {
 	DEFAULT_REST_DURATION,
 	WORKOUT_REFRESH_INTERVAL,
 } from '@/lib/constants';
-
-function serializeExecution(execution: WorkoutExecution) {
-	const {
-		id,
-		exercise: _exercise,
-		referenceGroup: _referenceGroup,
-		referencePersonalRecord: _referencePersonalRecord,
-		metric1Type: _metric1Type,
-		metric2Type: _metric2Type,
-		predictedRm: _predictedRm,
-		finishedAt: _finishedAt,
-		pendingRemoval: _pendingRemoval,
-		...payload
-	} = execution;
-	return { ...payload, ...(id > 0 ? { id } : {}) };
-}
 
 function statusLabel(status: WorkoutDetail['status']) {
 	return {
@@ -96,82 +95,13 @@ function preloadPrescribedValues(workout: WorkoutDetail): WorkoutDetail {
 	};
 }
 
-function serializeExecutions(executions: WorkoutExecution[]) {
-	return executions
-		.filter((execution) => !execution.pendingRemoval)
-		.map((execution, index) =>
-			serializeExecution({ ...execution, position: index + 1 }),
-		);
-}
-
-function deletedExecutionIds(executions: WorkoutExecution[]) {
-	return executions
-		.filter((execution) => execution.pendingRemoval && execution.id > 0)
-		.map((execution) => execution.id);
-}
-
-function executionHasChanged(
-	current: WorkoutExecution,
-	snapshot: WorkoutExecution,
-) {
-	return (
-		JSON.stringify(serializeExecution(current)) !==
-		JSON.stringify(serializeExecution(snapshot))
-	);
-}
-
-function reconcileSavedWorkout(
-	snapshot: WorkoutDetail,
-	current: WorkoutDetail,
-	saved: WorkoutDetail,
-): WorkoutDetail {
-	const savedById = new Map(
-		saved.executions.map((execution) => [execution.id, execution]),
-	);
-	const representedSavedIds = new Set<number>();
-	const executions = current.executions.map((execution) => {
-		const snapshotExecution = snapshot.executions.find(
-			(item) => item.id === execution.id,
-		);
-		const savedExecution = snapshotExecution
-			? snapshotExecution.id > 0
-				? savedById.get(snapshotExecution.id)
-				: saved.executions.find(
-						(item) =>
-							item.exerciseId === snapshotExecution.exerciseId &&
-							item.position === snapshotExecution.position,
-					)
-			: execution.id > 0
-				? savedById.get(execution.id)
-				: undefined;
-
-		if (!savedExecution) return execution;
-		representedSavedIds.add(savedExecution.id);
-		if (!snapshotExecution || executionHasChanged(execution, snapshotExecution))
-			return { ...savedExecution, ...execution, id: savedExecution.id };
-		return savedExecution;
-	});
-
-	// A série foi criada no servidor, mas foi removida localmente enquanto o
-	// request estava em voo. Mantemos-a apenas para enviá-la como remoção no
-	// próximo ciclo, sem fazê-la reaparecer visualmente.
-	for (const execution of saved.executions) {
-		if (!representedSavedIds.has(execution.id))
-			executions.push({ ...execution, pendingRemoval: true });
-	}
-
-	return {
-		...saved,
-		executions,
-		exerciseNotes: current.exerciseNotes,
-	};
-}
-
 export default function TrainingExecution({ id }: { id: string }) {
 	const router = useRouter();
 	const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [conflict, setConflict] = useState<WorkoutDetail | null>(null);
+	const [trainerReview, setTrainerReview] = useState<WorkoutExecution[]>([]);
 	const [starting, setStarting] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -257,14 +187,47 @@ export default function TrainingExecution({ id }: { id: string }) {
 	const load = useCallback(
 		async (background = false) => {
 			if (!background) setLoading(true);
+			const userId = getSessionUser()?.sub;
+			if (userId) {
+				try {
+					await waitForPendingWorkoutWrites(userId, id);
+					const local = await readCurrentWorkout(userId, id);
+					setConflict(local?.conflict ?? null);
+					if (local?.workout.status === 'completed') setTrainerReview(await readTrainerReview(userId, id));
+					if (local && local.workout.athleteId === userId && (!local.synchronized || !navigator.onLine)) {
+						const localWorkout = preloadPrescribedValues(local.workout);
+						workoutRef.current = localWorkout;
+						setWorkout(localWorkout);
+						setHasUnsavedChanges(!local.synchronized);
+						dirtyRef.current = !local.synchronized;
+						setError(null);
+						if (!background) setLoading(false);
+						return;
+					}
+				} catch (cause) {
+					setError(cause instanceof Error ? cause.message : 'Falha ao ler o treino local.');
+				}
+			}
+			if (userId && navigator.onLine && getSessionUser()?.roles.includes(Role.TENANT_CLIENT) && !(await readCurrentWorkout(userId, id))) {
+				try { await pullWorkouts(userId); }
+				catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao sincronizar treino.'); }
+			}
+			if (userId && navigator.onLine && !getSessionUser()?.roles.includes(Role.TENANT_CLIENT)) {
+				try { await syncSingleWorkoutSource(userId, id); }
+				catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao sincronizar treino.'); }
+			}
 			const response = await workoutsService.findOne(id);
 			if (!response.success || !response.data)
 				setError(response.error || 'Não foi possível carregar o treino.');
 			else {
 				const prescribedWorkout = preloadPrescribedValues(response.data);
+				setError(null);
+				if (userId === response.data.athleteId) {
+					try { await createConfirmedWorkout(userId, response.data); }
+					catch { setError('Não foi possível guardar o treino neste dispositivo.'); }
+				}
 				workoutRef.current = prescribedWorkout;
 				setWorkout(prescribedWorkout);
-				setError(null);
 				if (
 					getSessionUser()?.sub === response.data.athleteId &&
 					response.data.executions.some(
@@ -291,6 +254,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 		return () => window.clearInterval(refresh);
 	}, [isAthlete, load, workout?.status]);
 	const editable = isAthlete && workout?.status === 'in_progress';
+	const structuralEditable = editable && workout?.createdBy === getSessionUser()?.sub;
 	const unresolved =
 		workout?.executions.some(
 			(item) =>
@@ -313,65 +277,106 @@ export default function TrainingExecution({ id }: { id: string }) {
 	);
 	const save = useCallback(async (snapshot = workoutRef.current) => {
 		if (!snapshot || savingRef.current) return;
+		const userId = getSessionUser()?.sub;
+		if (!userId || userId !== snapshot.athleteId) return;
 
 		savingRef.current = true;
 		setSaving(true);
 		setError(null);
-		const submit = (workout: WorkoutDetail) =>
-			workoutsService.updateExecutions(
-				workout.id,
-				serializeExecutions(workout.executions),
-				workout.exerciseNotes.map(({ exerciseId, athleteNote }) => ({
-					exerciseId,
-					athleteNote,
-				})),
-				deletedExecutionIds(workout.executions),
-			);
-		let response = await submit(snapshot);
-		if (!response.success && response.status === 409 && response.currentState) {
-			const latestWorkout = workoutRef.current ?? snapshot;
-			const serverState = preloadPrescribedValues(response.currentState);
-			const reconciled = reconcileSavedWorkout(snapshot, latestWorkout, serverState);
-			workoutRef.current = reconciled;
-			setWorkout(reconciled);
-			response = await submit(reconciled);
+		let pending;
+		try {
+			await waitForPendingWorkoutWrites(userId, snapshot.id);
+			pending = await readPendingWorkout(userId, snapshot.id);
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : 'Falha ao ler alterações locais.');
+			savingRef.current = false;
+			setSaving(false);
+			return;
 		}
-		if (!response.success || !response.data) {
-			setError(response.error || 'Não foi possível salvar as séries.');
-			if (typeof window !== 'undefined')
-				window.dispatchEvent(
-					new CustomEvent(API_ERROR_EVENT, {
-						detail: {
-							message:
-								response.error || 'Não foi possível salvar as séries.',
-						},
-					}),
-				);
-		} else {
-			const savedWorkout = preloadPrescribedValues(response.data);
-			const latestWorkout = workoutRef.current ?? snapshot;
-			const reconciledWorkout = reconcileSavedWorkout(
-				snapshot,
-				latestWorkout,
-				savedWorkout,
-			);
-			const hasPendingChanges =
-				latestWorkout !== snapshot ||
-				reconciledWorkout.executions.some((execution) => execution.pendingRemoval);
-			workoutRef.current = reconciledWorkout;
-			setWorkout(reconciledWorkout);
-			dirtyRef.current = hasPendingChanges;
-			setHasUnsavedChanges(hasPendingChanges);
+		if (!pending || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+			savingRef.current = false;
+			setSaving(false);
+			return;
+		}
+		try {
+			const result = await syncPendingWorkouts(userId, { workoutId: snapshot.id });
+			const latestPending = await readPendingWorkout(userId, snapshot.id);
+			setConflict(latestPending?.conflict ?? null);
+			const latest = latestPending ?? await readConfirmedWorkout(userId, snapshot.id);
+			if (latest) {
+				const visible = preloadPrescribedValues(latest.workout);
+				workoutRef.current = visible;
+				setWorkout(visible);
+				dirtyRef.current = !!latestPending;
+				setHasUnsavedChanges(!!latestPending);
+			}
+			if (result.errors.length) setError(result.errors.join(' '));
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : 'Não foi possível sincronizar.');
 		}
 		savingRef.current = false;
 		setSaving(false);
 	}, []);
 	useEffect(() => {
+		const onConflict = (event: Event) => {
+			if ((event as CustomEvent<{ workoutId: string }>).detail?.workoutId !== id) return;
+			const userId = getSessionUser()?.sub;
+			if (userId) void readPendingWorkout(userId, id).then((row) => setConflict(row?.conflict ?? null));
+		};
+		window.addEventListener('workout-sync-conflict', onConflict);
+		const onTrainerReconciled = (event: Event) => {
+			if ((event as CustomEvent<{ workoutId: string }>).detail?.workoutId === id) void load(true);
+		};
+		window.addEventListener('workout-trainer-reconciled', onTrainerReconciled);
+		const onCopied = (event: Event) => {
+			const detail = (event as CustomEvent<{ originalId: string; copyId: string }>).detail;
+			if (detail?.originalId === id) router.replace(`/training/${detail.copyId}`);
+		};
+		window.addEventListener('workout-sync-copy', onCopied);
+		return () => {
+			window.removeEventListener('workout-sync-conflict', onConflict);
+			window.removeEventListener('workout-trainer-reconciled', onTrainerReconciled);
+			window.removeEventListener('workout-sync-copy', onCopied);
+		};
+	}, [id, load, router]);
+	const chooseConflict = async (choice: 'current' | 'saved' | 'both') => {
+		const userId = getSessionUser()?.sub;
+		if (!userId || !workout) return;
+		try {
+			await resolveWorkoutConflict(userId, workout.id, choice);
+			setConflict(null);
+			if (choice === 'current') {
+				const saved = await readCurrentWorkout(userId, workout.id);
+				if (saved) { workoutRef.current = saved.workout; setWorkout(saved.workout); setHasUnsavedChanges(false); dirtyRef.current = false; }
+			} else {
+				const result = await syncPendingWorkouts(userId, { workoutId: workout.id });
+				if (result.errors.length) setError(result.errors.join(' '));
+				const latest = await readCurrentWorkout(userId, workout.id);
+				if (latest) { workoutRef.current = latest.workout; setWorkout(latest.workout); setHasUnsavedChanges(!latest.synchronized); dirtyRef.current = !latest.synchronized; }
+			}
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : 'Falha ao resolver o conflito.');
+		}
+	};
+	useEffect(() => {
 		const autosave = window.setInterval(() => {
-			if (dirtyRef.current) void save();
+			const userId = getSessionUser()?.sub;
+			if (!userId || workoutRef.current?.status !== 'in_progress' || !navigator.onLine) return;
+			void pullWorkouts(userId).then(async () => {
+				const current = workoutRef.current;
+				const confirmed = current && await readConfirmedWorkout(userId, current.id);
+				if (current && confirmed?.workout.status === 'completed') {
+					if (!(await readPendingWorkout(userId, current.id))) await updatePendingWorkout(userId, current);
+					await recordWorkoutConflict(userId, current.id, confirmed.workout);
+					setConflict(confirmed.workout);
+					return;
+				}
+				if (dirtyRef.current) await save();
+				else await load(true);
+			}).catch((cause) => setError(cause instanceof Error ? cause.message : 'Falha na sincronização do treino.'));
 		}, 60_000);
 		return () => window.clearInterval(autosave);
-	}, [save]);
+	}, [save, load]);
 	useEffect(() => {
 		const interval = window.setInterval(() => setNow(Date.now()), 1000);
 		return () => window.clearInterval(interval);
@@ -385,6 +390,11 @@ export default function TrainingExecution({ id }: { id: string }) {
 		setWorkout(updatedWorkout);
 		dirtyRef.current = true;
 		setHasUnsavedChanges(true);
+		const userId = getSessionUser()?.sub;
+		if (userId === updatedWorkout.athleteId)
+			void updatePendingWorkout(userId, updatedWorkout).catch((cause) =>
+				setError(cause instanceof Error ? cause.message : 'Falha ao salvar alterações no dispositivo.'),
+			);
 	};
 
 	const updateExecution = (
@@ -408,9 +418,10 @@ export default function TrainingExecution({ id }: { id: string }) {
 							...item,
 							...patch,
 							...(patch.status === 'completed'
-								? { finishedAt: new Date().toISOString() }
+								? { startedAt: item.startedAt ?? new Date().toISOString(), finishedAt: new Date().toISOString() }
 								: {}),
 							...(patch.status === 'in_progress' ? { finishedAt: null } : {}),
+							...(patch.status === 'in_progress' && !item.startedAt ? { startedAt: new Date().toISOString() } : {}),
 						}
 					: item,
 			),
@@ -453,7 +464,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 				: current.executions.length;
 			const executions = [...current.executions];
 			executions.splice(insertionIndex, 0, {
-				id: -position,
+				id: Math.min(0, ...current.executions.map((item) => item.id)) - 1,
 				exerciseId: exercise.id,
 				position,
 				prescribedMetric1: sourceSet?.prescribedMetric1 ?? null,
@@ -518,7 +529,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 				executions: [
 					...current.executions,
 					...newExercises.map((exercise, index) => ({
-						id: -(firstNewPosition + index),
+						id: Math.min(0, ...current.executions.map((item) => item.id)) - index - 1,
 						exerciseId: exercise.id,
 						position: firstNewPosition + index,
 						prescribedMetric1: null,
@@ -709,27 +720,24 @@ export default function TrainingExecution({ id }: { id: string }) {
 		setCompletionOpen(false);
 		setSaving(true);
 		setError(null);
-		const saveResult = await workoutsService.updateExecutions(
-			workout.id,
-			serializeExecutions(workout.executions),
-			workout.exerciseNotes.map(({ exerciseId, athleteNote }) => ({
-				exerciseId,
-				athleteNote,
-			})),
-			deletedExecutionIds(workout.executions),
-		);
-		if (!saveResult.success || !saveResult.data) {
-			setError(saveResult.error || 'Não foi possível salvar as séries.');
-			setSaving(false);
-			return;
+		const userId = getSessionUser()?.sub;
+		if (userId === workout.athleteId) {
+			try { await waitForPendingWorkoutWrites(userId, workout.id); }
+			catch {
+				setError('Não foi possível salvar as alterações neste dispositivo.');
+				setSaving(false);
+				return;
+			}
 		}
-		dirtyRef.current = false;
-		setHasUnsavedChanges(false);
 		const result = await workoutsService.complete(workout.id);
 		if (!result.success || !result.data)
 			setError(result.error || 'Não foi possível finalizar o treino.');
 		else {
 			const completedWorkout = preloadPrescribedValues(result.data);
+			if (userId) setTrainerReview(await readTrainerReview(userId, workout.id));
+			dirtyRef.current = true;
+			setHasUnsavedChanges(true);
+			if (navigator.onLine && userId) void syncPendingWorkouts(userId, { workoutId: workout.id });
 			workoutRef.current = completedWorkout;
 			setWorkout(completedWorkout);
 			setCompletionMessage(
@@ -749,10 +757,12 @@ export default function TrainingExecution({ id }: { id: string }) {
 			setError(result.error || 'Não foi possível pular o treino.');
 		} else {
 			const skippedWorkout = preloadPrescribedValues(result.data);
+			const userId = getSessionUser()?.sub;
+			if (navigator.onLine && userId) void syncPendingWorkouts(userId, { workoutId: workout.id });
 			workoutRef.current = skippedWorkout;
 			setWorkout(skippedWorkout);
-			dirtyRef.current = false;
-			setHasUnsavedChanges(false);
+			dirtyRef.current = true;
+			setHasUnsavedChanges(true);
 			setSkipOpen(false);
 			window.dispatchEvent(new Event('workout-status-changed'));
 		}
@@ -772,7 +782,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 	if (showPostCompletion)
 		return (
 			<WorkoutCompletionScreen
-				measurements={workout.measurements}
+				measurements={preliminaryMeasurements(workout)}
 				message={completionMessage}
 				onConfirm={() => {
 					setShowPostCompletion(false);
@@ -782,6 +792,27 @@ export default function TrainingExecution({ id }: { id: string }) {
 		);
 	return (
 		<section className="mx-auto w-full max-w-5xl space-y-4 pb-10">
+			<Modal isOpen={trainerReview.length > 0} title="Alterações do treinador para revisão" onClose={() => undefined}>
+				<p className="mb-3 text-sm text-on-surface-variant">As séries realizadas mantiveram seus valores anteriores. As novas prescrições aparecem como séries de contingência e não entram na adesão ou nas métricas.</p>
+				<WorkoutComparison executions={trainerReview} />
+				<div className="mt-4 flex justify-end"><Button type="button" onClick={() => void (async () => {
+					const userId = getSessionUser()?.sub;
+					if (userId) await acknowledgeTrainerReview(userId, workout.id);
+					setTrainerReview([]);
+				})()}>Entendi</Button></div>
+			</Modal>
+			<Modal isOpen={!!conflict} title={conflict?.status === 'completed' && workout.status !== 'completed' ? 'Este treino já foi finalizado por você. Deseja continuar?' : 'Conflito neste treino'} onClose={() => undefined}>
+				<p className="mb-3 text-sm text-on-surface-variant">Compare a versão salva no servidor com as alterações deste dispositivo.</p>
+				<div className="grid max-h-[55vh] gap-4 overflow-auto md:grid-cols-2">
+					<div><h3 className="mb-2 font-semibold">Versão persistida: {conflict?.templateName}</h3>{conflict && <WorkoutComparison executions={conflict.executions} />}</div>
+					<div><h3 className="mb-2 font-semibold">Versão deste dispositivo: {workout.templateName}</h3><WorkoutComparison executions={workout.executions} /></div>
+				</div>
+				<div className="mt-4 flex flex-wrap justify-end gap-2">
+					<Button type="button" variant="outline" onClick={() => void chooseConflict('current')}>{conflict?.status === 'completed' ? 'Abandonar treino' : 'Manter Atual'}</Button>
+					<Button type="button" variant="outline" onClick={() => void chooseConflict(conflict?.status === 'completed' ? 'both' : 'saved')}>{conflict?.status === 'completed' ? 'Continuar treinando' : 'Manter Salvo'}</Button>
+					{conflict?.status !== 'completed' && <Button type="button" onClick={() => void chooseConflict('both')}>Salvar Ambos</Button>}
+				</div>
+			</Modal>
 			{workout.status === 'in_progress' && activeRest && (
 				<>
 					<div
@@ -832,7 +863,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 					<h1 className="line-clamp-2 min-w-0 flex-1 text-base font-bold leading-snug sm:text-lg">
 						{workout.templateName}
 					</h1>
-					{isAthlete && !['completed', 'cancelled'].includes(workout.status) && (
+					{isAthlete && workout.createdBy === getSessionUser()?.sub && !['completed', 'cancelled'].includes(workout.status) && (
 						<button
 							type="button"
 							onClick={() => {
@@ -869,7 +900,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 			{workout.status === 'completed' ||
 			!(isAthlete && workout.status == 'in_progress') ? (
 				<>
-					<WorkoutMeasurements measurements={workout.measurements} />
+					<WorkoutMeasurements measurements={preliminaryMeasurements(workout)} />
 					<WorkoutComparison
 						executions={workout.executions}
 						onExerciseClick={openExerciseHistory}
@@ -889,13 +920,13 @@ export default function TrainingExecution({ id }: { id: string }) {
 								>
 									Pular treino
 								</Button>
-								<Button
+								{structuralEditable && <Button
 									variant="outline"
 									disabled={saving}
 									onClick={() => setReorderOpen(true)}
 								>
 									Reordenar exercícios
-								</Button>
+								</Button>}
 							</div>
 						)}
 					{editable && (
@@ -904,14 +935,14 @@ export default function TrainingExecution({ id }: { id: string }) {
 							role="status"
 						>
 							{saving
-								? 'Salvando...'
+								? 'Sincronizando...'
 								: hasUnsavedChanges
-									? 'Alterações serão salvas em até 1 min'
-									: '✓ Alterações salvas'}
+									? 'Salvo neste dispositivo; aguardando sincronização'
+									: '✓ Treino sincronizado'}
 						</p>
 					)}
 					<div className="space-y-4">
-						{executionGroups.length === 0 && editable && (
+						{executionGroups.length === 0 && structuralEditable && (
 							<div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-6 text-center">
 								<h2 className="text-lg font-bold">Nenhum exercício</h2>
 								<p className="mt-1 text-sm text-on-surface-variant">
@@ -935,6 +966,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 										updateAthleteNote(exerciseId, athleteNote)
 									}
 									editable={editable}
+									structuralEditable={!!structuralEditable}
 									onChange={(executionId, key, value) =>
 										updateExecution(executionId, {
 											[key]: value,
@@ -946,7 +978,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 									onSkipExercise={() => skipExercise(sets.map((item) => item.id))}
 									onAddWarmup={() => addSeries(sets[0].exercise, 'before')}
 									onAddSeries={() => addSeries(sets[0].exercise, 'after')}
-									onTitleLongPress={() => setReorderOpen(true)}
+									onTitleLongPress={structuralEditable ? () => setReorderOpen(true) : undefined}
 									onTitleClick={() => openExerciseHistory(exerciseId, sets[0])}
 									onRestClick={openRest}
 								/>
@@ -957,7 +989,7 @@ export default function TrainingExecution({ id }: { id: string }) {
 			)}
 			{editable && (
 				<>
-					{executionGroups.length > 0 && (
+					{executionGroups.length > 0 && structuralEditable && (
 						<Button
 							variant="outline"
 							className="w-full border-primary-container/40 bg-primary-container/5 text-primary-fixed"

@@ -359,6 +359,35 @@ describe('WorkoutsService', () => {
 		expect(manager.save).not.toHaveBeenCalled();
 	});
 
+	it('impede alteração estrutural pelo atleta em treino criado pelo treinador', async () => {
+		const workout = {
+			id: 'workout-id',
+			athleteId: input.athleteId,
+			createdBy: input.createdBy,
+			status: WorkoutStatus.IN_PROGRESS,
+		} as Workout;
+		Object.assign(manager, { find: jest.fn().mockResolvedValue([{
+			id: 10,
+			exerciseId: 1,
+			position: 1,
+			prescribedMetric1: 10,
+			prescribedMetric2: null,
+			prescribedPse: null,
+			prescribedRestDuration: 60,
+			setType: 'padrao',
+		}]) });
+		jest.spyOn(service as any, 'findWritableWorkout').mockResolvedValue(workout);
+
+		await expect(service.updateExecutions(workout.id, {
+			executions: [{ id: 10, exerciseId: 1, position: 2 }],
+		}, {
+			sub: input.athleteId,
+			tenantId: input.template.tenantId,
+			roles: [Role.TENANT_CLIENT],
+		})).rejects.toThrow('Somente o autor do treino pode alterar sua estrutura.');
+		expect(manager.save).not.toHaveBeenCalled();
+	});
+
 	it('impede iniciar um treino percentual sem os RPs necessários', async () => {
 		const workout = {
 			id: 'workout-id',

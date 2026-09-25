@@ -28,7 +28,7 @@ export default function ExerciseCatalogPage({
 	const [metricsById, setMetricsById] = useState<Record<number, Metric>>({});
 
 	useEffect(() => {
-		Promise.all([metricsService.search(), exercisesService.syncCatalog()]).then(
+		Promise.all([metricsService.search(), exercisesService.readCatalog()]).then(
 			([metrics, exercises]) => {
 				const metricsById = Object.fromEntries(
 					metrics.map((metric) => [metric.id, metric]),

@@ -7,6 +7,7 @@ export const seriesTypeClassName: Record<ExecutionSetType, string> = {
 	aquecimento: 'border-outline-variant bg-surface-variant text-on-surface-variant',
 	dropset: 'border-purple-500/50 bg-purple-500/15 text-purple-300',
 	falha: 'border-error/50 bg-error-container/30 text-error',
+	contingencia_offline: 'border-amber-500/50 bg-amber-500/15 text-amber-300',
 };
 
 type SeriesIndicatorProps = {

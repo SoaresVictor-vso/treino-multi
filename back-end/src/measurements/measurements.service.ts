@@ -1,5 +1,5 @@
 import { enums, tools, types } from '@treino-multi/shared';
-const { ExecutionStatus } = enums;
+const { ExecutionStatus, ExecutionSetType } = enums;
 type ExecutionStatus = enums.ExecutionStatus;
 const { createZeroState, evaluateValueFormula, executeFormula, formulaFields, validateFormula } = tools;
 type FormulaContext = types.FormulaContext;
@@ -73,26 +73,27 @@ export class MeasurementsService {
 						(execution.finishedAt.getTime() - execution.startedAt.getTime()) / 1000,
 					)
 				: null;
+		const prescription = execution.adherenceSnapshot ?? execution;
 		const values: FormulaContext = {
 			duration,
 			rpe: execution.performedPse,
-			prescribedRpe: execution.prescribedPse,
+			prescribedRpe: prescription.prescribedPse,
 			completed: execution.status === ExecutionStatus.COMPLETED,
 			performedMetric1: execution.performedMetric1,
 			performedMetric2: execution.performedMetric2,
-			prescribedMetric1: execution.prescribedMetric1,
-			prescribedMetric2: execution.prescribedMetric2,
+			prescribedMetric1: prescription.prescribedMetric1,
+			prescribedMetric2: prescription.prescribedMetric2,
 			hasMetric2: execution.exercise.metric2 !== null,
 			metricsMatch:
-				execution.prescribedMetric1 !== null &&
-				execution.prescribedMetric1 > 0 &&
-				execution.performedMetric1 === execution.prescribedMetric1 &&
+				prescription.prescribedMetric1 !== null &&
+				prescription.prescribedMetric1 > 0 &&
+				execution.performedMetric1 === prescription.prescribedMetric1 &&
 				(execution.exercise.metric2 === null ||
-					(execution.prescribedMetric2 !== null &&
-						execution.prescribedMetric2 > 0 &&
-						execution.performedMetric2 === execution.prescribedMetric2)),
+					(prescription.prescribedMetric2 !== null &&
+						prescription.prescribedMetric2 > 0 &&
+						execution.performedMetric2 === prescription.prescribedMetric2)),
 			performedRestDuration: execution.performedRestDuration,
-			prescribedRestDuration: execution.prescribedRestDuration,
+			prescribedRestDuration: prescription.prescribedRestDuration,
 		};
 		values[execution.exercise.metric1.name] = execution.performedMetric1;
 		if (execution.exercise.metric2)
@@ -109,6 +110,7 @@ export class MeasurementsService {
 			};
 		},
 	) {
+		if (execution.setType === ExecutionSetType.CONTINGENCIA_OFFLINE) return false;
 		// Workout adherence counts every completed set and prescribed skipped sets.
 		// An unprescribed skipped set does not contribute to the denominator.
 		if (measurement.key === 'workout-adherence') return true;

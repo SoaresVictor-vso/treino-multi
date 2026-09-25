@@ -108,8 +108,7 @@ export default function ClientWorkouts() {
 
 	useEffect(() => {
 		let isMounted = true;
-
-		void workoutsService.findMine().then((activeResponse) => {
+		const reload = () => void workoutsService.findMine().then((activeResponse) => {
 			if (!isMounted) return;
 			if (activeResponse.error) setError(activeResponse.error);
 			else {
@@ -117,9 +116,12 @@ export default function ClientWorkouts() {
 			}
 			setIsLoading(false);
 		});
+		reload();
+		window.addEventListener('workout-status-changed', reload);
 
 		return () => {
 			isMounted = false;
+			window.removeEventListener('workout-status-changed', reload);
 		};
 	}, []);
 

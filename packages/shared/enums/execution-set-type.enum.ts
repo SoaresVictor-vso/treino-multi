@@ -3,4 +3,5 @@ export enum ExecutionSetType {
 	AQUECIMENTO = 'aquecimento',
 	DROPSET = 'dropset',
 	FALHA = 'falha',
+	CONTINGENCIA_OFFLINE = 'contingencia_offline',
 }

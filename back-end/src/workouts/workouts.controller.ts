@@ -26,13 +26,25 @@ import { UpdateWorkoutNameDto } from './dto/update-workout-name.dto';
 import { UpdateWorkoutScheduleDto } from './dto/update-workout-schedule.dto';
 import { ListWorkoutsCalendarDto } from './dto/list-completed-workouts.dto';
 import { WorkoutsService } from './workouts.service';
+import { WorkoutSyncService } from './workout-sync.service';
+import { SyncWorkoutDto } from './dto/sync-workout.dto';
 
 @ApiTags('workouts')
 @ApiBearerAuth('JWT')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('workouts')
 export class WorkoutsController {
-	constructor(private readonly service: WorkoutsService) {}
+	constructor(private readonly service: WorkoutsService, private readonly sync: WorkoutSyncService) {}
+
+	@Get('me/sync')
+	getSyncChanges(@CurrentUser() actor: JwtPayload, @Query('cursor') cursor?: string) {
+		return this.sync.pull(actor, cursor);
+	}
+
+	@Post('me/sync')
+	applySyncedWorkout(@Body() dto: SyncWorkoutDto, @CurrentUser() actor: JwtPayload) {
+		return this.sync.apply(dto, actor);
+	}
 
 	@Get('me')
 	@ApiOperation({

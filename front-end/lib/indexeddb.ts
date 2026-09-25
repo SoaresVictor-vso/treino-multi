@@ -101,6 +101,20 @@ export class IndexedDbService {
 		});
 	}
 
+	public async replace<T extends IndexedDbEntity>(parametro: string, entities: T[]): Promise<void> {
+		if (typeof window === 'undefined' || !window.indexedDB) return;
+		const database = await this.openDatabase(parametro);
+		return new Promise((resolve, reject) => {
+			const transaction = database.transaction(parametro, 'readwrite');
+			const store = transaction.objectStore(parametro);
+			store.clear();
+			for (const entity of entities) store.put(entity);
+			transaction.oncomplete = () => { database.close(); resolve(); };
+			transaction.onabort = () => { database.close(); reject(transaction.error); };
+			transaction.onerror = () => { database.close(); reject(transaction.error); };
+		});
+	}
+
 	public async clearStores(stores: string[]): Promise<void> {
 		if (typeof window === 'undefined' || !window.indexedDB) return;
 

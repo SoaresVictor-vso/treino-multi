@@ -8,7 +8,8 @@ import {
 	CACHE_PARAMETROS as CACHE_PARAMETERS,
 	TTL_PARAMETROS as TTL_PARAMETERS,
 } from '../../../lib/constants';
-import { IndexedDbEntity, indexedDbService } from '../../../lib/indexeddb';
+import { IndexedDbEntity } from '../../../lib/indexeddb';
+import { clearCatalogRows, readCatalogRows } from '@/lib/offline-catalog';
 import { ExerciseParameter, exercisesService } from './exercises';
 import { MetricsService } from './metrics';
 
@@ -16,7 +17,7 @@ export type ParameterType = 'metrics' | 'exercises';
 
 export async function clearParametersCache(): Promise<void> {
 	await exercisesService.waitForSync();
-	await indexedDbService.clearStores(['exercises', 'metrics']);
+	await clearCatalogRows();
 	localStorage.removeItem('last_sync_exercises');
 	localStorage.removeItem('last_search_exercises');
 	localStorage.removeItem('last_search_metrics');
@@ -28,13 +29,11 @@ export class ParametersService {
 		parameter: ParameterType,
 	): Promise<T[]> {
 		if (parameter === 'exercises') {
-			return exercisesService
-				.syncCatalog()
-				.then((items) => items as unknown as T[]);
+			return readCatalogRows(parameter);
 		}
 
 		const cachedResults = CACHE_PARAMETERS
-			? await indexedDbService.search(parameter)
+			? await readCatalogRows(parameter)
 			: null;
 		const lastSearchKey = `last_search_${parameter}`;
 		const lastSearch =
@@ -46,13 +45,7 @@ export class ParametersService {
 
 		if (cacheIsValid && cachedResults?.length) return cachedResults as T[];
 
-		const searchResult = await this.webSearch<T>(parameter, lastSearchKey);
-		await indexedDbService.anexar<T>(parameter, searchResult);
-		if (typeof localStorage !== 'undefined') {
-			localStorage.setItem(lastSearchKey, String(Date.now()));
-		}
-
-		return searchResult as T[];
+		return (cachedResults ?? []) as T[];
 	}
 
 	public async fullTextSearchExercises(
@@ -79,7 +72,6 @@ export class ParametersService {
 	}
 }
 
-export * from '../../../lib/indexeddb';
 export * from './metrics';
 export * from './exercises';
 export * from '../../../lib/constants';

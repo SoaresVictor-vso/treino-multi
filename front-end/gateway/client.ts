@@ -1,5 +1,5 @@
 import { API_URL } from '@/lib/constants';
-import { clearAuthCookie, getAuthToken, setAuthCookie } from '@/lib/auth';
+import { clearAuthCookie, clearOfflineUser, getAuthToken, getRememberedOfflineUserId, getSessionUser, rememberOfflineUser, setAuthCookie } from '@/lib/auth';
 
 export interface ApiResponse<T> {
 	success: boolean;
@@ -18,9 +18,27 @@ let refreshPromise: Promise<ApiResponse<Refreshed>> | null = null;
 let inMemoryRefreshToken: string | null = null;
 let rememberCurrent = false;
 let sessionExpirationReported = false;
+let accountCacheReset: Promise<void> = Promise.resolve();
+let previousAccountId: string | null = null;
+
+export function waitForAccountCacheReset(): Promise<void> { return accountCacheReset; }
 
 export function storeSessionTokens(accessToken: string, refreshToken: string, rememberMe: boolean): void {
+  const previousUserId = previousAccountId ?? getRememberedOfflineUserId();
   setAuthCookie(accessToken);
+  rememberOfflineUser();
+  const nextUserId = getSessionUser()?.sub;
+  previousAccountId = nextUserId ?? previousUserId;
+  if (previousUserId && nextUserId && previousUserId !== nextUserId) {
+    accountCacheReset = accountCacheReset.catch(() => undefined).then(async () => {
+      const [{ clearOfflineUserData }, { clearCatalogRows }, { exercisesService }, { metricsService }] = await Promise.all([
+        import('@/lib/offline-contingency'), import('@/lib/offline-catalog'), import('@/gateway/services/parametro/exercises'), import('@/gateway/services/parametro/metrics'),
+      ]);
+      await Promise.all([exercisesService.waitForSync(), metricsService.waitForSync()]);
+      await Promise.all([clearOfflineUserData(previousUserId), clearCatalogRows()]);
+      localStorage.removeItem('last_sync_exercises');
+    });
+  }
   rememberCurrent = rememberMe;
   inMemoryRefreshToken = rememberMe ? null : refreshToken;
   if (typeof localStorage !== 'undefined') {
@@ -34,10 +52,12 @@ export function storeSessionTokens(accessToken: string, refreshToken: string, re
 }
 
 export function clearSessionTokens(): void {
+  previousAccountId = getRememberedOfflineUserId() ?? previousAccountId;
   inMemoryRefreshToken = null;
   rememberCurrent = false;
   refreshPromise = null;
   clearAuthCookie();
+  clearOfflineUser();
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem(REMEMBER_ME_KEY);
     localStorage.removeItem('refreshToken');
@@ -52,9 +72,19 @@ export async function forgetBrowserSession(): Promise<void> {
 }
 
 export async function logoutSession(): Promise<void> {
+  const userId = getSessionUser()?.sub;
   const token = inMemoryRefreshToken;
-  await apiRequest('auth/logout', { method: 'POST', body: JSON.stringify(token ? { refreshToken: token } : {}) }, false);
-  clearSessionTokens();
+  try {
+    await apiRequest('auth/logout', { method: 'POST', body: JSON.stringify(token ? { refreshToken: token } : {}) }, false);
+    if (userId) {
+      const { clearOfflineUserData } = await import('@/lib/offline-contingency');
+      const { clearCatalogRows } = await import('@/lib/offline-catalog');
+      await clearOfflineUserData(userId);
+      await clearCatalogRows();
+    }
+  } finally {
+    clearSessionTokens();
+  }
 }
 
 export function tokenHasEnoughLifetime(token: string | null): boolean {
@@ -179,7 +209,7 @@ export async function authenticatedRequest<T>(
 	if (!tokenHasEnoughLifetime(token)) {
 		const refreshResponse = await refreshAccessToken();
 		if (!refreshResponse.success || !refreshResponse.data?.accessToken) {
-			reportSessionExpired();
+			if (refreshResponse.status !== 0) reportSessionExpired();
 			return {
 				success: false,
 				error: refreshResponse.error || 'Sessão expirada. Faça login novamente.',
@@ -212,7 +242,7 @@ export async function authenticatedRequest<T>(
 	// The rejected request never reached its handler, so retrying it once is safe.
 	const refreshResponse = await refreshAccessToken();
 	if (!refreshResponse.success || !refreshResponse.data?.accessToken) {
-		reportSessionExpired();
+		if (refreshResponse.status !== 0) reportSessionExpired();
 		return {
 			success: false,
 			error: refreshResponse.error || 'Sessão expirada. Faça login novamente.',

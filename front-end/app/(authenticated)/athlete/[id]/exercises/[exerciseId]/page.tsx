@@ -18,6 +18,7 @@ import {
 	analysisService,
 	type ExerciseAnalysis,
 } from '@/gateway/services/analysis';
+import { syncAnalysisSource } from '@/lib/offline-contingency';
 import {
 	exerciseReviewsService,
 	type ExerciseReviewSummary,
@@ -73,8 +74,11 @@ export default function ExerciseReviewPage({
 
 	useEffect(() => {
 		let active = true;
-		void analysisService
-			.exercise(athleteId, exerciseId, period)
+		void (async () => {
+			const userId = getSessionUser()?.sub;
+			if (userId && userId !== athleteId && navigator.onLine) await syncAnalysisSource(userId, athleteId);
+			return analysisService.exercise(athleteId, exerciseId, period);
+		})()
 			.then((response) => {
 				if (!active) return;
 				setAnalysis(response.success ? (response.data ?? null) : null);
@@ -83,17 +87,21 @@ export default function ExerciseReviewPage({
 						? null
 						: (response.error ?? 'Não foi possível carregar a análise.'),
 				);
-			});
+			}).catch((cause) => { if (active) setAnalysisError(cause instanceof Error ? cause.message : 'Falha na sincronização.'); });
 		return () => {
 			active = false;
 		};
 	}, [athleteId, exerciseId, period]);
 
 	useEffect(() => {
-		void Promise.all([
+		void (async () => {
+			const userId = getSessionUser()?.sub;
+			if (userId && userId !== athleteId && navigator.onLine) await syncAnalysisSource(userId, athleteId);
+			return Promise.all([
 			exerciseReviewsService.summary(athleteId, exerciseId),
 			exerciseReviewsService.workouts(athleteId, exerciseId),
-		]).then(([review, history]) => {
+			]);
+		})().then(([review, history]) => {
 			if (!review.success || !review.data)
 				setError(review.error || 'Não foi possível carregar a revisão.');
 			else {
@@ -101,7 +109,7 @@ export default function ExerciseReviewPage({
 				setWorkouts(history.data?.items ?? []);
 				setError(null);
 			}
-		});
+		}).catch((cause) => setError(cause instanceof Error ? cause.message : 'Falha na leitura local.'));
 	}, [athleteId, exerciseId]);
 
 	const metrics = summary?.exercise.metrics.map((metric) => metric.name) ?? [];

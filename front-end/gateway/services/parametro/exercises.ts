@@ -1,5 +1,6 @@
 import { authenticatedRequest } from '@/gateway/client';
-import { indexedDbService, type IndexedDbEntity } from '@/lib/indexeddb';
+import type { IndexedDbEntity } from '@/lib/indexeddb';
+import { readCatalogRows, updateCatalogRows, replaceCatalogRows, deleteCatalogRows } from '@/lib/offline-catalog';
 import { create, insertMultiple, search } from '@orama/orama';
 import { stemmer } from '@orama/stemmers/portuguese';
 import { Metric } from './metrics';
@@ -162,19 +163,16 @@ export class ExercisesService implements ExercisesServiceContract {
 
 		const response = await authenticatedRequest<ExerciseSyncResponse>(endpoint);
 		if (!response.success || !response.data) {
-			return {
-				exercises: [],
-				deletedIds: [],
-				syncedAt: since ?? new Date(0).toISOString(),
-			};
+			throw new Error(response.error || 'Falha ao sincronizar exercícios.');
 		}
 
 		return response.data;
 	}
 
-	public async syncCatalog(): Promise<ExerciseParameter[]> {
+	public async syncCatalog(forceFull = false): Promise<ExerciseParameter[]> {
+		if (forceFull && this.syncPromise) await this.syncPromise.catch(() => undefined);
 		if (!this.syncPromise) {
-			this.syncPromise = this.syncCatalogOnce().finally(() => {
+			this.syncPromise = this.syncCatalogOnce(forceFull).finally(() => {
 				this.syncPromise = null;
 			});
 		}
@@ -186,6 +184,10 @@ export class ExercisesService implements ExercisesServiceContract {
 		if (this.syncPromise) await this.syncPromise.catch(() => undefined);
 	}
 
+	public async readCatalog(): Promise<ExerciseParameter[]> {
+		return readCatalogRows<ExerciseParameter>('exercises');
+	}
+
 	public resetSearchIndex(): void {
 		this.stemmedIndex = createStemmedCatalogIndex();
 		this.typoTolerantIndex = createTypoTolerantCatalogIndex();
@@ -193,9 +195,9 @@ export class ExercisesService implements ExercisesServiceContract {
 		this.isIndexReady = false;
 	}
 
-	private async syncCatalogOnce(): Promise<ExerciseParameter[]> {
+	private async syncCatalogOnce(forceFull = false): Promise<ExerciseParameter[]> {
 		const since =
-			typeof localStorage !== 'undefined'
+			!forceFull && typeof localStorage !== 'undefined'
 				? localStorage.getItem(EXERCISES_SYNC_CURSOR_KEY)
 				: null;
 		const { exercises, deletedIds, syncedAt } = await this.buscar(since);
@@ -210,16 +212,18 @@ export class ExercisesService implements ExercisesServiceContract {
 			visualUrl: exercise.visualUrl ?? null,
 		}));
 
-		if (normalized.length > 0) {
-			await indexedDbService.anexar<ExerciseParameter>(
-				EXERCISES_STORE,
+		if (forceFull) {
+			await replaceCatalogRows('exercises', normalized);
+		} else if (normalized.length > 0) {
+			await updateCatalogRows<ExerciseParameter>(
+				'exercises',
 				normalized,
 			);
 		}
 
 		const toDelete = deletedIds.map((id) => id.toString());
 		if (toDelete.length > 0) {
-			await indexedDbService.remover(EXERCISES_STORE, toDelete);
+			await deleteCatalogRows('exercises', toDelete);
 		}
 
 		if (typeof localStorage !== 'undefined' && syncedAt) {
@@ -227,7 +231,7 @@ export class ExercisesService implements ExercisesServiceContract {
 		}
 
 		const exercisesCache =
-			await indexedDbService.search<ExerciseParameter>(EXERCISES_STORE);
+			await readCatalogRows<ExerciseParameter>('exercises');
 		await this.rebuildIndex(exercisesCache);
 		return exercisesCache;
 	}
@@ -241,14 +245,14 @@ export class ExercisesService implements ExercisesServiceContract {
 		if (this.syncPromise) await this.syncPromise;
 		if (!this.isIndexReady) {
 			const catalog =
-				await indexedDbService.search<ExerciseParameter>(EXERCISES_STORE);
+				await readCatalogRows<ExerciseParameter>('exercises');
 			await this.rebuildIndex(catalog);
 		}
 		const term = query.trim();
 
 		if (!term) {
 			return (
-				await indexedDbService.search<ExerciseParameter>(EXERCISES_STORE)
+				await readCatalogRows<ExerciseParameter>('exercises')
 			).map((exercise) => ({ ...exercise, scorePonderado: 0 }));
 		}
 

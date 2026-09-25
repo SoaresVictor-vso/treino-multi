@@ -13,9 +13,19 @@ export function useSession(): SessionUser | null {
     let mounted = true;
     const ensure = async () => {
       if (!tokenHasEnoughLifetime(getAuthToken())) {
+        if (!navigator.onLine) {
+          const offlineUser = getSessionUser();
+          if (mounted && offlineUser) setUser(offlineUser);
+          else if (mounted) router.replace('/login');
+          return;
+        }
         if (!hasStoredRefreshToken()) { if (mounted) router.replace('/login'); return; }
         const response = await refreshAccessToken();
         if (!response.success) {
+		  if (response.status === 0 && getSessionUser()) {
+		    if (mounted) setUser(getSessionUser());
+		    return;
+		  }
           clearSessionTokens();
           if (mounted) router.replace('/login');
           return;

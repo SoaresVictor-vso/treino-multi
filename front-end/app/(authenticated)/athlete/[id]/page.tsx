@@ -17,6 +17,8 @@ import {
 	type WorkoutTemplateSummary,
 } from '@/gateway/services/workout-templates';
 import type { Exercise } from '@/gateway/services/parametro';
+import { getSessionUser } from '@/lib/auth';
+import { syncAnalysisSource } from '@/lib/offline-contingency';
 
 function ActionTooltip({ label, children }: { label: string; children: ReactNode }) {
 	return (
@@ -103,8 +105,13 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 	const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplateResponse | null>(null);
 
 	useEffect(() => {
-		void params.then(({ id }) => {
+		void params.then(async ({ id }) => {
 			setAthleteId(id);
+			const userId = getSessionUser()?.sub;
+			if (userId && userId !== id) {
+				try { await syncAnalysisSource(userId, id); }
+				catch (cause) { setError(cause instanceof Error ? cause.message : 'Falha ao sincronizar treinos.'); }
+			}
 			workoutsService.findByAthlete(id).then((response) => {
 				if (!response.success || !response.data)
 					setError(response.error || 'Não foi possível carregar os treinos do atleta.');
@@ -127,6 +134,8 @@ export default function AthleteDetailPage({ params }: { params: Promise<{ id: st
 
 	const refresh = async () => {
 		if (!athleteId) return;
+		const userId = getSessionUser()?.sub;
+		if (userId && userId !== athleteId) await syncAnalysisSource(userId, athleteId);
 		const response = await workoutsService.findByAthlete(athleteId);
 		if (!response.success || !response.data) setError(response.error || 'Não foi possível atualizar os treinos.');
 		else setWorkouts(response.data.workouts);

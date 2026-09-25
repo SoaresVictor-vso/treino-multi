@@ -118,6 +118,9 @@ export class Execution {
 	})
 	setType!: ExecutionSetType;
 
+	@Column({ name: 'adherence_snapshot', type: 'jsonb', nullable: true })
+	adherenceSnapshot!: { prescribedMetric1: number | null; prescribedMetric2: number | null; prescribedPse: number | null; prescribedRestDuration: number | null } | null;
+
 	@Column({
 		type: 'enum',
 		enum: ExecutionStatus,

@@ -9,6 +9,7 @@ import { UsersModule } from '../users/users.module';
 import { WorkoutsController } from './workouts.controller';
 import { WorkoutsService } from './workouts.service';
 import { MeasurementsModule } from '../measurements/measurements.module';
+import { WorkoutSyncService } from './workout-sync.service';
 
 @Module({
 	imports: [
@@ -23,7 +24,7 @@ import { MeasurementsModule } from '../measurements/measurements.module';
 		MeasurementsModule,
 	],
 	controllers: [WorkoutsController],
-	providers: [WorkoutsService],
+	providers: [WorkoutsService, WorkoutSyncService],
 	exports: [TypeOrmModule, WorkoutsService],
 })
 export class WorkoutsModule {}

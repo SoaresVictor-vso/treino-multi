@@ -13,7 +13,6 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { ExerciseReviewQueryDto } from './exercise-reviews.dto';
-import { ExerciseAnalysisPeriodDto } from '../athlete/analysis/analysis.controller';
 import { ExerciseReviewsService } from './exercise-reviews.service';
 
 @ApiTags('exercise-reviews')
@@ -22,14 +21,6 @@ import { ExerciseReviewsService } from './exercise-reviews.service';
 @Controller('exercise-reviews/athletes/:athleteId/exercises/:exerciseId')
 export class ExerciseReviewsController {
 	constructor(private readonly service: ExerciseReviewsService) {}
-	@Get('analysis') analysis(
-		@Param('athleteId', new ParseUUIDPipe()) athleteId: string,
-		@Param('exerciseId', ParseIntPipe) exerciseId: number,
-		@Query() query: ExerciseAnalysisPeriodDto,
-		@CurrentUser() actor: JwtPayload,
-	) {
-		return this.service.analysis(athleteId, exerciseId, query.period, actor);
-	}
 	@Get('summary') summary(
 		@Param('athleteId', new ParseUUIDPipe()) athleteId: string,
 		@Param('exerciseId', ParseIntPipe) exerciseId: number,

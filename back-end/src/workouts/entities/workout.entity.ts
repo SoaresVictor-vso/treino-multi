@@ -24,7 +24,7 @@ import { WorkoutExerciseNote } from './workout-exercise-note.entity';
 @Index(['tenantId', 'status', 'scheduledDate'])
 @Index('UQ_workouts_athlete_in_progress', ['athleteId'], {
 	unique: true,
-	where: `"status" = 'in_progress'`,
+	where: `"status" = 'in_progress' AND "offline_conflict_copy" = false`,
 })
 export class Workout {
 	@PrimaryGeneratedColumn('uuid')
@@ -70,6 +70,9 @@ export class Workout {
 
 	@Column({ name: 'exclude_from_achievements', type: 'boolean', default: false })
 	excludeFromAchievements!: boolean;
+
+	@Column({ name: 'offline_conflict_copy', type: 'boolean', default: false })
+	offlineConflictCopy!: boolean;
 
 	@Column({ name: 'created_by', type: 'uuid' })
 	createdBy!: string;

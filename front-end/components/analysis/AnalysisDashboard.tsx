@@ -14,6 +14,8 @@ import AnalysisIndicators from './AnalysisIndicators';
 import MeasurementCharts from './MeasurementCharts';
 import LifetimeStats from './LifetimeStats';
 import AthleteExerciseList from './AthleteExerciseList';
+import { syncAnalysisSource } from '@/lib/offline-contingency';
+import { getSessionUser } from '@/lib/auth';
 
 export default function AnalysisDashboard({
 	athleteId,
@@ -28,7 +30,11 @@ export default function AnalysisDashboard({
 	const [loading, setLoading] = useState(true);
 	useEffect(() => {
 		let active = true;
-		void analysisService.athlete(athleteId, days).then((response) => {
+		const reload = () => void (async () => {
+			const userId = getSessionUser()?.sub;
+			if (userId && userId !== athleteId && navigator.onLine) await syncAnalysisSource(userId, athleteId);
+			return analysisService.athlete(athleteId, days);
+		})().then((response) => {
 			if (!active) return;
 			setData(response.success ? (response.data ?? null) : null);
 			setError(
@@ -37,9 +43,12 @@ export default function AnalysisDashboard({
 					: (response.error ?? 'Não foi possível carregar a análise.'),
 			);
 			setLoading(false);
-		});
+		}).catch((cause) => { if (active) { setError(cause instanceof Error ? cause.message : 'Falha na sincronização.'); setLoading(false); } });
+		reload();
+		window.addEventListener('workout-status-changed', reload);
 		return () => {
 			active = false;
+			window.removeEventListener('workout-status-changed', reload);
 		};
 	}, [athleteId, days]);
 	const measurementValue = (key: string) => {

@@ -54,6 +54,7 @@ type WorkoutExecutionRow = {
 	workoutId: string;
 	athleteId: string;
 	createdBy: string;
+	updatedBy: string;
 	templateName: string;
 	templateDescription: string;
 	scheduledDate: string | null;
@@ -77,6 +78,8 @@ type WorkoutExecutionRow = {
 	performedRestDuration: string | number | null;
 	performedNote: string | null;
 	setType: ExecutionSetType;
+	adherenceSnapshot: { prescribedMetric1: number | null; prescribedMetric2: number | null; prescribedPse: number | null; prescribedRestDuration: number | null } | null;
+	startedAt: string | null;
 	finishedAt: string | null;
 	note: string | null;
 	athleteNote: string | null;
@@ -595,6 +598,7 @@ export class WorkoutsService {
 				workout.id AS "workoutId",
 				workout.athlete_id AS "athleteId",
 				workout.created_by AS "createdBy",
+				workout.updated_by AS "updatedBy",
 				workout.template_name AS "templateName",
 				workout.template_description AS "templateDescription",
 				workout.scheduled_date AS "scheduledDate",
@@ -618,6 +622,8 @@ export class WorkoutsService {
 				execution.performed_rest_duration AS "performedRestDuration",
 				execution.performed_note AS "performedNote",
 				execution.set_type AS "setType",
+				execution.adherence_snapshot AS "adherenceSnapshot",
+				execution.started_at AS "startedAt",
 				execution.finished_at AS "finishedAt",
 				workout_exercise_note.note AS "note",
 				workout_exercise_note.athlete_note AS "athleteNote",
@@ -708,7 +714,7 @@ export class WorkoutsService {
 		if (!rows[0].canRead)
 			throw new ForbiddenException('Você não pode visualizar este treino.');
 		const workout = rows[0];
-		let measurements = Array.from(
+		const measurements = Array.from(
 			new Map(
 				rows
 					.filter(
@@ -731,19 +737,11 @@ export class WorkoutsService {
 					]),
 			).values(),
 		);
-		if (workout.workoutStatus === WorkoutStatus.COMPLETED && !measurements.length) {
-			await this.dataSource.transaction(async (manager) => {
-				// Evita que duas revisões abertas simultaneamente gerem o mesmo snapshot.
-				await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [id]);
-				if (!(await this.measurementsService.findForWorkout(id)).length)
-					await this.measurementsService.persistForWorkout(manager, id);
-			});
-			measurements = await this.measurementsService.findForWorkout(id);
-		}
 		return {
 			id: workout.workoutId,
 			athleteId: workout.athleteId,
 			createdBy: workout.createdBy,
+			updatedBy: workout.updatedBy,
 			templateName: workout.templateName,
 			templateDescription: workout.templateDescription,
 			scheduledDate: workout.scheduledDate,
@@ -783,6 +781,8 @@ export class WorkoutsService {
 				performedRestDuration: numberOrNull(execution.performedRestDuration),
 				performedNote: execution.performedNote,
 				setType: execution.setType,
+				adherenceSnapshot: execution.adherenceSnapshot,
+				startedAt: execution.startedAt,
 				finishedAt: execution.finishedAt,
 				status: execution.executionStatus,
 				exercise: {
@@ -916,6 +916,23 @@ export class WorkoutsService {
 		await this.dataSource.transaction(async (manager) => {
 			const current = await manager.find(Execution, { where: { workoutId: id } });
 			const deletedIds = dto.deletedExecutionIds ?? [];
+			if (workout.createdBy !== actor.sub) {
+				const currentById = new Map(current.map((item) => [item.id, item]));
+				const structuralChange = deletedIds.length > 0 ||
+					dto.executions.length !== current.length ||
+					dto.executions.some((input) => {
+						const saved = input.id === undefined ? undefined : currentById.get(input.id);
+						return !saved || input.exerciseId !== saved.exerciseId ||
+							input.position !== saved.position ||
+							(input.prescribedMetric1 !== undefined && input.prescribedMetric1 !== saved.prescribedMetric1) ||
+							(input.prescribedMetric2 !== undefined && input.prescribedMetric2 !== saved.prescribedMetric2) ||
+							(input.prescribedPse !== undefined && input.prescribedPse !== saved.prescribedPse) ||
+							(input.prescribedRestDuration !== undefined && input.prescribedRestDuration !== saved.prescribedRestDuration) ||
+							(input.setType !== undefined && input.setType !== saved.setType);
+						});
+				if (structuralChange)
+					throw new ForbiddenException('Somente o autor do treino pode alterar sua estrutura.');
+			}
 			if (new Set(deletedIds).size !== deletedIds.length)
 				throw new BadRequestException('Uma série só pode ser removida uma vez.');
 			const currentIdSet = new Set(current.map((execution) => execution.id));
@@ -1308,6 +1325,8 @@ export class WorkoutsService {
 
 	async updateWorkoutName(id: string, name: string, actor: JwtPayload) {
 		const workout = await this.findWritableWorkout(id, actor);
+		if (workout.createdBy !== actor.sub)
+			throw new ForbiddenException('Somente o autor do treino pode alterar seu nome.');
 		const normalizedName = name.trim();
 		if (!normalizedName)
 			throw new BadRequestException('Informe o nome do treino.');

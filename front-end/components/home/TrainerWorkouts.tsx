@@ -103,14 +103,17 @@ export default function TrainerWorkouts({
 
 	useEffect(() => {
 		let isMounted = true;
-		void workoutsService.findTrainerWorkouts().then((response) => {
+		const reload = () => void workoutsService.findTrainerWorkouts().then((response) => {
 			if (!isMounted) return;
 			if (!response.success) setError(response.error || 'Não foi possível carregar os treinos.');
 			else setWorkouts(response.data ?? []);
 			setLoading(false);
 		});
+		reload();
+		window.addEventListener('workout-status-changed', reload);
 		return () => {
 			isMounted = false;
+			window.removeEventListener('workout-status-changed', reload);
 		};
 	}, []);
 

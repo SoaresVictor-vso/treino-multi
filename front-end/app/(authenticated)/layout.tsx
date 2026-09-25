@@ -7,10 +7,12 @@ import AthleteAppShell from '@/components/athlete-app/AthleteAppShell';
 import { useSession } from '@/hooks/useSession';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useOfflineWorkoutSync } from '@/hooks/useOfflineWorkoutSync';
 
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const user = useSession();
   const pathname = usePathname();
+  useOfflineWorkoutSync(user?.sub);
   const router = useRouter();
   const allowed = getAllowedRoles(pathname);
   const permitted = !!user && (!allowed || allowed.includes(Role.ALL) || allowed.some(role => role !== Role.ALL && user.roles.includes(role)));

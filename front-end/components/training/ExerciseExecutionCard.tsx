@@ -12,6 +12,7 @@ import ExecutionSet from './ExecutionSet';
 type ExerciseExecutionCardProps = {
 	sets: WorkoutExecution[];
 	editable: boolean;
+	structuralEditable: boolean;
 	onChange: (
 		executionId: number,
 		key: keyof WorkoutExecution,
@@ -31,6 +32,7 @@ type ExerciseExecutionCardProps = {
 export default function ExerciseExecutionCard({
 	sets,
 	editable,
+	structuralEditable,
 	onChange,
 	onSkipSet,
 	onSkipExercise,
@@ -150,7 +152,7 @@ export default function ExerciseExecutionCard({
 				</div>
 			) : null}
 			<div className="space-y-2">
-				{editable && (
+				{structuralEditable && (
 					<button
 						type="button"
 						onClick={onAddWarmup}
@@ -172,7 +174,7 @@ export default function ExerciseExecutionCard({
 					/>
 				))}
 			</div>
-			{editable && (
+			{structuralEditable && (
 				<button
 					type="button"
 					onClick={onAddSeries}

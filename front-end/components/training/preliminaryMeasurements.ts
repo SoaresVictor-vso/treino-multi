@@ -9,22 +9,23 @@ import type { WorkoutDetail, WorkoutExecution, WorkoutMeasurement } from '@/gate
 
 function context(execution: WorkoutExecution): FormulaContext {
   const metric2 = execution.exercise.metric_2 ?? null;
+  const prescription = execution.adherenceSnapshot ?? execution;
   const values: FormulaContext = {
     duration: null,
     rpe: execution.performedPse,
-    prescribedRpe: execution.prescribedPse,
+    prescribedRpe: prescription.prescribedPse,
     completed: execution.status === 'completed',
     performedMetric1: execution.performedMetric1,
     performedMetric2: execution.performedMetric2,
-    prescribedMetric1: execution.prescribedMetric1,
-    prescribedMetric2: execution.prescribedMetric2,
+    prescribedMetric1: prescription.prescribedMetric1,
+    prescribedMetric2: prescription.prescribedMetric2,
     hasMetric2: metric2 !== null,
-    metricsMatch: execution.prescribedMetric1 !== null && execution.prescribedMetric1 > 0 &&
-      execution.performedMetric1 === execution.prescribedMetric1 &&
-      (metric2 === null || (execution.prescribedMetric2 !== null && execution.prescribedMetric2 > 0 &&
-        execution.performedMetric2 === execution.prescribedMetric2)),
+    metricsMatch: prescription.prescribedMetric1 !== null && prescription.prescribedMetric1 > 0 &&
+      execution.performedMetric1 === prescription.prescribedMetric1 &&
+      (metric2 === null || (prescription.prescribedMetric2 !== null && prescription.prescribedMetric2 > 0 &&
+        execution.performedMetric2 === prescription.prescribedMetric2)),
     performedRestDuration: execution.performedRestDuration,
-    prescribedRestDuration: execution.prescribedRestDuration,
+    prescribedRestDuration: prescription.prescribedRestDuration,
   };
   values[execution.exercise.metric_1.name] = execution.performedMetric1;
   if (metric2) values[metric2.name] = execution.performedMetric2;
@@ -32,8 +33,7 @@ function context(execution: WorkoutExecution): FormulaContext {
 }
 
 export function preliminaryMeasurements(workout: WorkoutDetail, now = Date.now()): WorkoutMeasurement[] {
-  if (workout.status === 'completed') return workout.measurements;
-  const executions = workout.executions.filter((item) => !item.pendingRemoval);
+  const executions = workout.executions.filter((item) => !item.pendingRemoval && item.setType !== 'contingencia_offline');
   return MEASUREMENT_DEFINITIONS.flatMap((definition): WorkoutMeasurement[] => {
     if (definition.key === 'workout-adherence' && workout.createdBy === workout.athleteId) return [];
     const compatible = executions.filter((execution) => {

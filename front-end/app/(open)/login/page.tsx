@@ -26,9 +26,15 @@ import { apiRequest } from '@/gateway/client';
 
 import Link from 'next/link';
 import GoogleCredentialButton from '@/components/auth/GoogleCredentialButton';
+import { warmTrainerCache } from '@/lib/offline-contingency';
 import PasswordInput from '@/components/auth/PasswordInput';
 
 const REMEMBER_ME_KEY = 'rememberMe';
+async function cacheTrainerParameters() {
+	const roles = getSessionUser()?.roles ?? [];
+	if (roles.some((role) => ['tenant:trainer', 'tenant:trainer-master', 'tenant:admin'].includes(role)))
+		await warmTrainerCache();
+}
 
 export default function Login() {
 	const router = useRouter();
@@ -55,6 +61,7 @@ export default function Login() {
 
 			const response = await refreshAccessToken();
 			if (isActive && response.success && response.data?.accessToken) {
+				await cacheTrainerParameters().catch(() => undefined);
 				router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
 			} else if (isActive) {
 				// Um refresh que falhou não deve ser tentado indefinidamente nem
@@ -108,6 +115,7 @@ export default function Login() {
 			const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
 				res.data!;
 			storeSessionTokens(newAccessToken, newRefreshToken, rememberMe);
+			await cacheTrainerParameters().catch(() => undefined);
 
 			setLoading(false);
 			router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
@@ -129,6 +137,7 @@ export default function Login() {
 		setLoading(false);
 		if (!result.success || !result.data) { setError(result.error || 'Login Google indisponível.'); return; }
 		storeSessionTokens(result.data.accessToken, result.data.refreshToken, rememberMe);
+		await cacheTrainerParameters().catch(() => undefined);
 		router.replace(getLandingPathForRoles(getSessionUser()?.roles ?? []));
 	}
 

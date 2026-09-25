@@ -71,7 +71,7 @@ export default function ExerciseGroupsPage() {
 		const [groupsResult, metricList, exerciseList] = await Promise.all([
 			exerciseGroupsService.findAll(),
 			metricsService.search(),
-			exercisesService.syncCatalog(),
+			exercisesService.readCatalog(),
 		]);
 		if (!groupsResult.success || !groupsResult.data)
 			setError(groupsResult.error || 'Não foi possível carregar os grupos.');
